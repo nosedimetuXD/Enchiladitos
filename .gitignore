@@ -1,0 +1,41 @@
+# Binarios compilados de Go
+/cmd/server/server
+/cmd/hashpw/hashpw
+/node_modules
+/Cafeteria-web
+
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Archivos de test
+*.test
+*.out
+
+# Variables de entorno y secretos — MUY IMPORTANTE
+.env
+.env.local
+*.env
+seed.sql
+
+# Directorio de dependencias vendor (si lo llegas a usar)
+vendor/
+
+# Frontend (cuando lo agregues)
+node_modules/
+dist/
+.vite/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
