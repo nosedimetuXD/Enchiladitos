@@ -32,7 +32,7 @@ export default function Layout() {
         >
           ☰
         </button>
-        <span className="mobile-title">☕ Cafetería POS</span>
+        <span className="mobile-title">☕ Coffe POS</span>
       </header>
 
       {/* Overlay para cerrar sidebar en móvil */}
@@ -45,8 +45,8 @@ export default function Layout() {
         <div className="sidebar-brand">
           <div className="brand-logo">☕</div>
           <div>
-            <h1 className="brand-title">Café Master</h1>
-            <span className="brand-subtitle">Gestión & POS</span>
+            <h1 className="brand-title">Coffe</h1>
+            <span className="brand-subtitle">Hecho por y para estudiantes</span>
           </div>
         </div>
 
