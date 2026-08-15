@@ -1,8 +1,8 @@
-# ☕ Coffe
+# ☕ Toffe
 
 > *"Hecho por y para estudiantes"*
 
-**Coffe** es un sistema web completo de punto de venta (POS), gestión operativa, comandas en tiempo real y contabilidad diseñado específicamente para la administración eficiente de cafeterías.
+**Toffe** es un sistema web completo de punto de venta (POS), gestión operativa, comandas en tiempo real y contabilidad diseñado específicamente para la administración eficiente de cafeterías.
 
 ---
 

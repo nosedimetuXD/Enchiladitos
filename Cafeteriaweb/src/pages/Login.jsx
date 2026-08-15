@@ -66,7 +66,7 @@ export default function Login() {
             ☕
           </div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#1c1917', margin: 0 }}>
-            Coffe
+            Toffe
           </h1>
           <p style={{ fontSize: '0.88rem', color: '#78716c', marginTop: '0.25rem', fontWeight: 600 }}>
             "Hecho por y para estudiantes"
