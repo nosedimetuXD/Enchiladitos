@@ -5,16 +5,17 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/cors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 
 	"github.com/NosedimetuXD/cafeteria/internal/db"
-	"github.com/NosedimetuXD/cafeteria/internal/handlers"
-	"github.com/NosedimetuXD/cafeteria/internal/models"
-
 	"github.com/NosedimetuXD/cafeteria/internal/events"
+	"github.com/NosedimetuXD/cafeteria/internal/handlers"
 	custommw "github.com/NosedimetuXD/cafeteria/internal/middleware"
+	"github.com/NosedimetuXD/cafeteria/internal/models"
 )
 
 func main() {
@@ -36,6 +37,14 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
@@ -49,9 +58,12 @@ func main() {
 	taskHandler := handlers.NewTaskHandler(pool, hub)
 	recipeHandler := handlers.NewRecipeHandler(pool)
 	eventHandler := handlers.NewEventHandler(hub)
+	userHandler := handlers.NewUserHandler(pool)
+	comandaHandler := handlers.NewComandaHandler(pool, hub)
+	accountingHandler := handlers.NewAccountingHandler(pool, hub)
 
 	r.Group(func(r chi.Router) {
-		r.Use(custommw.RequireAuthSSE) // en vez de RequireAuth
+		r.Use(custommw.RequireAuthSSE)
 		r.Get("/events", eventHandler.Stream)
 	})
 
@@ -63,29 +75,35 @@ func main() {
 		r.Get("/ingredients", ingredientHandler.List)
 		r.Get("/ingredients/{id}", ingredientHandler.Get)
 		r.Get("/products/{id}/recipe", recipeHandler.Get)
+		r.Get("/users", userHandler.List)
 	})
 
-	// Crear/editar/borrar productos: solo el dueño
+	// Crear/editar/borrar productos y recetas: solo owner y admin
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
-		r.Use(custommw.RequireRole(models.RoleOwner))
+		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin))
 		r.Post("/products", productHandler.Create)
 		r.Put("/products/{id}", productHandler.Update)
 		r.Delete("/products/{id}", productHandler.Delete)
-
-		userHandler := handlers.NewUserHandler(pool)
-		r.Post("/users", userHandler.Create)
-
 		r.Put("/products/{id}/recipe", recipeHandler.Set)
+
+		r.Post("/users", userHandler.Create)
 	})
 
-	// Modificar inventario: dueño, admin y empleado
+	// Modificar inventario directamente: solo dueño y admin (empleados ya NO pueden editar inventario libremente)
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
-		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin, models.RoleEmployee))
+		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin))
 		r.Post("/ingredients", ingredientHandler.Create)
 		r.Put("/ingredients/{id}", ingredientHandler.Update)
 		r.Delete("/ingredients/{id}", ingredientHandler.Delete)
+	})
+
+	// Comandas: cualquier usuario logueado puede verlas y actualizar su estado
+	r.Group(func(r chi.Router) {
+		r.Use(custommw.RequireAuth)
+		r.Get("/comandas", comandaHandler.List)
+		r.Patch("/comandas/{id}/status", comandaHandler.UpdateStatus)
 	})
 
 	// Ver tareas y cambiar su propio estado: cualquier usuario logueado
@@ -104,6 +122,7 @@ func main() {
 		r.Delete("/tasks/{id}", taskHandler.Delete)
 	})
 
+	// Ventas: cualquier rol puede vender
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
 		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin, models.RoleEmployee))
@@ -112,7 +131,15 @@ func main() {
 		r.Post("/sales", saleHandler.Create)
 	})
 
+	// Contabilidad y Gastos: solo Owner y Admin
+	r.Group(func(r chi.Router) {
+		r.Use(custommw.RequireAuth)
+		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin))
+		r.Get("/accounting/summary", accountingHandler.GetSummary)
+		r.Get("/expenses", accountingHandler.ListExpenses)
+		r.Post("/expenses", accountingHandler.CreateExpense)
+	})
+
 	log.Println("servidor corriendo en :8080")
 	http.ListenAndServe(":8080", r)
-
 }

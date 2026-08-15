@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS expenses;
+DROP TABLE IF EXISTS comanda_items;
+DROP TABLE IF EXISTS comandas;
+
+ALTER TABLE sales DROP COLUMN IF EXISTS transfer_amount;
+ALTER TABLE sales DROP COLUMN IF EXISTS cash_amount;
+ALTER TABLE sales DROP COLUMN IF EXISTS payment_method;
+ALTER TABLE sales DROP COLUMN IF EXISTS customer_name;

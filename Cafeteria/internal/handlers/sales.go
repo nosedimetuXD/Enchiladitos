@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -29,7 +30,12 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 // GET /sales
 func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, sold_by, total, created_at FROM sales ORDER BY created_at DESC`)
+		`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
+		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
+		        s.total, s.created_at 
+		 FROM sales s
+		 LEFT JOIN users u ON s.sold_by = u.id
+		 ORDER BY s.created_at DESC`)
 	if err != nil {
 		log.Printf("error consultando ventas: %v", err)
 		http.Error(w, "error consultando ventas", http.StatusInternalServerError)
@@ -40,7 +46,8 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	var sales []models.Sale
 	for rows.Next() {
 		var s models.Sale
-		if err := rows.Scan(&s.ID, &s.SoldBy, &s.Total, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
+			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt); err != nil {
 			log.Printf("error leyendo ventas: %v", err)
 			http.Error(w, "error leyendo ventas", http.StatusInternalServerError)
 			return
@@ -52,7 +59,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sales)
 }
 
-// GET /sales/{id} — incluye los items de esa venta
+// GET /sales/{id} — incluye los items de esa venta con el nombre del producto
 func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -62,8 +69,15 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var s models.Sale
 	err = h.DB.QueryRow(r.Context(),
-		`SELECT id, sold_by, total, created_at FROM sales WHERE id = $1`, id,
-	).Scan(&s.ID, &s.SoldBy, &s.Total, &s.CreatedAt)
+		`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
+		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
+		        s.total, s.created_at 
+		 FROM sales s
+		 LEFT JOIN users u ON s.sold_by = u.id
+		 WHERE s.id = $1`, id,
+	).Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
+		&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt)
+
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "venta no encontrada", http.StatusNotFound)
 		return
@@ -75,7 +89,10 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT product_id, quantity, unit_price FROM sale_items WHERE sale_id = $1`, id)
+		`SELECT si.product_id, COALESCE(p.name, ''), si.quantity, si.unit_price 
+		 FROM sale_items si
+		 LEFT JOIN products p ON si.product_id = p.id
+		 WHERE si.sale_id = $1`, id)
 	if err != nil {
 		log.Printf("error consultando items: %v", err)
 		http.Error(w, "error consultando items", http.StatusInternalServerError)
@@ -85,7 +102,7 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var item models.SaleItem
-		if err := rows.Scan(&item.ProductID, &item.Quantity, &item.UnitPrice); err != nil {
+		if err := rows.Scan(&item.ProductID, &item.ProductName, &item.Quantity, &item.UnitPrice); err != nil {
 			log.Printf("error leyendo items: %v", err)
 			http.Error(w, "error leyendo items", http.StatusInternalServerError)
 			return
@@ -97,11 +114,16 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s)
 }
 
-// POST /sales — la pieza importante: crea la venta y descuenta insumos, todo en una transacción
+// POST /sales — crea venta, descuenta insumos y genera comanda en tiempo real
 type createSaleRequest struct {
-	Items []struct {
+	CustomerName  string  `json:"customer_name"`
+	PaymentMethod string  `json:"payment_method"`
+	CashAmount    float64 `json:"cash_amount"`
+	TransferAmount float64 `json:"transfer_amount"`
+	Items         []struct {
 		ProductID uuid.UUID `json:"product_id"`
 		Quantity  int       `json:"quantity"`
+		Notes     string    `json:"notes"`
 	} `json:"items"`
 }
 
@@ -122,8 +144,30 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	customerName := strings.TrimSpace(req.CustomerName)
+	if customerName == "" {
+		customerName = "Cliente General"
+	}
+
+	paymentMethod := strings.ToLower(strings.TrimSpace(req.PaymentMethod))
+	if paymentMethod == "" {
+		paymentMethod = "efectivo"
+	}
+	if paymentMethod != "efectivo" && paymentMethod != "transferencia" && paymentMethod != "mixto" {
+		http.Error(w, "método de pago inválido", http.StatusBadRequest)
+		return
+	}
+
 	ctx := r.Context()
-	soldBy := ctx.Value(custommw.ContextUserID)
+	soldByVal := ctx.Value(custommw.ContextUserID)
+	var soldBy uuid.UUID
+	if soldByVal != nil {
+		if id, ok := soldByVal.(uuid.UUID); ok {
+			soldBy = id
+		} else if idStr, ok := soldByVal.(string); ok {
+			soldBy, _ = uuid.Parse(idStr)
+		}
+	}
 
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
@@ -131,23 +175,26 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback(ctx) // si no se hace Commit, esto revierte todo automáticamente
+	defer tx.Rollback(ctx)
 
 	var total float64
 	type resolvedItem struct {
-		ProductID uuid.UUID
-		Quantity  int
-		UnitPrice float64
+		ProductID   uuid.UUID
+		ProductName string
+		Quantity    int
+		UnitPrice   float64
+		Notes       string
 	}
 	var resolved []resolvedItem
 
-	// 1. Verificar que cada producto existe y está activo, calcular el total
+	// 1. Verificar que cada producto existe, está activo y calcular el total
 	for _, item := range req.Items {
+		var name string
 		var price float64
 		var active bool
 		err := tx.QueryRow(ctx,
-			`SELECT price, active FROM products WHERE id = $1`, item.ProductID,
-		).Scan(&price, &active)
+			`SELECT name, price, active FROM products WHERE id = $1`, item.ProductID,
+		).Scan(&name, &price, &active)
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, fmt.Sprintf("producto %s no existe", item.ProductID), http.StatusBadRequest)
 			return
@@ -158,15 +205,37 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !active {
-			http.Error(w, fmt.Sprintf("producto %s no está disponible", item.ProductID), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("producto %s no está disponible", name), http.StatusBadRequest)
 			return
 		}
 
 		total += price * float64(item.Quantity)
-		resolved = append(resolved, resolvedItem{item.ProductID, item.Quantity, price})
+		resolved = append(resolved, resolvedItem{
+			ProductID:   item.ProductID,
+			ProductName: name,
+			Quantity:    item.Quantity,
+			UnitPrice:   price,
+			Notes:       item.Notes,
+		})
 	}
 
-	// 2. Verificar y descontar insumos según la receta de cada producto
+	// Determinar montos abonados según forma de pago
+	cashAmount := req.CashAmount
+	transferAmount := req.TransferAmount
+	if paymentMethod == "efectivo" {
+		cashAmount = total
+		transferAmount = 0
+	} else if paymentMethod == "transferencia" {
+		cashAmount = 0
+		transferAmount = total
+	} else if paymentMethod == "mixto" {
+		if cashAmount+transferAmount < total {
+			http.Error(w, "el pago total en mixto es inferior al monto de la venta", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// 2. Descontar insumos del inventario según receta
 	for _, item := range resolved {
 		rows, err := tx.Query(ctx,
 			`SELECT ingredient_id, quantity_used FROM product_ingredients WHERE product_id = $1`,
@@ -196,7 +265,6 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 		for _, rl := range recipe {
 			needed := rl.QtyUsed * float64(item.Quantity)
-
 			tag, err := tx.Exec(ctx,
 				`UPDATE ingredients SET quantity = quantity - $1
 				 WHERE id = $2 AND quantity >= $1`,
@@ -207,18 +275,18 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if tag.RowsAffected() == 0 {
-				// o no existe el insumo, o no había suficiente stock
 				http.Error(w, "no hay suficiente inventario para completar la venta", http.StatusConflict)
 				return
 			}
 		}
 	}
 
-	// 3. Crear la venta
+	// 3. Insertar la venta
 	var saleID uuid.UUID
 	err = tx.QueryRow(ctx,
-		`INSERT INTO sales (sold_by, total) VALUES ($1, $2) RETURNING id`,
-		soldBy, total,
+		`INSERT INTO sales (sold_by, total, customer_name, payment_method, cash_amount, transfer_amount) 
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		soldBy, total, customerName, paymentMethod, cashAmount, transferAmount,
 	).Scan(&saleID)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)
@@ -226,7 +294,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Crear los items de la venta
+	// 4. Insertar los items de la venta
 	for _, item := range resolved {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO sale_items (sale_id, product_id, quantity, unit_price)
@@ -239,22 +307,73 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 5. Confirmar todo junto
+	// 5. Crear la Comanda (Kitchen ticket) automáticamente
+	var comandaID uuid.UUID
+	var orderNumber int
+	err = tx.QueryRow(ctx,
+		`INSERT INTO comandas (sale_id, customer_name, status, notes) 
+		 VALUES ($1, $2, 'pendiente', '') RETURNING id, order_number`,
+		saleID, customerName,
+	).Scan(&comandaID, &orderNumber)
+	if err != nil {
+		log.Printf("error generando comanda: %v", err)
+		http.Error(w, "error interno generando comanda", http.StatusInternalServerError)
+		return
+	}
+
+	var comandaItems []models.ComandaItem
+	for _, item := range resolved {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO comanda_items (comanda_id, product_id, product_name, quantity, notes)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			comandaID, item.ProductID, item.ProductName, item.Quantity, item.Notes)
+		if err != nil {
+			log.Printf("error registrando item de comanda: %v", err)
+			http.Error(w, "error interno registrando comanda", http.StatusInternalServerError)
+			return
+		}
+		comandaItems = append(comandaItems, models.ComandaItem{
+			ProductID:   item.ProductID,
+			ProductName: item.ProductName,
+			Quantity:    item.Quantity,
+			Notes:       item.Notes,
+		})
+	}
+
+	// 6. Confirmar la transacción
 	if err := tx.Commit(ctx); err != nil {
-		log.Printf("error confirmando venta: %v", err)
+		log.Printf("error confirmando venta y comanda: %v", err)
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
 
+	// Notificar vía eventos SSE
 	h.Hub.Publish("sale_created", map[string]interface{}{
-		"id":    saleID,
-		"total": total,
+		"id":              saleID,
+		"customer_name":   customerName,
+		"payment_method":  paymentMethod,
+		"total":           total,
 	})
+
+	h.Hub.Publish("comanda_created", map[string]interface{}{
+		"id":            comandaID,
+		"order_number":  orderNumber,
+		"sale_id":       saleID,
+		"customer_name": customerName,
+		"status":        "pendiente",
+		"items":         comandaItems,
+	})
+
+	// Publicar actualización de inventario también
+	h.Hub.Publish("inventory_updated", map[string]interface{}{"action": "sale_deduction"})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":    saleID,
-		"total": total,
+		"id":            saleID,
+		"comanda_id":    comandaID,
+		"order_number":  orderNumber,
+		"customer_name": customerName,
+		"total":         total,
 	})
 }

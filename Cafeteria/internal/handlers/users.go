@@ -84,3 +84,30 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(user)
 }
+
+// GET /users
+func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.Query(r.Context(),
+		`SELECT id, username, role, created_by, created_at
+		 FROM users ORDER BY username`)
+	if err != nil {
+		log.Printf("error consultando usuarios: %v", err)
+		http.Error(w, "error consultando usuarios", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedBy, &u.CreatedAt); err != nil {
+			log.Printf("error leyendo usuarios: %v", err)
+			http.Error(w, "error leyendo usuarios", http.StatusInternalServerError)
+			return
+		}
+		users = append(users, u)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
+}
