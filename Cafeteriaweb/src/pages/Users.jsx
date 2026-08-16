@@ -90,9 +90,9 @@ export default function Users() {
   }
 
   const roleBadges = {
-    owner: { label: '👑 Dueño', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-    admin: { label: '🛡️ Administrador', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-    employee: { label: '☕ Empleado', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' }
+    owner: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+    admin: { label: 'ADMINISTRADOR', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+    employee: { label: 'EMPLEADO', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' }
   }
 
   const isPrimaryOwner = Boolean(
@@ -242,9 +242,9 @@ export default function Users() {
               disabled={isPrimaryOwner}
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             >
-              <option value="employee">☕ Empleado (Ventas, Comandas, Inventario lectura)</option>
-              <option value="admin">🛡️ Administrador (Acceso completo salvo gestión usuarios)</option>
-              <option value="owner">👑 Dueño (Control total del sistema)</option>
+              <option value="employee">Empleado (Ventas, Comandas, Inventario lectura)</option>
+              <option value="admin">Administrador (Acceso completo salvo gestión usuarios)</option>
+              <option value="owner">Dueño (Control total del sistema)</option>
             </select>
             {isPrimaryOwner && (
               <p className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold flex items-center gap-1.5">

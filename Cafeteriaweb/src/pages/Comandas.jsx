@@ -6,8 +6,7 @@ import {
   CheckCircle2,
   Bell,
   Play,
-  Check,
-  Coffee
+  Check
 } from 'lucide-react'
 
 export default function Comandas() {
@@ -96,12 +95,12 @@ export default function Comandas() {
     return (
       <div
         key={c.id}
-        className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-[#9F6839] transition-all"
+        className="bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-[#9F6839] transition-all"
       >
         <div>
           <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
             <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-              Comanda #{c.id.slice(0, 4)}
+              Comanda #{c.order_number || c.id.slice(0, 4)}
             </span>
 
             <span className="flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#FEE4D7] text-[#9F6839] border border-[#D4B28E]">
@@ -115,22 +114,28 @@ export default function Comandas() {
           </div>
 
           <div className="mt-3 space-y-1.5">
-            {(c.items || []).map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/70 p-2.5 rounded-2xl text-xs flex items-center justify-between font-bold text-[#432414] dark:text-[#FEE4D7]"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-lg bg-[#9F6839] text-white font-bold flex items-center justify-center text-[10px]">
-                    {item.quantity}
+            {(c.items || []).map((item, idx) => {
+              const unitPrice = typeof item.unit_price !== 'undefined' ? item.unit_price : (item.price || 0)
+
+              return (
+                <div
+                  key={idx}
+                  className="bg-white dark:bg-[#201009] border border-[#D4B28E]/70 p-2.5 rounded-2xl text-xs flex items-center justify-between font-bold text-[#432414] dark:text-[#FEE4D7]"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-lg bg-[#9F6839] text-white font-bold flex items-center justify-center text-[10px]">
+                      {item.quantity}
+                    </span>
+                    {item.product_name}
                   </span>
-                  {item.product_name}
-                </span>
-                <span className="text-[11px] text-[#9F6839] dark:text-[#DABA8C]">
-                  ${(item.unit_price * item.quantity).toLocaleString()}
-                </span>
-              </div>
-            ))}
+                  {unitPrice > 0 && (
+                    <span className="text-[11px] font-extrabold text-[#9F6839] dark:text-[#DABA8C]">
+                      ${(unitPrice * item.quantity).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -207,10 +212,10 @@ export default function Comandas() {
         </div>
       )}
 
-      {/* Grid de Columnas KDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Grid de Columnas KDS alineadas arriba */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
         {/* Columna 1: Pendientes */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
             <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
               🟡 Pendientes ({pending.length})
@@ -218,7 +223,7 @@ export default function Comandas() {
           </div>
           <div className="space-y-3">
             {pending.length === 0 ? (
-              <p className="text-xs text-[#9F6839] text-center py-8">Sin comandas pendientes</p>
+              <p className="text-xs text-[#9F6839] text-center py-8 font-semibold">Sin comandas pendientes</p>
             ) : (
               pending.map((c) => renderCard(c, 'pending'))
             )}
@@ -226,7 +231,7 @@ export default function Comandas() {
         </div>
 
         {/* Columna 2: En Preparación */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
             <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
               🟠 En Preparación ({inPrep.length})
@@ -234,7 +239,7 @@ export default function Comandas() {
           </div>
           <div className="space-y-3">
             {inPrep.length === 0 ? (
-              <p className="text-xs text-[#9F6839] text-center py-8">Sin órdenes en preparación</p>
+              <p className="text-xs text-[#9F6839] text-center py-8 font-semibold">Sin órdenes en preparación</p>
             ) : (
               inPrep.map((c) => renderCard(c, 'in_prep'))
             )}
@@ -242,7 +247,7 @@ export default function Comandas() {
         </div>
 
         {/* Columna 3: Listas en Barra */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
             <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
               🟢 Listas en Barra ({ready.length})
@@ -250,7 +255,7 @@ export default function Comandas() {
           </div>
           <div className="space-y-3">
             {ready.length === 0 ? (
-              <p className="text-xs text-[#9F6839] text-center py-8">Sin órdenes listas por entregar</p>
+              <p className="text-xs text-[#9F6839] text-center py-8 font-semibold">Sin órdenes listas por entregar</p>
             ) : (
               ready.map((c) => renderCard(c, 'ready'))
             )}
@@ -258,7 +263,7 @@ export default function Comandas() {
         </div>
 
         {/* Columna 4: Entregadas */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
             <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
               ✅ Entregadas ({delivered.length})
@@ -266,7 +271,7 @@ export default function Comandas() {
           </div>
           <div className="space-y-3">
             {delivered.length === 0 ? (
-              <p className="text-xs text-[#9F6839] text-center py-8">Sin historial reciente</p>
+              <p className="text-xs text-[#9F6839] text-center py-8 font-semibold">Sin historial reciente</p>
             ) : (
               delivered.map((c) => renderCard(c, 'delivered'))
             )}

@@ -28,9 +28,9 @@ export default function Accounting() {
     try {
       const [sumData, expData, ingData, salesData] = await Promise.all([
         api.get(`/accounting/summary?period=${period}`),
-        api.get('/expenses'),
+        api.get(`/expenses?period=${period}`),
         api.get('/ingredients'),
-        api.get('/sales')
+        api.get(`/sales?period=${period}`)
       ])
       setSummary(sumData)
       setExpenses(expData || [])

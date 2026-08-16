@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -164,15 +165,31 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(summary)
 }
 
-// GET /expenses
+// GET /expenses?period=today|week|month|all
 func (h *AccountingHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(r.Context(),
-		`SELECT e.id, e.description, e.amount, e.category, e.payment_method, e.registered_by, 
+	period := r.URL.Query().Get("period")
+	var timeCondition string
+
+	switch period {
+	case "today":
+		timeCondition = "WHERE e.created_at >= date_trunc('day', now())"
+	case "week":
+		timeCondition = "WHERE e.created_at >= date_trunc('week', now())"
+	case "month":
+		timeCondition = "WHERE e.created_at >= date_trunc('month', now())"
+	default:
+		timeCondition = ""
+	}
+
+	query := fmt.Sprintf(`SELECT e.id, e.description, e.amount, e.category, e.payment_method, e.registered_by, 
 		        COALESCE(u.username, ''), e.ingredient_id, COALESCE(i.name, ''), e.quantity_added, e.created_at 
 		 FROM expenses e
 		 LEFT JOIN users u ON e.registered_by = u.id
 		 LEFT JOIN ingredients i ON e.ingredient_id = i.id
-		 ORDER BY e.created_at DESC`)
+		 %s
+		 ORDER BY e.created_at DESC`, timeCondition)
+
+	rows, err := h.DB.Query(r.Context(), query)
 	if err != nil {
 		log.Printf("error consultando gastos: %v", err)
 		http.Error(w, "error consultando gastos", http.StatusInternalServerError)

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { Coffee, Plus, Edit2, Trash2, Search, BookOpen } from 'lucide-react'
+import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon } from 'lucide-react'
+
+const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
 
 export default function Products() {
   const [products, setProducts] = useState([])
@@ -12,6 +14,15 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
+  // Almacenamiento local de URLs de imagen por ID de producto
+  const [productImages, setProductImages] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('toffe_product_images') || '{}')
+    } catch (e) {
+      return {}
+    }
+  })
+
   // Modal Crear / Editar Producto
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -19,6 +30,7 @@ export default function Products() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState('Café')
+  const [imageUrl, setImageUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
@@ -47,6 +59,7 @@ export default function Products() {
     setDescription('')
     setPrice('')
     setCategory('Café')
+    setImageUrl('')
     setIsActive(true)
     setFormError('')
     setIsModalOpen(true)
@@ -58,7 +71,9 @@ export default function Products() {
     setDescription(prod.description || '')
     setPrice(String(prod.price))
     setCategory(prod.category || 'Café')
-    setIsActive(prod.is_active)
+    setImageUrl(productImages[prod.id] || prod.image_url || '')
+    const currentActive = typeof prod.active !== 'undefined' ? prod.active : (prod.is_active ?? true)
+    setIsActive(currentActive)
     setFormError('')
     setIsModalOpen(true)
   }
@@ -69,22 +84,36 @@ export default function Products() {
     setFormError('')
 
     try {
+      let savedProd
       if (editingProduct) {
-        await api.put(`/products/${editingProduct.id}`, {
+        savedProd = await api.put(`/products/${editingProduct.id}`, {
           name,
           description,
           price: Number(price),
           category,
+          active: isActive,
           is_active: isActive
         })
+        const prodId = editingProduct.id
+        if (imageUrl.trim()) {
+          const nextImages = { ...productImages, [prodId]: imageUrl.trim() }
+          setProductImages(nextImages)
+          localStorage.setItem('toffe_product_images', JSON.stringify(nextImages))
+        }
       } else {
-        await api.post('/products', {
+        savedProd = await api.post('/products', {
           name,
           description,
           price: Number(price),
           category,
+          active: isActive,
           is_active: isActive
         })
+        if (savedProd && savedProd.id && imageUrl.trim()) {
+          const nextImages = { ...productImages, [savedProd.id]: imageUrl.trim() }
+          setProductImages(nextImages)
+          localStorage.setItem('toffe_product_images', JSON.stringify(nextImages))
+        }
       }
 
       setIsModalOpen(false)
@@ -93,6 +122,24 @@ export default function Products() {
       setFormError(err.message || 'No se pudo guardar el producto')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function toggleProductActive(prod, e) {
+    e.stopPropagation()
+    const currentActive = typeof prod.active !== 'undefined' ? prod.active : (prod.is_active ?? true)
+    try {
+      await api.put(`/products/${prod.id}`, {
+        name: prod.name,
+        description: prod.description || '',
+        price: prod.price,
+        category: prod.category || 'Café',
+        active: !currentActive,
+        is_active: !currentActive
+      })
+      await loadProducts()
+    } catch (err) {
+      alert('Error al cambiar el estado del producto')
     }
   }
 
@@ -123,7 +170,7 @@ export default function Products() {
             Catálogo de Productos & Menú
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Configuración de precios, recetas e insumos consumidos por venta
+            Configuración de precios, recetas, fotos e insumos consumidos por venta
           </p>
         </div>
 
@@ -173,71 +220,93 @@ export default function Products() {
 
       {/* Grid de Productos */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((prod) => (
-          <div
-            key={prod.id}
-            className={`bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs transition-all ${
-              !prod.is_active ? 'opacity-60' : ''
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-[10px] border border-[#D4B28E]">
-                  {prod.category || 'General'}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                    prod.is_active
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                      : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
-                  }`}
-                >
-                  {prod.is_active ? '✓ Activo' : '✕ Inactivo'}
-                </span>
-              </div>
+        {filtered.map((prod) => {
+          const activeState = typeof prod.active !== 'undefined' ? prod.active : (prod.is_active ?? true)
+          const img = productImages[prod.id] || prod.image_url || DEFAULT_PRODUCT_IMAGE
 
-              <h3 className="font-bold text-base text-[#432414] dark:text-[#FEE4D7]">{prod.name}</h3>
-              {prod.description && (
-                <p className="text-xs text-[#9F6839] dark:text-[#DABA8C] line-clamp-2 mt-1">
-                  {prod.description}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-[#D4B28E]/40 flex items-center justify-between">
+          return (
+            <div
+              key={prod.id}
+              className={`bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs transition-all ${
+                !activeState ? 'opacity-65' : ''
+              }`}
+            >
               <div>
-                <span className="text-[10px] text-[#9F6839] font-semibold block">Precio Venta</span>
-                <span className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                  ${prod.price.toLocaleString()}
-                </span>
+                <div className="relative h-36 w-full bg-[#FEE4D7]/50 dark:bg-[#2A150C] overflow-hidden">
+                  <img
+                    src={img}
+                    alt={prod.name}
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                    onError={(e) => {
+                      e.target.src = DEFAULT_PRODUCT_IMAGE
+                    }}
+                  />
+                  <div className="absolute top-2.5 left-2.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#432414]/90 text-[#FEE4D7] font-extrabold text-[10px] backdrop-blur-xs shadow-xs">
+                      {prod.category || 'General'}
+                    </span>
+                  </div>
+                  <div className="absolute top-2.5 right-2.5">
+                    <button
+                      type="button"
+                      onClick={(e) => toggleProductActive(prod, e)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold cursor-pointer transition-transform hover:scale-105 shadow-xs ${
+                        activeState
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-red-600 text-white'
+                      }`}
+                      title="Haz clic para activar o desactivar este producto"
+                    >
+                      {activeState ? '✓ Activo' : '✕ Inactivo'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-extrabold text-base text-[#432414] dark:text-[#FEE4D7]">{prod.name}</h3>
+                  {prod.description && (
+                    <p className="text-xs text-[#9F6839] dark:text-[#DABA8C] line-clamp-2 mt-1">
+                      {prod.description}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <Link
-                  to={`/products/${prod.id}/recipe`}
-                  className="p-2 rounded-xl bg-[#FEE4D7]/60 dark:bg-[#2E180E] text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#9F6839] hover:text-white transition-colors"
-                  title="Ver / Editar Receta"
-                >
-                  <BookOpen className="w-4 h-4" />
-                </Link>
-                <button
-                  onClick={() => openEditModal(prod)}
-                  className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
-                  title="Editar producto"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(prod.id, prod.name)}
-                  className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                  title="Eliminar producto"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="px-4 pb-4 pt-2 border-t border-[#D4B28E]/40 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-[#9F6839] font-semibold block">Precio Venta</span>
+                  <span className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                    ${prod.price.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    to={`/products/${prod.id}/recipe`}
+                    className="p-2 rounded-xl bg-[#FEE4D7]/60 dark:bg-[#2E180E] text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#9F6839] hover:text-white transition-colors"
+                    title="Ver / Editar Receta"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                  </Link>
+                  <button
+                    onClick={() => openEditModal(prod)}
+                    className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
+                    title="Editar producto"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(prod.id, prod.name)}
+                    className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                    title="Eliminar producto"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Modal Crear / Editar Producto */}
@@ -309,6 +378,22 @@ export default function Products() {
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5 text-[#9F6839]" /> URL de la Imagen (Opcional)
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://ejemplo.com/foto-cafe.jpg"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+            <p className="text-[10px] text-[#9F6839] mt-1 font-medium">
+              Puedes colocar el enlace a cualquier imagen en internet para mostrarla en el menú.
+            </p>
+          </div>
+
+          <div>
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
               Descripción
             </label>
@@ -327,9 +412,9 @@ export default function Products() {
               id="is-active-check"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="w-4 h-4 rounded text-[#9F6839]"
+              className="w-4 h-4 rounded text-[#9F6839] cursor-pointer"
             />
-            <label htmlFor="is-active-check" className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7]">
+            <label htmlFor="is-active-check" className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer">
               Producto Activo y disponible para venta en POS
             </label>
           </div>

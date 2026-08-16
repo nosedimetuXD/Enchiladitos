@@ -27,15 +27,31 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	return &SaleHandler{DB: db, Hub: hub}
 }
 
-// GET /sales
+// GET /sales?period=today|week|month|all
 func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(r.Context(),
-		`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
+	period := r.URL.Query().Get("period")
+	var timeCondition string
+
+	switch period {
+	case "today":
+		timeCondition = "WHERE s.created_at >= date_trunc('day', now())"
+	case "week":
+		timeCondition = "WHERE s.created_at >= date_trunc('week', now())"
+	case "month":
+		timeCondition = "WHERE s.created_at >= date_trunc('month', now())"
+	default:
+		timeCondition = ""
+	}
+
+	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
 		        s.total, s.created_at 
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
-		 ORDER BY s.created_at DESC`)
+		 %s
+		 ORDER BY s.created_at DESC`, timeCondition)
+
+	rows, err := h.DB.Query(r.Context(), query)
 	if err != nil {
 		log.Printf("error consultando ventas: %v", err)
 		http.Error(w, "error consultando ventas", http.StatusInternalServerError)

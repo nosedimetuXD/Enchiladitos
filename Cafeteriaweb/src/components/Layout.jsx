@@ -61,9 +61,9 @@ export default function Layout() {
   }
 
   const roleLabels = {
-    owner: '👑 DUEÑO',
-    admin: '🛡️ ADMIN',
-    employee: '☕ EMPLEADO'
+    owner: 'DUEÑO',
+    admin: 'ADMINISTRADOR',
+    employee: 'EMPLEADO'
   }
 
   const isOwner = user?.role === 'owner'
@@ -94,15 +94,17 @@ export default function Layout() {
             <Menu className="w-6 h-6" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#432414] text-[#DABA8C] flex items-center justify-center font-bold text-sm">
-              ☕
-            </div>
+            <img
+              src="/icon-192.png"
+              alt="Toffe Logo"
+              className="w-8 h-8 rounded-xl object-cover border border-[#9F6839]"
+            />
             <div>
               <span className="font-extrabold text-sm text-[#432414] dark:text-[#FEE4D7] block leading-tight">
                 Toffe
               </span>
               <span className="text-[9px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider block">
-                "Hecho por y para estudiantes"
+                "HECHO POR Y PARA ESTUDIANTES"
               </span>
             </div>
           </div>
@@ -137,18 +139,20 @@ export default function Layout() {
               <ToffeeMarblePattern />
             </div>
 
-            <div className="relative flex items-center justify-between z-10">
+            <div className={`relative flex items-center justify-between z-10 ${isCollapsed ? 'flex-col gap-2' : ''}`}>
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-[#432414] dark:bg-[#34180D] border border-[#9F6839] text-[#DABA8C] shrink-0 shadow-xs">
-                  <Coffee className="w-5 h-5 text-[#DABA8C]" />
-                </div>
+                <img
+                  src="/icon-192.png"
+                  alt="Toffe Logo"
+                  className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shrink-0 shadow-xs"
+                />
                 {!isCollapsed && (
                   <div className="flex flex-col min-w-0">
                     <span className="font-bold text-lg text-[#432414] dark:text-[#FEE4D7] tracking-tight leading-tight">
                       Toffe Coffee
                     </span>
-                    <span className="text-[9px] font-bold tracking-wider text-[#9F6839] dark:text-[#DABA8C] uppercase truncate">
-                      "Hecho por y para estudiantes"
+                    <span className="text-[9px] font-bold tracking-wider text-[#9F6839] dark:text-[#DABA8C] uppercase leading-tight">
+                      "HECHO POR Y PARA ESTUDIANTES"
                     </span>
                   </div>
                 )}
