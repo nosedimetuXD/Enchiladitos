@@ -139,27 +139,20 @@ export default function Layout() {
               <ToffeeMarblePattern />
             </div>
 
-            <div className={`relative flex items-center justify-between z-10 ${isCollapsed ? 'justify-center' : ''}`}>
-              <div
+            <div className={`relative flex items-center ${isCollapsed ? 'justify-center w-full' : 'justify-between'} z-10`}>
+              <button
+                type="button"
                 onClick={toggleCollapse}
-                className="flex items-center gap-3 overflow-hidden cursor-pointer group"
-                title={isCollapsed ? 'Haz clic en el logo para expandir el menú' : 'Haz clic para contraer el menú'}
+                className="flex items-center gap-3 cursor-pointer group focus:outline-none"
+                title={isCollapsed ? 'Desplegar menú' : 'Contraer menú'}
               >
-                <div className="relative shrink-0">
-                  <img
-                    src="/icon-192.png"
-                    alt="Toffe Logo"
-                    className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shadow-xs group-hover:scale-105 transition-transform"
-                  />
-                  {isCollapsed && (
-                    <div className="absolute -bottom-1 -right-1 bg-[#9F6839] text-white p-0.5 rounded-full shadow-xs">
-                      <ChevronRight className="w-3 h-3" />
-                    </div>
-                  )}
-                </div>
-
+                <img
+                  src="/icon-192.png"
+                  alt="Toffe Logo"
+                  className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shadow-xs group-hover:scale-105 transition-transform shrink-0"
+                />
                 {!isCollapsed && (
-                  <div className="flex flex-col min-w-0">
+                  <div className="flex flex-col min-w-0 text-left">
                     <span className="font-bold text-lg text-[#432414] dark:text-[#FEE4D7] tracking-tight leading-tight">
                       Toffe Coffee
                     </span>
@@ -168,13 +161,14 @@ export default function Layout() {
                     </span>
                   </div>
                 )}
-              </div>
+              </button>
 
               {/* Toggle Arrow Button in desktop */}
               {!isCollapsed && (
                 <button
+                  type="button"
                   onClick={toggleCollapse}
-                  className="hidden lg:flex p-1.5 rounded-xl text-[#432414]/70 dark:text-[#DABA8C]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114] transition-colors"
+                  className="hidden lg:flex p-1.5 rounded-xl text-[#432414]/70 dark:text-[#DABA8C]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114] transition-colors cursor-pointer"
                   title="Contraer menú"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -269,7 +263,7 @@ export default function Layout() {
             <div className="flex justify-center">
               <button
                 onClick={toggleDarkMode}
-                className={`p-2.5 rounded-2xl border transition-all ${
+                className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
                   isDarkMode
                     ? 'bg-[#2B160C] border-[#9F6839] text-[#DABA8C] hover:bg-[#3B1F11]'
                     : 'bg-white border-[#D4B28E] text-[#9F6839] hover:bg-[#FEE4D7]'
@@ -284,9 +278,13 @@ export default function Layout() {
 
         {/* Active User Footer */}
         <div className="p-3 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/40 bg-[#FEE4D7]/50 dark:bg-[#241209]">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 overflow-hidden text-left flex-1 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-[#9F6839] text-[#FEE4D7] font-bold flex items-center justify-center text-sm shrink-0 shadow-xs">
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between gap-2'}`}>
+            <div className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'overflow-hidden text-left flex-1 min-w-0'}`}>
+              <div
+                className="w-9 h-9 rounded-full bg-[#9F6839] text-[#FEE4D7] font-bold flex items-center justify-center text-sm shrink-0 shadow-xs cursor-pointer"
+                title={user?.username ? `${user.username} (${roleLabels[user?.role] || user?.role})` : 'Usuario'}
+                onClick={isCollapsed ? toggleCollapse : undefined}
+              >
                 {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
               </div>
               {!isCollapsed && (
@@ -303,13 +301,15 @@ export default function Layout() {
               )}
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl text-[#9F6839] dark:text-[#DABA8C] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0"
-              title="Cerrar sesión"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {!isCollapsed && (
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-[#9F6839] dark:text-[#DABA8C] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 cursor-pointer"
+                title="Cerrar sesión"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </aside>

@@ -430,34 +430,45 @@ export default function Sales() {
                 <p className="text-[11px] text-[#9F6839] mt-0.5 font-semibold">Selecciona productos para comenzar el pedido</p>
               </div>
             ) : (
-              cartItems.map((item) => (
-                <div
-                  key={item.product.id}
-                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/60 text-xs"
-                >
-                  <div className="flex-1 min-w-0 pr-2">
-                    <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block truncate">
-                      {item.product.name}
-                    </span>
-                    <span className="text-[11px] font-semibold text-[#9F6839] dark:text-[#DABA8C]">
-                      ${item.product.price.toLocaleString()} x {item.quantity}
-                    </span>
-                  </div>
+              cartItems.map((item) => {
+                const itemImg = productImages[item.product.id] || item.product.image_url || DEFAULT_PRODUCT_IMAGE
+                return (
+                  <div
+                    key={item.product.id}
+                    className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/60 text-xs gap-2.5"
+                  >
+                    <img
+                      src={itemImg}
+                      alt={item.product.name}
+                      className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[#D4B28E]/60"
+                      onError={(e) => {
+                        e.target.src = DEFAULT_PRODUCT_IMAGE
+                      }}
+                    />
+                    <div className="flex-1 min-w-0 pr-1">
+                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block truncate">
+                        {item.product.name}
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#9F6839] dark:text-[#DABA8C]">
+                        ${item.product.price.toLocaleString()} x {item.quantity}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                      ${(item.product.price * item.quantity).toLocaleString()}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(item.product.id)}
-                      className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                        ${(item.product.price * item.quantity).toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.product.id)}
+                        className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
@@ -641,8 +652,9 @@ export default function Sales() {
         {lastOrder && (
           <div className="space-y-4">
             <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
-              <div className="border-b pb-3">
-                <h2 className="text-lg font-bold">☕ TOFFE COFFEE</h2>
+              <div className="border-b pb-3 flex flex-col items-center">
+                <img src="/icon-192.png" alt="Toffe Logo" className="w-8 h-8 rounded-xl object-cover border border-[#9F6839] mb-1" />
+                <h2 className="text-base font-extrabold text-[#432414] tracking-tight">TOFFE COFFEE</h2>
                 <p className="text-[10px] text-gray-500">"Hecho por y para estudiantes"</p>
                 <p className="text-[10px] text-gray-500 mt-1">Comprobante de Venta</p>
                 <p className="text-[10px] text-gray-500">{new Date().toLocaleString()}</p>

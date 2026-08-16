@@ -197,13 +197,6 @@ export default function Comandas() {
             Monitor de comandas en tiempo real (KDS) para preparación de café y productos
           </p>
         </div>
-
-        <button
-          onClick={playBellSound}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] shadow-xs cursor-pointer"
-        >
-          <Bell className="w-4 h-4" /> Probar Timbre
-        </button>
       </div>
 
       {error && (

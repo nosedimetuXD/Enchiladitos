@@ -178,8 +178,9 @@ export default function SalesHistory() {
         {selectedSale && (
           <div className="space-y-4">
             <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
-              <div className="border-b pb-3">
-                <h2 className="text-lg font-bold">☕ TOFFE COFFEE</h2>
+              <div className="border-b pb-3 flex flex-col items-center">
+                <img src="/icon-192.png" alt="Toffe Logo" className="w-8 h-8 rounded-xl object-cover border border-[#9F6839] mb-1" />
+                <h2 className="text-base font-extrabold text-[#432414] tracking-tight">TOFFE COFFEE</h2>
                 <p className="text-[10px] text-gray-500">"Hecho por y para estudiantes"</p>
                 <p className="text-[10px] text-gray-500 mt-1">Venta #{selectedSale.id.slice(0, 8)}</p>
                 <p className="text-[10px] text-gray-500">{new Date(selectedSale.created_at).toLocaleString()}</p>
