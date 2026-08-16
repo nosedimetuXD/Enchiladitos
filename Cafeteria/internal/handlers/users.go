@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -329,17 +330,27 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	// Desvincular referencias de clave foránea para preservar el historial contable/operativo intacto
-	_, _ = tx.Exec(ctx, `UPDATE sales SET sold_by = NULL WHERE sold_by = $1`, id)
-	_, _ = tx.Exec(ctx, `UPDATE expenses SET registered_by = NULL WHERE registered_by = $1`, id)
-	_, _ = tx.Exec(ctx, `UPDATE tasks SET assigned_to = NULL WHERE assigned_to = $1`, id)
-	_, _ = tx.Exec(ctx, `UPDATE tasks SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID)
-	_, _ = tx.Exec(ctx, `UPDATE users SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID)
+	// Reasignar referencias de clave foránea al dueño principal para cumplir restricciones NOT NULL y preservar la contabilidad intacta
+	if _, err := tx.Exec(ctx, `UPDATE sales SET sold_by = $2 WHERE sold_by = $1`, id, primaryOwnerID); err != nil {
+		log.Printf("aviso actualizando sales: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE expenses SET registered_by = $2 WHERE registered_by = $1`, id, primaryOwnerID); err != nil {
+		log.Printf("aviso actualizando expenses: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE tasks SET assigned_to = NULL WHERE assigned_to = $1`, id); err != nil {
+		log.Printf("aviso actualizando tasks assigned_to: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE tasks SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID); err != nil {
+		log.Printf("aviso actualizando tasks created_by: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE users SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID); err != nil {
+		log.Printf("aviso actualizando users created_by: %v", err)
+	}
 
 	tag, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando usuario: %v", err)
-		http.Error(w, "error eliminando usuario", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("no se pudo eliminar el usuario: %v", err), http.StatusBadRequest)
 		return
 	}
 	if tag.RowsAffected() == 0 {
