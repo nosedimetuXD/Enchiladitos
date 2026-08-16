@@ -95,6 +95,7 @@ func main() {
 		r.Use(custommw.RequireRole(models.RoleOwner))
 		r.Post("/users", userHandler.Create)
 		r.Put("/users/{id}", userHandler.Update)
+		r.Delete("/users/{id}", userHandler.Delete)
 	})
 
 	// Modificar inventario directamente: solo dueño y admin (empleados ya NO pueden editar inventario libremente)

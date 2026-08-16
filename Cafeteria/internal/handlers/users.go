@@ -288,3 +288,48 @@ func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
+
+// DELETE /users/{id} - Permite únicamente al Dueño eliminar usuarios (salvo el dueño principal)
+func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "id de usuario inválido", http.StatusBadRequest)
+		return
+	}
+
+	var primaryOwnerID uuid.UUID
+	_ = h.DB.QueryRow(r.Context(), `SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1`).Scan(&primaryOwnerID)
+
+	if id == primaryOwnerID {
+		http.Error(w, "El dueño principal está protegido permanentemente y no se puede eliminar", http.StatusForbidden)
+		return
+	}
+
+	// No permitir que el usuario se elimine a sí mismo
+	userVal := r.Context().Value(custommw.ContextUserID)
+	if userVal != nil {
+		var currentID uuid.UUID
+		if val, ok := userVal.(uuid.UUID); ok {
+			currentID = val
+		} else if valStr, ok := userVal.(string); ok {
+			currentID, _ = uuid.Parse(valStr)
+		}
+		if id == currentID {
+			http.Error(w, "No puedes eliminar tu propio usuario activo", http.StatusBadRequest)
+			return
+		}
+	}
+
+	tag, err := h.DB.Exec(r.Context(), `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		log.Printf("error eliminando usuario: %v", err)
+		http.Error(w, "error eliminando usuario", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "usuario no encontrado", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

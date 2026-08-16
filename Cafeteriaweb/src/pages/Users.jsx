@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
-import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload } from 'lucide-react'
+import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2 } from 'lucide-react'
 
 export default function Users() {
   const { user: currentUser, updateUser } = useAuth()
@@ -121,6 +121,28 @@ export default function Users() {
     }
   }
 
+  async function handleDeleteUser(userItem) {
+    if (userItem.is_primary || userItem.username.trim().toLowerCase() === 'camilo osorio') {
+      alert('El dueño principal está protegido permanentemente y no se puede eliminar.')
+      return
+    }
+    if (currentUser && currentUser.id === userItem.id) {
+      alert('No puedes eliminar tu propia cuenta activa.')
+      return
+    }
+
+    if (!window.confirm(`¿Estás seguro de eliminar permanentemente al usuario "${userItem.username}"?`)) {
+      return
+    }
+
+    try {
+      await api.delete(`/users/${userItem.id}`)
+      await loadUsers()
+    } catch (err) {
+      alert(err.message || 'No se pudo eliminar el usuario')
+    }
+  }
+
   const roleBadges = {
     owner: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
     admin: { label: 'ADMINISTRADOR', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
@@ -168,6 +190,7 @@ export default function Users() {
           const badge = roleBadges[u.role] || roleBadges.employee
           const rawUAvatar = avatars[u.id] || ''
           const uAvatar = processImageUrl(rawUAvatar)
+          const isPrimary = Boolean(u.is_primary || u.username.trim().toLowerCase() === 'camilo osorio')
 
           return (
             <div
@@ -221,14 +244,24 @@ export default function Users() {
                 </div>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30">
+              <div className="mt-5 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 flex items-center gap-2">
                 <button
                   onClick={() => openEditModal(u)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] hover:bg-[#9F6839] text-[#432414] dark:text-[#FEE4D7] hover:text-white border border-[#D4B28E]/60 dark:border-[#9F6839]/50 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] hover:bg-[#9F6839] text-[#432414] dark:text-[#FEE4D7] hover:text-white border border-[#D4B28E]/60 dark:border-[#9F6839]/50 text-xs font-bold transition-all cursor-pointer shadow-xs"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                   <span>Editar Usuario & Rol</span>
                 </button>
+
+                {!isPrimary && !isCurrentUser && (
+                  <button
+                    onClick={() => handleDeleteUser(u)}
+                    className="p-2.5 rounded-2xl bg-red-50 dark:bg-red-950/40 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 dark:border-red-800 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                    title="Eliminar usuario"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           )
