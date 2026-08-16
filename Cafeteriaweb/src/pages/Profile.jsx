@@ -69,9 +69,14 @@ export default function Profile() {
     // Conteo de productos vendidos por este usuario
     const productCounts = {}
     userSales.forEach((s) => {
-      ;(s.items || []).forEach((it) => {
-        const name = it.product_name || 'Producto'
-        productCounts[name] = (productCounts[name] || 0) + (it.quantity || 1)
+      let items = s.items
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items) } catch (e) { items = [] }
+      }
+      (items || []).forEach((it) => {
+        const name = it.product_name || it.ProductName || it.name || 'Producto'
+        const q = Number(it.quantity || it.Quantity || 1)
+        productCounts[name] = (productCounts[name] || 0) + q
       })
     })
 
@@ -256,9 +261,6 @@ export default function Profile() {
                 placeholder="https://drive.google.com/file/d/... o enlace directo de imagen"
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
               />
-              <p className="text-[10px] text-[#9F6839] font-medium">
-                💡 Soporta imágenes directas, archivos de tu dispositivo o enlaces de Google Drive (se convierten automáticamente).
-              </p>
             </div>
 
             <div>

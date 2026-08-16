@@ -45,7 +45,16 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        s.total, s.created_at 
+		        s.total, s.created_at,
+		        COALESCE(
+		          (SELECT json_agg(json_build_object(
+		             'product_id', si.product_id,
+		             'product_name', COALESCE(p.name, ''),
+		             'quantity', si.quantity,
+		             'unit_price', si.unit_price))
+		           FROM sale_items si
+		           LEFT JOIN products p ON si.product_id = p.id
+		           WHERE si.sale_id = s.id), '[]'::json) AS items
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
 		 %s
@@ -62,11 +71,15 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	var sales []models.Sale
 	for rows.Next() {
 		var s models.Sale
+		var itemsJSON []byte
 		if err := rows.Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
-			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt); err != nil {
+			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt, &itemsJSON); err != nil {
 			log.Printf("error leyendo ventas: %v", err)
 			http.Error(w, "error leyendo ventas", http.StatusInternalServerError)
 			return
+		}
+		if len(itemsJSON) > 0 {
+			_ = json.Unmarshal(itemsJSON, &s.Items)
 		}
 		sales = append(sales, s)
 	}

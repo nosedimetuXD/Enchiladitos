@@ -81,23 +81,25 @@ export default function Tasks() {
     }
   }
 
+  const isTaskCompleted = (t) => t.status === 'done' || t.status === 'completed'
+
   async function toggleTaskStatus(task) {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
+    const newStatus = isTaskCompleted(task) ? 'pending' : 'done'
     try {
       await api.patch(`/tasks/${task.id}/status`, { status: newStatus })
       await loadData()
     } catch (err) {
-      alert('Error al actualizar el estado de la tarea')
+      alert('Error al actualizar el estado de la tarea: ' + (err.message || 'Error de conexión'))
     }
   }
 
-  const completedCount = tasks.filter((t) => t.status === 'completed').length
+  const completedCount = tasks.filter((t) => isTaskCompleted(t)).length
   const progressPercent = Math.round((completedCount / (tasks.length || 1)) * 100)
 
   const filteredTasks = tasks.filter((t) => {
     if (selectedShift === 'Todos') return true
-    if (selectedShift === 'Pendientes') return t.status === 'pending'
-    if (selectedShift === 'Completadas') return t.status === 'completed'
+    if (selectedShift === 'Pendientes') return !isTaskCompleted(t)
+    if (selectedShift === 'Completadas') return isTaskCompleted(t)
     return true
   })
 
@@ -131,7 +133,7 @@ export default function Tasks() {
       )}
 
       {/* Barra de Progreso Operativo */}
-      <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+      <div className="bg-[#FFFFFF] dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
         <div className="flex items-center justify-between text-xs font-bold text-[#432414] dark:text-[#FEE4D7] mb-2">
           <span className="flex items-center gap-2">
             <CheckSquare className="w-4 h-4 text-[#9F6839]" />
@@ -169,7 +171,7 @@ export default function Tasks() {
       {/* Lista de Tareas */}
       <div className="space-y-3">
         {filteredTasks.map((t) => {
-          const isDone = t.status === 'completed'
+          const isDone = isTaskCompleted(t)
           return (
             <div
               key={t.id}

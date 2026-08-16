@@ -162,6 +162,11 @@ func (h *TaskHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	statusStr := string(req.Status)
+	if statusStr == "completed" {
+		req.Status = models.TaskDone
+	}
+
 	switch req.Status {
 	case models.TaskPending, models.TaskInProgress, models.TaskDone:
 		// válido
