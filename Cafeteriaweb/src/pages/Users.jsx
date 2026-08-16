@@ -186,11 +186,20 @@ export default function Users() {
 
           <div className="form-group">
             <label>Rol de Sistema</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              disabled={editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio'}
+            >
               <option value="employee">☕ Empleado (Ventas, Comandas, Inventario lectura)</option>
               <option value="admin">🛡️ Administrador (Acceso completo salvo gestión usuarios)</option>
               <option value="owner">👑 Dueño (Control total del sistema)</option>
             </select>
+            {editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio' && (
+              <p style={{ fontSize: '0.78rem', color: '#92400e', background: '#fffbeb', padding: '6px 10px', borderRadius: '6px', marginTop: '0.35rem', border: '1px solid #fef3c7' }}>
+                🔒 El rol del usuario principal (Camilo Osorio) está protegido y no se puede modificar.
+              </p>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>

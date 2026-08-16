@@ -123,6 +123,15 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Protección: El rol del usuario principal Camilo Osorio no se puede cambiar
+	var existingUsername string
+	_ = h.DB.QueryRow(r.Context(), `SELECT username FROM users WHERE id = $1`, id).Scan(&existingUsername)
+
+	if (strings.EqualFold(strings.TrimSpace(existingUsername), "camilo osorio") || strings.EqualFold(username, "camilo osorio")) && req.Role != models.RoleOwner {
+		http.Error(w, "El rol del usuario principal Camilo Osorio está protegido y no se puede modificar", http.StatusForbidden)
+		return
+	}
+
 	var user models.User
 	if strings.TrimSpace(req.Password) != "" {
 		if len(req.Password) < 8 {
