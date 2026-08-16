@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 
 export default function Sales() {
   const [products, setProducts] = useState([])
+  const [pastCustomers, setPastCustomers] = useState([])
   const [cart, setCart] = useState({}) // { productId: quantity }
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -19,10 +20,24 @@ export default function Sales() {
   const [checkoutError, setCheckoutError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
-  async function loadProducts() {
+  async function loadData() {
     try {
-      const data = await api.get('/products')
-      setProducts((data || []).filter((p) => p.active))
+      const [productsData, salesData] = await Promise.all([
+        api.get('/products'),
+        api.get('/sales')
+      ])
+      setProducts((productsData || []).filter((p) => p.active))
+
+      if (salesData && Array.isArray(salesData)) {
+        const uniqueNames = Array.from(
+          new Set(
+            salesData
+              .map((s) => s.customer_name?.trim())
+              .filter((name) => name && name.toLowerCase() !== 'cliente general')
+          )
+        )
+        setPastCustomers(uniqueNames)
+      }
     } catch (err) {
       setError('No se pudieron cargar los productos')
     } finally {
@@ -31,7 +46,7 @@ export default function Sales() {
   }
 
   useEffect(() => {
-    loadProducts()
+    loadData()
   }, [])
 
   function addToCart(productId) {
@@ -111,6 +126,7 @@ export default function Sales() {
       setIsModalOpen(false)
       setSuccessMsg(`¡Venta #${res.order_number || ''} registrada con éxito! Comanda generada para ${customerName}.`)
       setTimeout(() => setSuccessMsg(''), 5000)
+      loadData()
     } catch (err) {
       setCheckoutError(err.message.includes('inventario') ? 'No hay suficiente inventario disponible para completar este pedido.' : err.message || 'No se pudo completar la venta')
     } finally {
@@ -232,11 +248,18 @@ export default function Sales() {
             <label>Nombre del Cliente</label>
             <input
               type="text"
+              list="customer-suggestions"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Ej. Juan Pérez / Mesa 4"
+              placeholder="Escribe o selecciona un cliente de compras anteriores..."
               required
             />
+            <datalist id="customer-suggestions">
+              <option value="Cliente General" />
+              {pastCustomers.map((name, idx) => (
+                <option key={idx} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div className="form-group">

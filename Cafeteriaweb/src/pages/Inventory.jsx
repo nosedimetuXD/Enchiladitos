@@ -118,11 +118,7 @@ export default function Inventory() {
         )}
       </div>
 
-      {!canManage && (
-        <div style={{ padding: '0.75rem 1rem', background: '#f5f5f4', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          ℹ️ Vista de solo lectura. Para reabastecer inventario, diríjase a Contabilidad para registrar compras de insumos.
-        </div>
-      )}
+
 
       {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
 

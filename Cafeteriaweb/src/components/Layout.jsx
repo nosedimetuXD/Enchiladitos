@@ -6,10 +6,21 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true'
+  })
 
   function handleLogout() {
     logout()
     navigate('/login')
+  }
+
+  function toggleCollapse() {
+    setIsCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar_collapsed', next.toString())
+      return next
+    })
   }
 
   const isOwner = user?.role === 'owner'
@@ -25,14 +36,19 @@ export default function Layout() {
     <div className="app-shell">
       {/* Botón de toggle móvil */}
       <header className="mobile-header">
-        <button
-          className="mobile-menu-btn"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Abrir menú"
-        >
-          ☰
-        </button>
-        <span className="mobile-title">☕ Toffe</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Abrir menú"
+          >
+            ☰
+          </button>
+          <div className="mobile-brand-block">
+            <span className="mobile-title">☕ Toffe</span>
+            <span className="mobile-slogan">"Hecho por y para estudiantes"</span>
+          </div>
+        </div>
       </header>
 
       {/* Overlay para cerrar sidebar en móvil */}
@@ -41,13 +57,25 @@ export default function Layout() {
       )}
 
       {/* Sidebar Lateral */}
-      <aside className={`app-sidebar ${mobileOpen ? 'open' : ''}`}>
+      <aside className={`app-sidebar ${mobileOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-brand">
-          <div className="brand-logo">☕</div>
-          <div>
-            <h1 className="brand-title">Toffe</h1>
-            <span className="brand-subtitle">"Hecho por y para estudiantes"</span>
+          <div className="brand-logo-wrapper">
+            <div className="brand-logo">☕</div>
+            {!isCollapsed && (
+              <div className="brand-text">
+                <h1 className="brand-title">Toffe</h1>
+                <span className="brand-subtitle">"Hecho por y para estudiantes"</span>
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={toggleCollapse}
+            title={isCollapsed ? 'Expandir panel lateral' : 'Colapsar panel lateral'}
+          >
+            {isCollapsed ? '❯' : '❮'}
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -56,45 +84,50 @@ export default function Layout() {
             end
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Ventas (POS)"
           >
             <span className="nav-icon">🛒</span>
-            <span>Ventas (POS)</span>
+            {!isCollapsed && <span>Ventas (POS)</span>}
           </NavLink>
 
           <NavLink
             to="/sales/history"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Historial Ventas"
           >
             <span className="nav-icon">📜</span>
-            <span>Historial Ventas</span>
+            {!isCollapsed && <span>Historial Ventas</span>}
           </NavLink>
 
           <NavLink
             to="/comandas"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Comandas (Cocina)"
           >
             <span className="nav-icon">🛎️</span>
-            <span>Comandas (Cocina)</span>
+            {!isCollapsed && <span>Comandas (Cocina)</span>}
           </NavLink>
 
           <NavLink
             to="/inventory"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Inventario"
           >
             <span className="nav-icon">📦</span>
-            <span>Inventario</span>
+            {!isCollapsed && <span>Inventario</span>}
           </NavLink>
 
           <NavLink
             to="/products"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Productos"
           >
             <span className="nav-icon">☕</span>
-            <span>Productos</span>
+            {!isCollapsed && <span>Productos</span>}
           </NavLink>
 
           {isAdmin && (
@@ -102,9 +135,10 @@ export default function Layout() {
               to="/accounting"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
+              title="Contabilidad"
             >
               <span className="nav-icon">💰</span>
-              <span>Contabilidad</span>
+              {!isCollapsed && <span>Contabilidad</span>}
             </NavLink>
           )}
 
@@ -112,9 +146,10 @@ export default function Layout() {
             to="/tasks"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setMobileOpen(false)}
+            title="Tareas"
           >
             <span className="nav-icon">✅</span>
-            <span>Tareas</span>
+            {!isCollapsed && <span>Tareas</span>}
           </NavLink>
 
           {isOwner && (
@@ -122,9 +157,10 @@ export default function Layout() {
               to="/users"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
+              title="Usuarios"
             >
               <span className="nav-icon">👥</span>
-              <span>Usuarios</span>
+              {!isCollapsed && <span>Usuarios</span>}
             </NavLink>
           )}
         </nav>
@@ -134,21 +170,23 @@ export default function Layout() {
             <div className="avatar">
               {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
             </div>
-            <div className="user-info">
-              <span className="username">{user?.username}</span>
-              <span className={`role-badge role-${user?.role}`}>
-                {roleLabels[user?.role] || user?.role}
-              </span>
-            </div>
+            {!isCollapsed && (
+              <div className="user-info">
+                <span className="username">{user?.username}</span>
+                <span className={`role-badge role-${user?.role}`}>
+                  {roleLabels[user?.role] || user?.role}
+                </span>
+              </div>
+            )}
           </div>
           <button className="logout-btn" onClick={handleLogout} title="Cerrar sesión">
-            🚪 Salir
+            🚪 {!isCollapsed && 'Salir'}
           </button>
         </div>
       </aside>
 
       {/* Ámbito de Contenido Principal */}
-      <main className="app-main-content">
+      <main className={`app-main-content ${isCollapsed ? 'collapsed' : ''}`}>
         <Outlet />
       </main>
     </div>
