@@ -21,6 +21,7 @@ type Sale struct {
 	PaymentMethod  string     `json:"payment_method"`
 	CashAmount     float64    `json:"cash_amount"`
 	TransferAmount float64    `json:"transfer_amount"`
+	BankDetails    string     `json:"bank_details,omitempty"`
 	Total          float64    `json:"total"`
 	CreatedAt      time.Time  `json:"created_at"`
 	Items          []SaleItem `json:"items,omitempty"`

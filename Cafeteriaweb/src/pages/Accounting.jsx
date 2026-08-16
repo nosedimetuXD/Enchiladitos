@@ -1,7 +1,24 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, Wallet } from 'lucide-react'
+import {
+  DollarSign,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Wallet,
+  Package,
+  Zap,
+  Wrench,
+  User,
+  FileText,
+  Banknote,
+  Smartphone,
+  CreditCard,
+  ArrowUpDown,
+  CircleDot
+} from 'lucide-react'
 
 export default function Accounting() {
   const [summary, setSummary] = useState(null)
@@ -83,17 +100,17 @@ export default function Accounting() {
   }
 
   const categoryBadges = {
-    insumos: { label: '📦 Insumos', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
-    servicios: { label: '💡 Servicios', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
-    mantenimiento: { label: '🛠️ Mantenimiento', style: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
-    nomina: { label: '👤 Nómina', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
-    otros: { label: '📑 Otros', style: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' }
+    insumos: { label: 'Insumos', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
+    servicios: { label: 'Servicios', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
+    mantenimiento: { label: 'Mantenimiento', style: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
+    nomina: { label: 'Nómina', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+    otros: { label: 'Otros', style: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' }
   }
 
   const paymentBadges = {
-    efectivo: { label: '💵 Efectivo', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
-    transferencia: { label: '📱 Transferencia', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
-    mixto: { label: '💳 Mixto', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' }
+    efectivo: { label: 'Efectivo', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+    transferencia: { label: 'Transferencia', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
+    mixto: { label: 'Pago Mixto', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' }
   }
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando contabilidad...</p>
@@ -114,7 +131,7 @@ export default function Accounting() {
     if (period === 'month') {
       return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
     }
-    return true // 'all'
+    return true
   })
 
   const filteredExpenses = expenses.filter((e) => {
@@ -133,7 +150,7 @@ export default function Accounting() {
     if (period === 'month') {
       return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
     }
-    return true // 'all'
+    return true
   })
 
   const combinedMovements = [
@@ -142,7 +159,7 @@ export default function Accounting() {
       type: 'income',
       date: s.created_at,
       concept: `Venta - ${s.customer_name || 'Cliente General'}`,
-      details: s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS',
+      details: `${s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS'}${s.bank_details ? ` (${s.bank_details})` : ''}`,
       paymentMethod: s.payment_method,
       amount: s.total
     })),
@@ -171,16 +188,19 @@ export default function Accounting() {
         </div>
 
         <div className="flex items-center gap-3">
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="px-3.5 py-2 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
-          >
-            <option value="today">📅 Hoy</option>
-            <option value="week">📅 Esta Semana</option>
-            <option value="month">📅 Este Mes</option>
-            <option value="all">📅 Histórico Total</option>
-          </select>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40">
+            <Calendar className="w-3.5 h-3.5 text-[#9F6839]" />
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="bg-transparent text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer outline-none"
+            >
+              <option value="today">Hoy</option>
+              <option value="week">Esta Semana</option>
+              <option value="month">Este Mes</option>
+              <option value="all">Histórico Total</option>
+            </select>
+          </div>
 
           <button
             onClick={openCreateModal}
@@ -244,8 +264,16 @@ export default function Accounting() {
             <Wallet className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-xs space-y-1 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
-            <div>💵 Efectivo: <strong>${(summary?.income_by_payment_method?.efectivo || 0).toLocaleString()}</strong></div>
-            <div>📱 Transferencia: <strong>${(summary?.income_by_payment_method?.transferencia || 0).toLocaleString()}</strong></div>
+            <div className="flex items-center gap-1.5">
+              <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Efectivo:</span>
+              <strong>${(summary?.income_by_payment_method?.efectivo || 0).toLocaleString()}</strong>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+              <span>Transferencia:</span>
+              <strong>${(summary?.income_by_payment_method?.transferencia || 0).toLocaleString()}</strong>
+            </div>
           </div>
         </div>
       </div>
@@ -254,33 +282,36 @@ export default function Accounting() {
       <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2">
         <button
           onClick={() => setActiveTab('sales')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
             activeTab === 'sales'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
           }`}
         >
-          🟢 Ingresos por Ventas
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Ingresos por Ventas</span>
         </button>
         <button
           onClick={() => setActiveTab('expenses')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
             activeTab === 'expenses'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
           }`}
         >
-          🔴 Gastos & Egresos
+          <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+          <span>Gastos & Egresos</span>
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
             activeTab === 'all'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
           }`}
         >
-          📋 Flujo de Caja Combinado
+          <ArrowUpDown className="w-3.5 h-3.5 text-[#9F6839]" />
+          <span>Flujo de Caja Combinado</span>
         </button>
       </div>
 
@@ -292,7 +323,7 @@ export default function Accounting() {
               <tr>
                 <th className="py-3.5 px-4">Fecha / Hora</th>
                 <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Método de Pago</th>
+                <th className="py-3.5 px-4">Método de Pago & Entidad</th>
                 <th className="py-3.5 px-4">Vendido Por</th>
                 <th className="py-3.5 px-4 text-right">Monto Ingresado</th>
               </tr>
@@ -305,9 +336,16 @@ export default function Accounting() {
                     <td className="py-3.5 px-4 font-semibold">{new Date(s.created_at).toLocaleString()}</td>
                     <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
                     <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] ${pBadge.style}`}>
-                        {pBadge.label}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] w-max uppercase tracking-wider ${pBadge.style}`}>
+                          {pBadge.label}
+                        </span>
+                        {s.bank_details && (
+                          <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
+                            {s.bank_details}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4">{s.sold_by_username || 'Vendedor'}</td>
                     <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
@@ -350,11 +388,13 @@ export default function Accounting() {
                     <td className="py-3.5 px-4 font-semibold">{new Date(exp.created_at).toLocaleDateString()}</td>
                     <td className="py-3.5 px-4 font-bold">{exp.description}</td>
                     <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] ${catBadge.style}`}>
+                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider ${catBadge.style}`}>
                         {catBadge.label}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4">{exp.payment_method === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}</td>
+                    <td className="py-3.5 px-4 font-bold">
+                      {exp.payment_method === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                    </td>
                     <td className="py-3.5 px-4">
                       {exp.ingredient_name ? (
                         <span className="text-emerald-600 font-bold text-xs">
@@ -401,12 +441,12 @@ export default function Accounting() {
                   <td className="py-3.5 px-4 font-semibold">{new Date(m.date).toLocaleString()}</td>
                   <td className="py-3.5 px-4">
                     {m.type === 'income' ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px]">
-                        🟢 Ingreso
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                        <CircleDot className="w-3 h-3 text-emerald-600" /> Ingreso
                       </span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px]">
-                        🔴 Gasto
+                      <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                        <CircleDot className="w-3 h-3 text-red-600" /> Gasto
                       </span>
                     )}
                   </td>
@@ -470,8 +510,8 @@ export default function Accounting() {
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               >
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="transferencia">📱 Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
               </select>
             </div>
           </div>
@@ -485,18 +525,18 @@ export default function Accounting() {
               onChange={(e) => setCategory(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             >
-              <option value="insumos">📦 Insumos / Materia Prima</option>
-              <option value="servicios">💡 Servicios Básicos</option>
-              <option value="mantenimiento">🛠️ Mantenimiento & Equipos</option>
-              <option value="nomina">👤 Nómina & Empleados</option>
-              <option value="otros">📑 Otros Gastos</option>
+              <option value="insumos">Insumos / Materia Prima</option>
+              <option value="servicios">Servicios Básicos</option>
+              <option value="mantenimiento">Mantenimiento & Equipos</option>
+              <option value="nomina">Nómina & Empleados</option>
+              <option value="otros">Otros Gastos</option>
             </select>
           </div>
 
           {category === 'insumos' && (
             <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E]">
               <span className="block text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
-                📦 Reabastecer Inventario (Opcional)
+                Reabastecer Inventario (Opcional)
               </span>
               <div className="grid grid-cols-2 gap-3">
                 <select

@@ -29,6 +29,9 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 
 // GET /sales?period=today|week|month|all
 func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
+	// Asegurar columna bank_details en base de datos
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE sales ADD COLUMN IF NOT EXISTS bank_details TEXT DEFAULT ''`)
+
 	period := r.URL.Query().Get("period")
 	var timeCondition string
 
@@ -45,7 +48,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        s.total, s.created_at,
+		        COALESCE(s.bank_details, ''), s.total, s.created_at,
 		        COALESCE(
 		          (SELECT json_agg(json_build_object(
 		             'product_id', si.product_id,
@@ -73,7 +76,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		var s models.Sale
 		var itemsJSON []byte
 		if err := rows.Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
-			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt, &itemsJSON); err != nil {
+			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails, &s.Total, &s.CreatedAt, &itemsJSON); err != nil {
 			log.Printf("error leyendo ventas: %v", err)
 			http.Error(w, "error leyendo ventas", http.StatusInternalServerError)
 			return
@@ -100,12 +103,12 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	err = h.DB.QueryRow(r.Context(),
 		`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        s.total, s.created_at 
+		        COALESCE(s.bank_details, ''), s.total, s.created_at 
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
 		 WHERE s.id = $1`, id,
 	).Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
-		&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.Total, &s.CreatedAt)
+		&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails, &s.Total, &s.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "venta no encontrada", http.StatusNotFound)
@@ -145,11 +148,12 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // POST /sales — crea venta, descuenta insumos y genera comanda en tiempo real
 type createSaleRequest struct {
-	CustomerName  string  `json:"customer_name"`
-	PaymentMethod string  `json:"payment_method"`
-	CashAmount    float64 `json:"cash_amount"`
+	CustomerName   string  `json:"customer_name"`
+	PaymentMethod  string  `json:"payment_method"`
+	CashAmount     float64 `json:"cash_amount"`
 	TransferAmount float64 `json:"transfer_amount"`
-	Items         []struct {
+	BankDetails    string  `json:"bank_details"`
+	Items          []struct {
 		ProductID uuid.UUID `json:"product_id"`
 		Quantity  int       `json:"quantity"`
 		Notes     string    `json:"notes"`
@@ -313,9 +317,9 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// 3. Insertar la venta
 	var saleID uuid.UUID
 	err = tx.QueryRow(ctx,
-		`INSERT INTO sales (sold_by, total, customer_name, payment_method, cash_amount, transfer_amount) 
-		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		soldBy, total, customerName, paymentMethod, cashAmount, transferAmount,
+		`INSERT INTO sales (sold_by, total, customer_name, payment_method, cash_amount, transfer_amount, bank_details) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		soldBy, total, customerName, paymentMethod, cashAmount, transferAmount, strings.TrimSpace(req.BankDetails),
 	).Scan(&saleID)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)

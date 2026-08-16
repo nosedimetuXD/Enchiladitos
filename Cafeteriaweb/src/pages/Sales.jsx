@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
 import confetti from 'canvas-confetti'
+import { processImageUrl } from '../utils/imageUtils'
 import {
   Search,
   Plus,
@@ -13,10 +14,17 @@ import {
   Bike,
   Heart,
   CheckCircle2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Banknote,
+  Smartphone,
+  CreditCard,
+  Building2,
+  AlertCircle
 } from 'lucide-react'
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
+
+const COMMON_BANKS = ['Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Bre-B / Llave']
 
 export default function Sales() {
   const [products, setProducts] = useState([])
@@ -47,6 +55,12 @@ export default function Sales() {
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [cashAmount, setCashAmount] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
+  
+  // Desglose de Bancos / Entidades para Transferencia y Pago Mixto
+  const [bankPayments, setBankPayments] = useState([
+    { bank: 'Nequi', amount: '' }
+  ])
+
   const [submitting, setSubmitting] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
   const [pastCustomers, setPastCustomers] = useState([])
@@ -141,7 +155,7 @@ export default function Sales() {
   // Mostrar solo productos activos en POS
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      if (!isProductActive(p)) return false // Filtra productos inactivos
+      if (!isProductActive(p)) return false
       const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase())
       return matchesCategory && matchesSearch
@@ -154,8 +168,50 @@ export default function Sales() {
     setPaymentMethod('efectivo')
     setCashAmount(String(cartTotal))
     setTransferAmount('0')
+    setBankPayments([{ bank: 'Nequi', amount: String(cartTotal) }])
     setCheckoutError('')
     setIsCheckoutOpen(true)
+  }
+
+  function handleSelectPaymentMethod(method) {
+    setPaymentMethod(method)
+    setCheckoutError('')
+    if (method === 'efectivo') {
+      setCashAmount(String(cartTotal))
+      setTransferAmount('0')
+    } else if (method === 'transferencia') {
+      setCashAmount('0')
+      setTransferAmount(String(cartTotal))
+      setBankPayments([{ bank: 'Nequi', amount: String(cartTotal) }])
+    } else if (method === 'mixto') {
+      const half = Math.round(cartTotal / 2)
+      setCashAmount(String(half))
+      setTransferAmount(String(cartTotal - half))
+      setBankPayments([{ bank: 'Nequi', amount: String(cartTotal - half) }])
+    }
+  }
+
+  // Manejo de deslose de bancos
+  function addBankLine() {
+    setBankPayments((prev) => [...prev, { bank: 'Bancolombia', amount: '' }])
+  }
+
+  function removeBankLine(index) {
+    if (bankPayments.length <= 1) return
+    setBankPayments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateBankLine(index, field, value) {
+    setBankPayments((prev) => {
+      const next = prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      
+      // Auto-calcular suma de transferencias
+      if (field === 'amount') {
+        const sumTransfers = next.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+        setTransferAmount(String(sumTransfers))
+      }
+      return next
+    })
   }
 
   async function handleConfirmSale(e) {
@@ -166,22 +222,42 @@ export default function Sales() {
     const finalCustomer = customerName.trim() || 'Cliente General'
     let numCash = Number(cashAmount) || 0
     let numTransfer = Number(transferAmount) || 0
+    let bankDetailsStr = ''
 
     if (paymentMethod === 'efectivo') {
       if (numCash < cartTotal) {
-        setCheckoutError(`El efectivo entregado ($${numCash}) es menor al total ($${cartTotal})`)
+        setCheckoutError(`El efectivo entregado ($${numCash.toLocaleString()}) es menor al total ($${cartTotal.toLocaleString()})`)
         setSubmitting(false)
         return
       }
       numTransfer = 0
     } else if (paymentMethod === 'transferencia') {
       numCash = 0
-      numTransfer = cartTotal
-    } else if (paymentMethod === 'mixto') {
-      if (numCash + numTransfer < cartTotal) {
-        setCheckoutError(`La suma de efectivo + transferencia ($${numCash + numTransfer}) no cubre el total ($${cartTotal})`)
+      const validBankLines = bankPayments.filter((b) => b.bank && Number(b.amount) > 0)
+      if (validBankLines.length === 0) {
+        setCheckoutError('Por favor especifica al menos un banco/entidad y el monto abonado.')
         setSubmitting(false)
         return
+      }
+      numTransfer = validBankLines.reduce((sum, b) => sum + Number(b.amount), 0)
+      if (numTransfer < cartTotal) {
+        setCheckoutError(`La suma de transferencias ($${numTransfer.toLocaleString()}) es inferior al total ($${cartTotal.toLocaleString()})`)
+        setSubmitting(false)
+        return
+      }
+      bankDetailsStr = validBankLines.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
+    } else if (paymentMethod === 'mixto') {
+      const validBankLines = bankPayments.filter((b) => b.bank && Number(b.amount) > 0)
+      numTransfer = validBankLines.reduce((sum, b) => sum + Number(b.amount), 0)
+      
+      if (numCash + numTransfer < cartTotal) {
+        setCheckoutError(`La suma de efectivo + transferencias ($${(numCash + numTransfer).toLocaleString()}) no cubre el total ($${cartTotal.toLocaleString()})`)
+        setSubmitting(false)
+        return
+      }
+
+      if (validBankLines.length > 0) {
+        bankDetailsStr = validBankLines.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
       }
     }
 
@@ -191,6 +267,7 @@ export default function Sales() {
         payment_method: paymentMethod,
         cash_amount: numCash,
         transfer_amount: numTransfer,
+        bank_details: bankDetailsStr,
         items: cartItems.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -198,21 +275,17 @@ export default function Sales() {
         }))
       }
 
-      const resOrder = await api.post('/sales', payload)
+      const createdSale = await api.post('/sales', payload)
 
-      // Lanzar confeti de celebración
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } })
-      } catch (err) {}
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
 
-      setLastOrder(resOrder || { customer_name: finalCustomer, total: cartTotal })
+      setLastOrder({ ...createdSale, items: cartItems, total: cartTotal, customer_name: payload.customer_name })
       setIsCheckoutOpen(false)
-      setIsReceiptOpen(true)
-
       clearCart()
+      setIsReceiptOpen(true)
       await loadData()
     } catch (err) {
-      setCheckoutError(err.message || 'No se pudo procesar la venta')
+      setCheckoutError(err.message || 'No se pudo procesar la venta en caja')
     } finally {
       setSubmitting(false)
     }
@@ -221,232 +294,229 @@ export default function Sales() {
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando catálogo POS...</p>
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-5rem)] lg:h-screen overflow-hidden">
-      {/* Catálogo de Productos */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Barra de Búsqueda */}
-        <div className="flex items-center gap-3 mb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-6rem)]">
+      {/* Catálogo de Productos (Izquierda - 8 cols) */}
+      <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden">
+        {/* Header de Filtros y Búsqueda */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#201009] p-4 rounded-3xl border border-[#D4B28E] dark:border-[#9F6839]/40 shadow-xs">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839] dark:text-[#DABA8C]" />
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9F6839]" />
             <input
               type="text"
-              placeholder="Buscar café, bebidas, repostería..."
+              placeholder="Buscar producto por nombre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-full pl-11 pr-4 py-2.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
+              className="w-full pl-10 pr-4 py-2 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
-        </div>
 
-        {/* Categorías (Pills) */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {categories.map((cat) => {
-              const isSelected = selectedCategory === cat
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#9F6839] text-white shadow-xs'
-                      : 'bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 text-[#432414] dark:text-[#FEE4D7] hover:bg-[#FEE4D7]'
-                  }`}
-                >
-                  {cat}
-                </button>
-              )
-            })}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-[#9F6839] text-white shadow-xs'
+                    : 'bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/20'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Grid de Tarjetas de Productos */}
-        <div className="flex-1 overflow-y-auto pr-1 pb-6">
-          {filteredProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-[#9F6839]">
-              <Coffee className="w-12 h-12 mb-3 stroke-[1.5]" />
-              <p className="text-sm font-bold text-[#432414] dark:text-[#FEE4D7]">No hay productos activos disponibles</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredProducts.map((product) => {
-                const inCart = cartItems.find((ci) => ci.product.id === product.id)
-                const qty = inCart ? inCart.quantity : 0
-                const img = productImages[product.id] || product.image_url || DEFAULT_PRODUCT_IMAGE
+        {error && (
+          <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+            ⚠️ {error}
+          </div>
+        )}
 
-                return (
-                  <div
-                    key={product.id}
-                    className="bg-white dark:bg-[#201009] border border-[#D4B28E]/70 dark:border-[#9F6839]/40 rounded-3xl overflow-hidden flex flex-col justify-between transition-all shadow-xs hover:border-[#9F6839]"
-                  >
-                    <div>
-                      {/* Imagen de Producto Banner */}
-                      <div className="relative h-32 w-full bg-[#FEE4D7]/50 dark:bg-[#2A150C] overflow-hidden">
-                        <img
-                          src={img}
-                          alt={product.name}
-                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                          onError={(e) => {
-                            e.target.src = DEFAULT_PRODUCT_IMAGE
-                          }}
-                        />
-                        <div className="absolute top-2.5 left-2.5">
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#432414]/90 text-[#FEE4D7] backdrop-blur-xs shadow-xs">
-                            {product.category || 'General'}
-                          </span>
-                        </div>
-                        <div className="absolute top-2.5 right-2.5">
-                          <span className="font-extrabold text-sm text-[#432414] bg-white/95 dark:bg-[#201009]/95 dark:text-[#FEE4D7] px-2.5 py-0.5 rounded-full shadow-xs border border-[#D4B28E]">
-                            ${product.price.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
+        {/* Grid de Productos */}
+        <div className="flex-1 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+            {filteredProducts.map((p) => {
+              const rawImg = productImages[p.id] || p.image_url || DEFAULT_PRODUCT_IMAGE
+              const displayImg = processImageUrl(rawImg)
 
-                      <div className="p-4">
-                        <h3 className="font-extrabold text-base text-[#432414] dark:text-[#FEE4D7] leading-snug">
-                          {product.name}
-                        </h3>
-                        {product.description && (
-                          <p className="text-xs text-[#9F6839] dark:text-[#DABA8C]/80 line-clamp-2 mt-1 font-semibold">
-                            {product.description}
-                          </p>
-                        )}
-                      </div>
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => addToCart(p, 1)}
+                  className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-3 shadow-xs hover:shadow-md hover:border-[#9F6839] transition-all cursor-pointer flex flex-col justify-between group"
+                >
+                  <div className="space-y-2">
+                    <div className="relative w-full h-28 rounded-2xl overflow-hidden bg-[#FEE4D7]/30 dark:bg-[#150904] border border-[#D4B28E]/40">
+                      <img
+                        src={displayImg}
+                        alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.target.src = DEFAULT_PRODUCT_IMAGE
+                        }}
+                      />
+                      <span className="absolute top-2 right-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#432414]/80 text-[#FEE4D7] backdrop-blur-xs uppercase tracking-wider">
+                        {p.category}
+                      </span>
                     </div>
 
-                    <div className="px-4 pb-4 pt-2 flex items-center justify-between border-t border-[#D4B28E]/30">
-                      {qty > 0 ? (
-                        <div className="flex items-center gap-2 bg-[#FEE4D7] dark:bg-[#34180D] border border-[#D4B28E] rounded-xl px-2 py-1">
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(product.id, -1)}
-                            className="w-6 h-6 rounded-lg text-[#432414] dark:text-[#FEE4D7] font-bold text-xs flex items-center justify-center cursor-pointer hover:bg-white dark:hover:bg-[#432414]"
-                          >
-                            -
-                          </button>
-                          <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] min-w-4 text-center">
-                            {qty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(product.id, 1)}
-                            className="w-6 h-6 rounded-lg text-[#432414] dark:text-[#FEE4D7] font-bold text-xs flex items-center justify-center cursor-pointer hover:bg-white dark:hover:bg-[#432414]"
-                          >
-                            +
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] font-extrabold text-[#9F6839]">Listo para servir</span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => addToCart(product, 1)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Agregar</span>
-                      </button>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] line-clamp-1 group-hover:text-[#9F6839]">
+                        {p.name}
+                      </h4>
+                      <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] font-bold mt-0.5">
+                        ${p.price.toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </main>
 
-      {/* Panel Lateral de Carrito */}
-      <aside className="w-full lg:w-96 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 flex flex-col justify-between p-5 rounded-3xl shadow-sm shrink-0">
-        <div>
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
-            <h2 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-              Resumen del Pedido
-            </h2>
+                  <div className="mt-3 pt-2 border-t border-[#D4B28E]/30 flex items-center justify-between">
+                    <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Disponible
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        addToCart(p, 1)
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar 1</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+
+            {filteredProducts.length === 0 && (
+              <div className="col-span-full py-16 text-center bg-white dark:bg-[#201009] rounded-3xl border border-[#D4B28E] p-6 space-y-2">
+                <Coffee className="w-8 h-8 text-[#9F6839] mx-auto opacity-50" />
+                <p className="text-xs font-bold text-[#9F6839]">No hay productos disponibles en esta categoría</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Carrito de Compras POS (Derecha - 4 cols) */}
+      <aside className="lg:col-span-4 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs flex flex-col justify-between overflow-hidden">
+        <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
+          {/* Header Carrito */}
+          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/40">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-[#9F6839]" />
+              <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                Orden de Caja
+              </h3>
+            </div>
             {cartItems.length > 0 && (
               <button
                 type="button"
                 onClick={clearCart}
-                className="text-xs text-[#9F6839] hover:text-red-600 flex items-center gap-1 cursor-pointer font-bold"
+                className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
               >
-                <Trash2 className="w-3.5 h-3.5" /> Vaciar
+                Vaciar Carrito
               </button>
             )}
           </div>
 
-          {/* Tipo de Pedido */}
-          <div className="grid grid-cols-3 gap-2 my-4">
+          {/* Selector de Tipo de Servicio */}
+          <div className="grid grid-cols-2 gap-2">
             {[
-              { id: 'Para Llevar', label: 'Llevar', icon: ShoppingBag },
-              { id: 'Mesa', label: 'Mesa', icon: Utensils },
-              { id: 'Barra', label: 'Barra', icon: Coffee }
-            ].map((type) => {
-              const Icon = type.icon
-              const isSelected = orderType === type.id
+              { id: 'Para Llevar', icon: ShoppingBag },
+              { id: 'Mesa', icon: Utensils }
+            ].map((t) => {
+              const Icon = t.icon
               return (
                 <button
-                  key={type.id}
+                  key={t.id}
                   type="button"
-                  onClick={() => setOrderType(type.id)}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#9F6839] text-white border-[#9F6839] shadow-xs'
-                      : 'bg-white dark:bg-[#150904] border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+                  onClick={() => setOrderType(t.id)}
+                  className={`py-2 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    orderType === t.id
+                      ? 'bg-[#9F6839] text-white shadow-xs'
+                      : 'bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
                   }`}
                 >
-                  <Icon className="w-4 h-4 mb-1" />
-                  <span>{type.label}</span>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{t.id}</span>
                 </button>
               )
             })}
           </div>
 
           {orderType === 'Mesa' && (
-            <div className="mb-4">
-              <input
-                type="text"
-                placeholder="Número o Ubicación de Mesa (Ej. Mesa 4)..."
-                value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Número / Nombre de Mesa (Ej. Mesa 4)..."
+              value={tableNumber}
+              onChange={(e) => setTableNumber(e.target.value)}
+              className="w-full px-3 py-2 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
           )}
 
-          {/* Ítems en Carrito */}
-          <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1 my-2">
+          {/* Lista de Items en Carrito */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {cartItems.length === 0 ? (
-              <div className="text-center py-12 text-[#9F6839]">
-                <Coffee className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7]">El carrito está vacío</p>
-                <p className="text-[11px] text-[#9F6839] mt-0.5 font-semibold">Selecciona productos para comenzar el pedido</p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[#9F6839] space-y-2">
+                <Coffee className="w-10 h-10 opacity-30" />
+                <p className="text-xs font-bold">Tu carrito está vacío</p>
+                <p className="text-[11px] text-[#9F6839]/70">Selecciona productos del catálogo para armar el pedido</p>
               </div>
             ) : (
               cartItems.map((item) => {
-                const itemImg = productImages[item.product.id] || item.product.image_url || DEFAULT_PRODUCT_IMAGE
+                const rawImg = productImages[item.product.id] || item.product.image_url || DEFAULT_PRODUCT_IMAGE
+                const displayImg = processImageUrl(rawImg)
+
                 return (
                   <div
                     key={item.product.id}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/60 text-xs gap-2.5"
+                    className="p-2.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/50 flex items-center justify-between gap-3 text-xs"
                   >
                     <img
-                      src={itemImg}
+                      src={displayImg}
                       alt={item.product.name}
-                      className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[#D4B28E]/60"
+                      className="w-10 h-10 rounded-xl object-cover border border-[#D4B28E]/60 shrink-0"
                       onError={(e) => {
                         e.target.src = DEFAULT_PRODUCT_IMAGE
                       }}
                     />
-                    <div className="flex-1 min-w-0 pr-1">
-                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block truncate">
+
+                    <div className="flex-1 min-w-0">
+                      <h5 className="font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">
                         {item.product.name}
-                      </span>
-                      <span className="text-[11px] font-semibold text-[#9F6839] dark:text-[#DABA8C]">
-                        ${item.product.price.toLocaleString()} x {item.quantity}
+                      </h5>
+                      <span className="text-[10px] text-[#9F6839] font-bold">
+                        ${item.product.price.toLocaleString()} c/u
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.product.id, -1)}
+                        className="w-6 h-6 rounded-lg bg-white dark:bg-[#150904] border border-[#D4B28E] flex items-center justify-center text-[#432414] hover:bg-[#9F6839] hover:text-white cursor-pointer font-bold"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+
+                      <span className="w-5 text-center font-extrabold text-xs text-[#432414] dark:text-[#FEE4D7]">
+                        {item.quantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.product.id, 1)}
+                        className="w-6 h-6 rounded-lg bg-white dark:bg-[#150904] border border-[#D4B28E] flex items-center justify-center text-[#432414] hover:bg-[#9F6839] hover:text-white cursor-pointer font-bold"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">
                         ${(item.product.price * item.quantity).toLocaleString()}
                       </span>
@@ -493,8 +563,9 @@ export default function Sales() {
       <Modal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} title="Finalizar Venta en Caja">
         <form onSubmit={handleConfirmSale} className="space-y-4">
           {checkoutError && (
-            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-              ⚠️ {checkoutError}
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{checkoutError}</span>
             </div>
           )}
 
@@ -523,29 +594,31 @@ export default function Sales() {
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'efectivo', label: '💵 Efectivo' },
-                { id: 'transferencia', label: '📱 Transferencia' },
-                { id: 'mixto', label: '💳 Pago Mixto' }
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMethod(m.id)
-                    if (m.id === 'efectivo') setCashAmount(String(cartTotal))
-                  }}
-                  className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
-                    paymentMethod === m.id
-                      ? 'bg-[#9F6839] text-white border-[#9F6839]'
-                      : 'bg-white dark:bg-[#150904] border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+                { id: 'efectivo', label: 'Efectivo', icon: Banknote },
+                { id: 'transferencia', label: 'Transferencia', icon: Smartphone },
+                { id: 'mixto', label: 'Pago Mixto', icon: CreditCard }
+              ].map((m) => {
+                const Icon = m.icon
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => handleSelectPaymentMethod(m.id)}
+                    className={`py-2.5 px-2 rounded-2xl border text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      paymentMethod === m.id
+                        ? 'bg-[#9F6839] text-white border-[#9F6839] shadow-xs'
+                        : 'bg-white dark:bg-[#150904] border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{m.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
+          {/* Pago 1: Solo Efectivo */}
           {paymentMethod === 'efectivo' && (
             <div>
               <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
@@ -560,18 +633,80 @@ export default function Sales() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               />
               {Number(cashAmount) >= cartTotal && (
-                <p className="mt-1 text-xs text-emerald-600 font-extrabold">
+                <p className="mt-1 text-xs text-emerald-600 font-extrabold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   Cambio a Entregar: ${(Number(cashAmount) - cartTotal).toLocaleString()}
                 </p>
               )}
             </div>
           )}
 
+          {/* Pago 2: Transferencia (Desglose por Banco/Entidad) */}
+          {paymentMethod === 'transferencia' && (
+            <div className="space-y-3 p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]">
+              <span className="block text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-[#9F6839]" />
+                Detalle de Entidad / Banco de Transferencia
+              </span>
+
+              {bankPayments.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <div className="flex-1 space-y-1">
+                    <input
+                      type="text"
+                      list="banks-list"
+                      placeholder="Banco / Entidad (ej. Nequi, Nu...)"
+                      value={item.bank}
+                      onChange={(e) => updateBankLine(idx, 'bank', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                    />
+                  </div>
+
+                  <div className="w-32">
+                    <input
+                      type="number"
+                      placeholder="Monto ($)"
+                      value={item.amount}
+                      onChange={(e) => updateBankLine(idx, 'amount', e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                    />
+                  </div>
+
+                  {bankPayments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeBankLine(idx)}
+                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <datalist id="banks-list">
+                {COMMON_BANKS.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
+
+              <button
+                type="button"
+                onClick={addBankLine}
+                className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#9F6839] hover:underline cursor-pointer pt-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Dividir en otro banco / entidad</span>
+              </button>
+            </div>
+          )}
+
+          {/* Pago 3: Pago Mixto (Efectivo + Transferencia por Bancos) */}
           {paymentMethod === 'mixto' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4 p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]">
               <div>
                 <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                  Abono Efectivo ($)
+                  Abono en Efectivo ($)
                 </label>
                 <input
                   type="number"
@@ -581,17 +716,64 @@ export default function Sales() {
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                  Abono Transferencia ($)
-                </label>
-                <input
-                  type="number"
-                  value={transferAmount}
-                  onChange={(e) => setTransferAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-                />
+
+              <div className="space-y-2 pt-2 border-t border-[#D4B28E]/40">
+                <span className="block text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-[#9F6839]" />
+                  Abonos por Transferencia (Bancos / Entidades)
+                </span>
+
+                {bankPayments.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      list="banks-list"
+                      placeholder="Banco / Entidad (Nequi, Nu...)"
+                      value={item.bank}
+                      onChange={(e) => updateBankLine(idx, 'bank', e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                    />
+
+                    <input
+                      type="number"
+                      placeholder="Monto ($)"
+                      value={item.amount}
+                      onChange={(e) => updateBankLine(idx, 'amount', e.target.value)}
+                      className="w-32 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                    />
+
+                    {bankPayments.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeBankLine(idx)}
+                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addBankLine}
+                  className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#9F6839] hover:underline cursor-pointer pt-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Agregar otro banco / entidad</span>
+                </button>
+              </div>
+
+              {/* Resumen de Pago Mixto */}
+              <div className="p-3 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E]/60 text-xs space-y-1">
+                <div className="flex justify-between font-semibold">
+                  <span>Monto Total Pedido:</span>
+                  <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">${cartTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-[#9F6839]">
+                  <span>Total Cubierto (Efectivo + Bancos):</span>
+                  <span className="font-extrabold">${((Number(cashAmount) || 0) + (Number(transferAmount) || 0)).toLocaleString()}</span>
+                </div>
               </div>
             </div>
           )}
@@ -616,7 +798,7 @@ export default function Sales() {
       </Modal>
 
       {/* Modal Ticket Venta Impreso */}
-      <Modal isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)} title="Venta Realizada con Éxito 🎉">
+      <Modal isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)} title="Venta Realizada con Éxito">
         {lastOrder && (
           <div className="space-y-4">
             <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
@@ -630,6 +812,7 @@ export default function Sales() {
 
               <div className="text-left space-y-1 text-xs">
                 <div><strong>Cliente:</strong> {lastOrder.customer_name}</div>
+                <div><strong>Forma Pago:</strong> {lastOrder.payment_method?.toUpperCase()} {lastOrder.bank_details ? `(${lastOrder.bank_details})` : ''}</div>
                 <div><strong>Estado:</strong> Venta Registrada & Comanda Creada</div>
               </div>
 

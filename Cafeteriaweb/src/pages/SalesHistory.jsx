@@ -107,9 +107,9 @@ export default function SalesHistory() {
           className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-2xl px-3 py-2.5 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs cursor-pointer"
         >
           <option value="Todos">Todos los Métodos de Pago</option>
-          <option value="efectivo">💵 Efectivo</option>
-          <option value="transferencia">📱 Transferencia</option>
-          <option value="mixto">💳 Pago Mixto</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="mixto">Pago Mixto</option>
         </select>
       </div>
 
@@ -122,7 +122,7 @@ export default function SalesHistory() {
                 <th className="py-3.5 px-4">ID Venta</th>
                 <th className="py-3.5 px-4">Fecha / Hora</th>
                 <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Método de Pago</th>
+                <th className="py-3.5 px-4">Método de Pago & Entidad</th>
                 <th className="py-3.5 px-4">Atendido Por</th>
                 <th className="py-3.5 px-4 text-right">Total</th>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
@@ -142,9 +142,16 @@ export default function SalesHistory() {
                   </td>
                   <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
                   <td className="py-3.5 px-4">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px]">
-                      {s.payment_method === 'efectivo' ? '💵 Efectivo' : s.payment_method === 'transferencia' ? '📱 Transferencia' : '💳 Mixto'}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px] uppercase tracking-wider w-max">
+                        {s.payment_method}
+                      </span>
+                      {s.bank_details && (
+                        <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
+                          {s.bank_details}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3.5 px-4 font-semibold">{s.sold_by_username || 'Vendedor'}</td>
                   <td className="py-3.5 px-4 text-right font-extrabold text-sm text-emerald-600">
