@@ -1,32 +1,22 @@
-import { useEffect, useState, useCallback } from 'react'
-import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
-import { useEvents } from '../hooks/useEvents'
+import { useEffect, useState } from 'react'
+import { api, API_URL } from '../api/client'
 import Modal from '../components/Modal'
-
-const STATUS_LABELS = {
-  pending: 'Pendiente',
-  in_progress: 'En progreso',
-  done: 'Completada'
-}
+import { CheckSquare, Plus, CheckCircle2, User } from 'lucide-react'
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([])
   const [users, setUsers] = useState([])
+  const [selectedShift, setSelectedShift] = useState('Todos')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  // Modal Nueva Tarea
+  // Modal Crear Tarea
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [dueDate, setDueDate] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
-
-  const { user } = useAuth()
-  const canManage = user?.role === 'owner' || user?.role === 'admin'
 
   async function loadData() {
     try {
@@ -45,195 +35,267 @@ export default function Tasks() {
 
   useEffect(() => {
     loadData()
-  }, [])
 
-  const handleTaskEvent = useCallback(() => {
-    loadData()
-  }, [])
+    // Conexión SSE en tiempo real
+    const eventSource = new EventSource(`${API_URL}/events`)
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'task_created' || data.type === 'task_status_updated') {
+          loadData()
+        }
+      } catch (e) {}
+    }
 
-  useEvents(['task_created', 'task_status_updated'], handleTaskEvent)
+    return () => {
+      eventSource.close()
+    }
+  }, [])
 
   function openCreateModal() {
     setTitle('')
     setDescription('')
-    setDueDate('')
     setAssignedTo('')
     setFormError('')
     setIsModalOpen(true)
   }
 
-  async function handleCreate(e) {
+  async function handleCreateTask(e) {
     e.preventDefault()
-    setCreating(true)
+    setSubmitting(true)
     setFormError('')
 
     try {
       await api.post('/tasks', {
         title,
         description,
-        due_date: dueDate || null,
-        assigned_to: assignedTo || null
+        assigned_to: assignedTo ? assignedTo : null
       })
+
       setIsModalOpen(false)
       await loadData()
     } catch (err) {
       setFormError(err.message || 'No se pudo crear la tarea')
     } finally {
-      setCreating(false)
+      setSubmitting(false)
     }
   }
 
-  async function handleStatusChange(taskId, status) {
+  async function toggleTaskStatus(task) {
+    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
     try {
-      await api.patch(`/tasks/${taskId}/status`, { status })
+      await api.patch(`/tasks/${task.id}/status`, { status: newStatus })
       await loadData()
     } catch (err) {
-      setPageError('No se pudo actualizar el estado')
+      alert('Error al actualizar el estado de la tarea')
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('¿Eliminar esta tarea?')) return
+  const completedCount = tasks.filter((t) => t.status === 'completed').length
+  const progressPercent = Math.round((completedCount / (tasks.length || 1)) * 100)
 
-    try {
-      await api.delete(`/tasks/${id}`)
-      await loadData()
-    } catch (err) {
-      setPageError('No se pudo eliminar la tarea')
-    }
-  }
+  const filteredTasks = tasks.filter((t) => {
+    if (selectedShift === 'Todos') return true
+    if (selectedShift === 'Pendientes') return t.status === 'pending'
+    if (selectedShift === 'Completadas') return t.status === 'completed'
+    return true
+  })
 
-  if (loading) return <p>Cargando tareas...</p>
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando tareas operativas...</p>
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">Gestión de Tareas</h2>
-          <p className="page-subtitle">Asignación y seguimiento de pendientes de la cafetería</p>
+          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+            Tareas & Checklists de Turno
+          </h2>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Protocolos operativos de apertura, calibración de barra y cierre de cafetería
+          </p>
         </div>
-        {canManage && (
-          <button onClick={openCreateModal}>
-            + Nueva Tarea
+
+        <button
+          onClick={openCreateModal}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" /> Nueva Tarea
+        </button>
+      </div>
+
+      {pageError && (
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+          ⚠️ {pageError}
+        </div>
+      )}
+
+      {/* Barra de Progreso Operativo */}
+      <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+        <div className="flex items-center justify-between text-xs font-bold text-[#432414] dark:text-[#FEE4D7] mb-2">
+          <span className="flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-[#9F6839]" />
+            Progreso Operativo del Día
+          </span>
+          <span className="text-[#9F6839] font-mono">
+            {completedCount} de {tasks.length} completadas ({progressPercent}%)
+          </span>
+        </div>
+        <div className="h-3 w-full bg-[#FEE4D7]/50 dark:bg-[#2A150C] rounded-full overflow-hidden border border-[#D4B28E]/60">
+          <div
+            className="h-full bg-[#9F6839] rounded-full transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex items-center gap-2">
+        {['Todos', 'Pendientes', 'Completadas'].map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setSelectedShift(filter)}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              selectedShift === filter
+                ? 'bg-[#9F6839] text-white shadow-xs'
+                : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+            }`}
+          >
+            {filter}
           </button>
+        ))}
+      </div>
+
+      {/* Lista de Tareas */}
+      <div className="space-y-3">
+        {filteredTasks.map((t) => {
+          const isDone = t.status === 'completed'
+          return (
+            <div
+              key={t.id}
+              onClick={() => toggleTaskStatus(t)}
+              className={`p-4 rounded-3xl border transition-all cursor-pointer flex items-start justify-between gap-4 shadow-xs select-none ${
+                isDone
+                  ? 'bg-[#FEE4D7]/30 dark:bg-[#2E180E]/40 border-[#D4B28E]/40 opacity-75'
+                  : 'bg-white dark:bg-[#201009] border-[#D4B28E] dark:border-[#9F6839]/40 hover:border-[#9F6839]'
+              }`}
+            >
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div
+                  className={`w-6 h-6 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border transition-colors ${
+                    isDone
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                      : 'bg-white dark:bg-[#150904] border-[#D4B28E] text-transparent'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 fill-current" />
+                </div>
+
+                <div>
+                  <h4 className={`text-sm font-bold tracking-tight ${isDone ? 'line-through text-[#9F6839]' : 'text-[#432414] dark:text-[#FEE4D7]'}`}>
+                    {t.title}
+                  </h4>
+                  {t.description && (
+                    <p className="text-xs text-[#9F6839] dark:text-[#DABA8C] mt-1">{t.description}</p>
+                  )}
+
+                  <div className="flex items-center gap-3 mt-2.5 text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-semibold">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3 h-3 text-[#9F6839]" />
+                      Asignada a: <strong className="text-[#432414] dark:text-[#FEE4D7]">{t.assigned_to_username || 'Todo el Equipo'}</strong>
+                    </span>
+                    <span>• Creada por: {t.creator_username || 'Sistema'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {isDone && (
+                <span className="text-[10px] text-emerald-600 font-extrabold shrink-0">
+                  ✓ Completada
+                </span>
+              )}
+            </div>
+          )
+        })}
+        {filteredTasks.length === 0 && (
+          <p className="text-xs text-[#9F6839] text-center py-8 font-semibold">
+            No hay tareas en esta categoría.
+          </p>
         )}
       </div>
 
-      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
-
-      {/* Tabla de Tareas */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Título</th>
-              <th>Descripción</th>
-              <th>Fecha Límite</th>
-              <th>Asignado a</th>
-              <th>Estado</th>
-              {canManage && <th>Acciones</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((t) => (
-              <tr key={t.id}>
-                <td style={{ fontWeight: 600 }}>{t.title}</td>
-                <td>{t.description || '—'}</td>
-                <td>{t.due_date ? new Date(t.due_date).toLocaleDateString() : '—'}</td>
-                <td>{users.find((u) => u.id === t.assigned_to)?.username || 'Sin asignar'}</td>
-                <td>
-                  <select
-                    value={t.status}
-                    onChange={(e) => handleStatusChange(t.id, e.target.value)}
-                    style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
-                    ))}
-                  </select>
-                </td>
-                {canManage && (
-                  <td>
-                    <button className="danger" onClick={() => handleDelete(t.id)} style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}>
-                      Eliminar
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {tasks.length === 0 && (
-              <tr>
-                <td colSpan={canManage ? 6 : 5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  No hay tareas registradas.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal Nueva Tarea */}
-      {canManage && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Tarea">
-          <form onSubmit={handleCreate}>
-            {formError && (
-              <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
-                ⚠️ {formError}
-              </div>
-            )}
-
-            <div className="form-group">
-              <label>Título de la Tarea</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ej. Limpieza profunda de molino de café"
-                required
-              />
+      {/* Modal Crear Tarea */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Crear Nueva Tarea Operativa">
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          {formError && (
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+              ⚠️ {formError}
             </div>
+          )}
 
-            <div className="form-group">
-              <label>Descripción</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Detalles adicionales de la tarea"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Título de la Tarea
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej. Calibrar molino de café / Limpieza de filtros"
+              required
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Fecha Límite (Opcional)</label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Asignar a</label>
-                <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
-                  <option value="">Sin asignar</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Instrucciones / Detalles
+            </label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descripción del protocolo o procedimiento a seguir..."
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-              <button type="button" className="secondary" onClick={() => setIsModalOpen(false)}>
-                Cancelar
-              </button>
-              <button type="submit" disabled={creating}>
-                {creating ? 'Creando...' : 'Crear Tarea'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Asignar a Empleado / Cajero (Opcional)
+            </label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            >
+              <option value="">Todo el Equipo (General)</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.username} ({u.role})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-3">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? 'Creando...' : 'Crear Tarea'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

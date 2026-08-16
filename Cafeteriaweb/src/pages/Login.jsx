@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Coffee, Lock, User, Sparkles } from 'lucide-react'
+import { ToffeeMarblePattern } from '../components/ToffeeMarblePattern'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -27,88 +29,88 @@ export default function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1c1917 0%, #3c2a21 100%)',
-        padding: '1.5rem'
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '400px',
-          padding: '2.5rem 2rem',
-          borderRadius: '16px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          background: '#ffffff'
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
-            style={{
-              fontSize: '3rem',
-              background: '#fef3c7',
-              width: '72px',
-              height: '72px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem auto'
-            }}
-          >
-            ☕
+    <div className="min-h-screen w-full flex items-center justify-center relative bg-[#150904] overflow-hidden p-4">
+      {/* Background Marble Pattern */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
+        <ToffeeMarblePattern />
+      </div>
+
+      <div className="relative w-full max-w-md bg-white dark:bg-[#201009] border border-[#D4B28E]/60 dark:border-[#9F6839]/40 rounded-3xl p-8 shadow-2xl z-10 backdrop-blur-md">
+        {/* Brand Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#432414] dark:bg-[#34180D] border-2 border-[#9F6839] text-[#DABA8C] shadow-md mb-4">
+            <Coffee className="w-8 h-8 text-[#DABA8C]" />
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#1c1917', margin: 0 }}>
-            Toffe
+          <h1 className="text-3xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+            Toffe Coffee
           </h1>
-          <p style={{ fontSize: '0.88rem', color: '#78716c', marginTop: '0.25rem', fontWeight: 600 }}>
+          <p className="text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-widest mt-1">
             "Hecho por y para estudiantes"
           </p>
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FEE4D7] dark:bg-[#2E180E] text-[10px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E]/50">
+            <Sparkles className="w-3 h-3" />
+            Acceso Multiusuario / Caja Simultánea
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: 'transparent', padding: 0, border: 'none' }}>
-          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-            <label style={{ color: '#44403c' }}>Nombre de Usuario</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Ingresa tu usuario"
-              required
-            />
-          </div>
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label style={{ color: '#44403c' }}>Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 p-3 rounded-2xl text-xs font-bold text-center">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Nombre de Usuario
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <User className="w-4 h-4 text-[#9F6839]" />
+              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Ingresa tu usuario"
+                required
+                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none focus:ring-2 focus:ring-[#9F6839]"
+              />
+            </div>
           </div>
 
-          {error && (
-            <p className="error-text" style={{ marginBottom: '1rem', textAlign: 'center' }}>
-              {error}
-            </p>
-          )}
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Contraseña
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Lock className="w-4 h-4 text-[#9F6839]" />
+              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none focus:ring-2 focus:ring-[#9F6839]"
+              />
+            </div>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            style={{ width: '100%', padding: '0.85rem', fontSize: '1rem' }}
+            className="w-full mt-6 py-3.5 px-4 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-sm shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 cursor-pointer"
           >
-            {loading ? 'Iniciando sesión...' : 'Ingresar al Sistema'}
+            {loading ? 'Iniciando sesión...' : 'Ingresar a Caja / Sistema'}
           </button>
         </form>
+
+        <p className="text-center text-[10px] font-semibold text-[#9F6839] dark:text-[#DABA8C]/70 mt-6">
+          Toffe Web App &copy; {new Date().getFullYear()} — Todos los derechos reservados
+        </p>
       </div>
     </div>
   )

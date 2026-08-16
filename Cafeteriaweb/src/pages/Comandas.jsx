@@ -1,6 +1,14 @@
-import { useEffect, useState, useCallback } from 'react'
-import { api } from '../api/client'
-import { useEvents } from '../hooks/useEvents'
+import { useEffect, useState } from 'react'
+import { api, API_URL } from '../api/client'
+import {
+  UtensilsCrossed,
+  Clock,
+  CheckCircle2,
+  Bell,
+  Play,
+  Check,
+  Coffee
+} from 'lucide-react'
 
 export default function Comandas() {
   const [comandas, setComandas] = useState([])
@@ -18,112 +26,252 @@ export default function Comandas() {
     }
   }
 
-  const handleComandaEvent = useCallback(() => {
-    loadComandas()
-  }, [])
-
-  useEvents(['comanda_created', 'comanda_updated'], handleComandaEvent)
+  function playBellSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(1318.51, ctx.currentTime) // E6
+      osc.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.12) // C6
+      gain.gain.setValueAtTime(0.25, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.6)
+    } catch (err) {}
+  }
 
   useEffect(() => {
     loadComandas()
+
+    // Conexión SSE en tiempo real
+    const eventSource = new EventSource(`${API_URL}/events`)
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'comanda_created' || data.type === 'comanda_status_updated') {
+          playBellSound()
+          loadComandas()
+        }
+      } catch (e) {}
+    }
+
+    return () => {
+      eventSource.close()
+    }
   }, [])
 
-  async function handleStatusChange(comandaId, newStatus) {
+  async function handleStatusChange(id, newStatus) {
     try {
-      await api.patch(`/comandas/${comandaId}/status`, { status: newStatus })
+      await api.patch(`/comandas/${id}/status`, { status: newStatus })
+      if (newStatus === 'listo') {
+        playBellSound()
+      }
       await loadComandas()
     } catch (err) {
-      setError('No se pudo actualizar el estado de la comanda')
+      alert('Error al actualizar el estado de la comanda')
     }
   }
 
-  if (loading) return <p>Cargando comandas en tiempo real...</p>
+  const getElapsedMinutes = (dateStr) => {
+    const elapsed = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
+    return Math.max(0, elapsed)
+  }
 
-  const columns = [
-    { key: 'pendiente', title: '⏳ Pendientes', color: '#fef08a' },
-    { key: 'en_preparacion', title: '🍳 En Preparación', color: '#bfdbfe' },
-    { key: 'listo', title: '🔔 Listo para Entregar', color: '#bbf7d0' },
-    { key: 'entregado', title: '✅ Entregados', color: '#e7e5e4' }
-  ]
+  const pending = comandas.filter((c) => c.status === 'pendiente')
+  const inPrep = comandas.filter((c) => c.status === 'en_preparacion')
+  const ready = comandas.filter((c) => c.status === 'listo')
+  const delivered = comandas.filter((c) => c.status === 'entregado').slice(0, 5)
 
-  return (
-    <div>
-      <div className="page-header">
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando comandas en vivo...</p>
+
+  const renderCard = (c, colType) => {
+    const elapsedMins = getElapsedMinutes(c.created_at)
+
+    return (
+      <div
+        key={c.id}
+        className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-[#9F6839] transition-all"
+      >
         <div>
-          <h2 className="page-title">Sistema de Comandas (Cocina & Barra)</h2>
-          <p className="page-subtitle">Pedidos en tiempo real generados automáticamente desde POS</p>
-        </div>
-      </div>
+          <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
+            <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+              Comanda #{c.id.slice(0, 4)}
+            </span>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+            <span className="flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#FEE4D7] text-[#9F6839] border border-[#D4B28E]">
+              <Clock className="w-3 h-3" />
+              {elapsedMins} min
+            </span>
+          </div>
 
-      <div className="comanda-board">
-        {columns.map((col) => {
-          const itemsInCol = comandas.filter((c) => c.status === col.key)
-          return (
-            <div key={col.key} className="comanda-column">
-              <div className="column-header">
-                <span>{col.title}</span>
-                <span style={{ background: '#fff', padding: '0.1rem 0.5rem', borderRadius: '12px', fontSize: '0.85rem' }}>
-                  {itemsInCol.length}
+          <div className="text-xs text-[#432414] dark:text-[#FEE4D7] mt-2 font-semibold">
+            Cliente: <span className="font-bold">{c.customer_name || 'Cliente General'}</span>
+          </div>
+
+          <div className="mt-3 space-y-1.5">
+            {(c.items || []).map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/70 p-2.5 rounded-2xl text-xs flex items-center justify-between font-bold text-[#432414] dark:text-[#FEE4D7]"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-lg bg-[#9F6839] text-white font-bold flex items-center justify-center text-[10px]">
+                    {item.quantity}
+                  </span>
+                  {item.product_name}
+                </span>
+                <span className="text-[11px] text-[#9F6839] dark:text-[#DABA8C]">
+                  ${(item.unit_price * item.quantity).toLocaleString()}
                 </span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              {itemsInCol.map((c) => {
-                const timeAgo = Math.max(0, Math.floor((new Date() - new Date(c.created_at)) / 60000))
-                return (
-                  <div key={c.id} className="comanda-card">
-                    <div className="comanda-card-header">
-                      <span className="order-number">#{c.order_number}</span>
-                      <span className="comanda-time">hace {timeAgo} min</span>
-                    </div>
+        <div className="pt-2 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/30">
+          {colType === 'pending' && (
+            <button
+              onClick={() => handleStatusChange(c.id, 'en_preparacion')}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Iniciar Preparación</span>
+            </button>
+          )}
 
-                    <div className="customer-name">👤 {c.customer_name}</div>
+          {colType === 'in_prep' && (
+            <button
+              onClick={() => handleStatusChange(c.id, 'listo')}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Listo para Servir</span>
+            </button>
+          )}
 
-                    <ul className="comanda-items-list">
-                      {(c.items || []).map((item, idx) => (
-                        <li key={idx} className="comanda-item-line">
-                          <span>{item.product_name}</span>
-                          <span style={{ fontWeight: 700 }}>x{item.quantity}</span>
-                        </li>
-                      ))}
-                    </ul>
+          {colType === 'ready' && (
+            <button
+              onClick={() => handleStatusChange(c.id, 'entregado')}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#432414] hover:bg-[#201009] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Marcar Entregado</span>
+            </button>
+          )}
 
-                    {/* Botones de Acción de Estado */}
-                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      {c.status === 'pendiente' && (
-                        <button onClick={() => handleStatusChange(c.id, 'en_preparacion')}>
-                          ▶ Iniciar Preparación
-                        </button>
-                      )}
-                      {c.status === 'en_preparacion' && (
-                        <button className="success" onClick={() => handleStatusChange(c.id, 'listo')}>
-                          ✔ Marcar Listo
-                        </button>
-                      )}
-                      {c.status === 'listo' && (
-                        <button onClick={() => handleStatusChange(c.id, 'entregado')}>
-                          🤝 Entregar al Cliente
-                        </button>
-                      )}
-                      {c.status !== 'entregado' && c.status !== 'cancelado' && (
-                        <button className="danger" onClick={() => handleStatusChange(c.id, 'cancelado')} style={{ fontSize: '0.78rem', padding: '0.3rem' }}>
-                          Cancelar Pedido
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+          {colType === 'delivered' && (
+            <span className="text-xs text-emerald-600 font-bold flex items-center justify-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Entregada
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
 
-              {itemsInCol.length === 0 && (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '2rem' }}>
-                  Sin pedidos
-                </p>
-              )}
-            </div>
-          )
-        })}
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+              Comandas (Cocina & Barista)
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FEE4D7] text-[#9F6839] border border-[#D4B28E]">
+              En Vivo
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Monitor de comandas en tiempo real (KDS) para preparación de café y productos
+          </p>
+        </div>
+
+        <button
+          onClick={playBellSound}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] shadow-xs cursor-pointer"
+        >
+          <Bell className="w-4 h-4" /> Probar Timbre
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Grid de Columnas KDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Columna 1: Pendientes */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
+              🟡 Pendientes ({pending.length})
+            </span>
+          </div>
+          <div className="space-y-3">
+            {pending.length === 0 ? (
+              <p className="text-xs text-[#9F6839] text-center py-8">Sin comandas pendientes</p>
+            ) : (
+              pending.map((c) => renderCard(c, 'pending'))
+            )}
+          </div>
+        </div>
+
+        {/* Columna 2: En Preparación */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
+              🟠 En Preparación ({inPrep.length})
+            </span>
+          </div>
+          <div className="space-y-3">
+            {inPrep.length === 0 ? (
+              <p className="text-xs text-[#9F6839] text-center py-8">Sin órdenes en preparación</p>
+            ) : (
+              inPrep.map((c) => renderCard(c, 'in_prep'))
+            )}
+          </div>
+        </div>
+
+        {/* Columna 3: Listas en Barra */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
+              🟢 Listas en Barra ({ready.length})
+            </span>
+          </div>
+          <div className="space-y-3">
+            {ready.length === 0 ? (
+              <p className="text-xs text-[#9F6839] text-center py-8">Sin órdenes listas por entregar</p>
+            ) : (
+              ready.map((c) => renderCard(c, 'ready'))
+            )}
+          </div>
+        </div>
+
+        {/* Columna 4: Entregadas */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
+              ✅ Entregadas ({delivered.length})
+            </span>
+          </div>
+          <div className="space-y-3">
+            {delivered.length === 0 ? (
+              <p className="text-xs text-[#9F6839] text-center py-8">Sin historial reciente</p>
+            ) : (
+              delivered.map((c) => renderCard(c, 'delivered'))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

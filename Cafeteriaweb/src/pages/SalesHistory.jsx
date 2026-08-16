@@ -1,25 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { Search, FileText, Printer, Clock, TrendingUp } from 'lucide-react'
 
 export default function SalesHistory() {
   const [sales, setSales] = useState([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedMethod, setSelectedMethod] = useState('Todos')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
-  const [filterMethod, setFilterMethod] = useState('todos')
+  const [pageError, setPageError] = useState('')
 
-  // Modal para ver detalles de una venta
+  // Modal Recibo impreso
   const [selectedSale, setSelectedSale] = useState(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false)
 
   async function loadSales() {
     try {
       const data = await api.get('/sales')
       setSales(data || [])
     } catch (err) {
-      setError('No se pudo cargar el historial de ventas')
+      setPageError('No se pudo cargar el historial de ventas')
     } finally {
       setLoading(false)
     }
@@ -29,159 +29,198 @@ export default function SalesHistory() {
     loadSales()
   }, [])
 
-  async function handleViewDetail(saleId) {
-    setIsModalOpen(true)
-    setLoadingDetail(true)
-    try {
-      const detail = await api.get(`/sales/${saleId}`)
-      setSelectedSale(detail)
-    } catch (err) {
-      setError('Error al obtener detalle de la venta')
-    } finally {
-      setLoadingDetail(false)
-    }
+  const filteredSales = useMemo(() => {
+    return sales.filter((s) => {
+      const matchSearch =
+        s.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.sold_by_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(s.id).includes(searchQuery)
+
+      const matchMethod = selectedMethod === 'Todos' || s.payment_method === selectedMethod
+      return matchSearch && matchMethod
+    })
+  }, [sales, searchQuery, selectedMethod])
+
+  const totalSalesVolume = useMemo(() => {
+    return filteredSales.reduce((acc, s) => acc + s.total, 0)
+  }, [filteredSales])
+
+  function handlePrintReceipt(sale) {
+    setSelectedSale(sale)
+    setIsReceiptOpen(true)
   }
 
-  const filteredSales = sales.filter((s) => {
-    const matchesSearch =
-      (s.customer_name && s.customer_name.toLowerCase().includes(search.toLowerCase())) ||
-      (s.sold_by_username && s.sold_by_username.toLowerCase().includes(search.toLowerCase()))
-    const matchesMethod = filterMethod === 'todos' || s.payment_method === filterMethod
-    return matchesSearch && matchesMethod
-  })
-
-  const paymentBadges = {
-    efectivo: { label: '💵 Efectivo', style: { background: '#dcfce7', color: '#166534' } },
-    transferencia: { label: '📱 Transferencia', style: { background: '#dbeafe', color: '#1e40af' } },
-    mixto: { label: '💳 Mixto', style: { background: '#fef3c7', color: '#92400e' } }
+  function executeBrowserPrint() {
+    window.print()
   }
 
-  if (loading) return <p>Cargando registro de ventas...</p>
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando historial de ventas...</p>
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">Registro de Ventas</h2>
-          <p className="page-subtitle">Historial detallado de todas las transacciones realizadas</p>
+          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+            Historial de Ventas & Recibos
+          </h2>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Registro cronológico de ventas, cobros y comprobantes de la cafetería
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 px-4 py-2.5 rounded-3xl shadow-xs">
+          <div className="p-2 rounded-2xl bg-[#432414] text-[#DABA8C]">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] text-[#9F6839] uppercase font-bold tracking-wider block">Total Facturado</span>
+            <div className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+              ${totalSalesVolume.toLocaleString()}
+            </div>
+          </div>
         </div>
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && (
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+          ⚠️ {pageError}
+        </div>
+      )}
 
-      {/* Filtros */}
-      <div className="card" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 200 }}>
+      {/* Buscador & Filtros */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839]" />
           <input
             type="text"
-            placeholder="🔍 Buscar por cliente o vendedor..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, cajero o ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-2xl pl-10 pr-3 py-2.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
           />
         </div>
-        <div style={{ width: 220 }}>
-          <select value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)}>
-            <option value="todos">Todos los métodos de pago</option>
-            <option value="efectivo">💵 Efectivo</option>
-            <option value="transferencia">📱 Transferencia</option>
-            <option value="mixto">💳 Pago Mixto</option>
-          </select>
-        </div>
+
+        <select
+          value={selectedMethod}
+          onChange={(e) => setSelectedMethod(e.target.value)}
+          className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-2xl px-3 py-2.5 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs cursor-pointer"
+        >
+          <option value="Todos">Todos los Métodos de Pago</option>
+          <option value="efectivo">💵 Efectivo</option>
+          <option value="transferencia">📱 Transferencia</option>
+          <option value="mixto">💳 Pago Mixto</option>
+        </select>
       </div>
 
-      {/* Tabla de Historial */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha y Hora</th>
-              <th>Cliente</th>
-              <th>Vendedor</th>
-              <th>Método de Pago</th>
-              <th>Total</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSales.map((s) => {
-              const badge = paymentBadges[s.payment_method] || paymentBadges.efectivo
-              return (
-                <tr key={s.id}>
-                  <td>{new Date(s.created_at).toLocaleString()}</td>
-                  <td style={{ fontWeight: 600 }}>{s.customer_name || 'Cliente General'}</td>
-                  <td>{s.sold_by_username || 'Atendido'}</td>
-                  <td>
-                    <span style={{ ...badge.style, padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700 }}>
-                      {badge.label}
+      {/* Tabla de Historial de Ventas */}
+      <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
+              <tr>
+                <th className="py-3.5 px-4">ID Venta</th>
+                <th className="py-3.5 px-4">Fecha / Hora</th>
+                <th className="py-3.5 px-4">Cliente</th>
+                <th className="py-3.5 px-4">Método de Pago</th>
+                <th className="py-3.5 px-4">Atendido Por</th>
+                <th className="py-3.5 px-4 text-right">Total</th>
+                <th className="py-3.5 px-4 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+              {filteredSales.map((s) => (
+                <tr key={s.id} className="hover:bg-[#FEE4D7]/30 transition-colors">
+                  <td className="py-3.5 px-4 font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                    #{s.id.slice(0, 8)}
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold text-[#9F6839] dark:text-[#DABA8C]">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{new Date(s.created_at).toLocaleString()}</span>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
+                  <td className="py-3.5 px-4">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px]">
+                      {s.payment_method === 'efectivo' ? '💵 Efectivo' : s.payment_method === 'transferencia' ? '📱 Transferencia' : '💳 Mixto'}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 800, color: 'var(--primary)' }}>
+                  <td className="py-3.5 px-4 font-semibold">{s.sold_by_username || 'Vendedor'}</td>
+                  <td className="py-3.5 px-4 text-right font-extrabold text-sm text-emerald-600">
                     ${s.total.toLocaleString()}
                   </td>
-                  <td>
-                    <button className="secondary" onClick={() => handleViewDetail(s.id)}>
-                      🔍 Ver detalle
+                  <td className="py-3.5 px-4 text-center">
+                    <button
+                      onClick={() => handlePrintReceipt(s)}
+                      className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
+                      title="Imprimir / Ver Ticket"
+                    >
+                      <Printer className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
-              )
-            })}
-            {filteredSales.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  No hay registros de ventas que coincidan con los filtros.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+              {filteredSales.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-[#9F6839] font-medium">
+                    No se encontraron ventas registradas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Modal de Detalle de Venta */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Detalle de la Venta">
-        {loadingDetail || !selectedSale ? (
-          <p>Cargando información del pedido...</p>
-        ) : (
-          <div>
-            <div style={{ background: '#f5f5f4', padding: '1rem', borderRadius: '8px', marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.9rem' }}>
-              <div><strong>Cliente:</strong> {selectedSale.customer_name}</div>
-              <div><strong>Atendido por:</strong> {selectedSale.sold_by_username || 'Sistema'}</div>
-              <div><strong>Fecha:</strong> {new Date(selectedSale.created_at).toLocaleString()}</div>
-              <div><strong>Forma de Pago:</strong> {selectedSale.payment_method.toUpperCase()}</div>
-              {selectedSale.payment_method === 'mixto' && (
-                <div style={{ gridColumn: '1 / -1', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Desglose: Efectivo (${selectedSale.cash_amount}) + Transferencia (${selectedSale.transfer_amount})
-                </div>
-              )}
+      {/* Modal Recibo Impreso */}
+      <Modal isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)} title="Recibo de Venta Toffe">
+        {selectedSale && (
+          <div className="space-y-4">
+            <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
+              <div className="border-b pb-3">
+                <h2 className="text-lg font-bold">☕ TOFFE COFFEE</h2>
+                <p className="text-[10px] text-gray-500">"Hecho por y para estudiantes"</p>
+                <p className="text-[10px] text-gray-500 mt-1">Venta #{selectedSale.id.slice(0, 8)}</p>
+                <p className="text-[10px] text-gray-500">{new Date(selectedSale.created_at).toLocaleString()}</p>
+              </div>
+
+              <div className="text-left space-y-1 text-xs">
+                <div><strong>Cliente:</strong> {selectedSale.customer_name || 'Cliente General'}</div>
+                <div><strong>Forma Pago:</strong> {selectedSale.payment_method}</div>
+                <div><strong>Cajero:</strong> {selectedSale.sold_by_username || 'Caja'}</div>
+              </div>
+
+              <div className="border-t border-b py-3 space-y-1 text-left">
+                {(selectedSale.items || []).map((it, idx) => (
+                  <div key={idx} className="flex justify-between">
+                    <span>{it.quantity}x {it.product_name}</span>
+                    <span className="font-bold">${(it.unit_price * it.quantity).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-between text-sm font-extrabold pt-2">
+                <span>TOTAL PAGADO:</span>
+                <span>${selectedSale.total.toLocaleString()}</span>
+              </div>
             </div>
 
-            <h4 style={{ marginBottom: '0.75rem' }}>Productos Comprados</h4>
-            <div className="table-container" style={{ marginBottom: '1.25rem' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Cant.</th>
-                    <th>Precio U.</th>
-                    <th>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedSale.items || []).map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: 600 }}>{item.product_name || item.product_id}</td>
-                      <td>x{item.quantity}</td>
-                      <td>${item.unit_price.toLocaleString()}</td>
-                      <td style={{ fontWeight: 700 }}>${(item.unit_price * item.quantity).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--primary-light)', padding: '1rem', borderRadius: '8px' }}>
-              <span style={{ fontWeight: 700, color: 'var(--primary-text)' }}>Total de la Venta:</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--primary)' }}>${selectedSale.total.toLocaleString()}</span>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setIsReceiptOpen(false)}
+                className="px-4 py-2.5 rounded-2xl bg-white border border-gray-300 text-xs font-bold cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={executeBrowserPrint}
+                className="px-5 py-2.5 rounded-2xl bg-[#9F6839] text-white text-xs font-extrabold shadow-md cursor-pointer inline-flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" /> Imprimir Comprobante
+              </button>
             </div>
           </div>
         )}

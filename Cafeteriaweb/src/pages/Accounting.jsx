@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { DollarSign, Plus, TrendingUp, TrendingDown, Calendar, Wallet } from 'lucide-react'
 
 export default function Accounting() {
   const [summary, setSummary] = useState(null)
@@ -8,11 +9,11 @@ export default function Accounting() {
   const [sales, setSales] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [period, setPeriod] = useState('month')
-  const [activeTab, setActiveTab] = useState('sales') // 'sales' | 'expenses' | 'all'
+  const [activeTab, setActiveTab] = useState('sales')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  // Modal para registrar gastos
+  // Modal Registrar Gasto
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
@@ -82,22 +83,21 @@ export default function Accounting() {
   }
 
   const categoryBadges = {
-    insumos: { label: '📦 Insumos', style: { background: '#fef3c7', color: '#92400e' } },
-    servicios: { label: '💡 Servicios', style: { background: '#e0e7ff', color: '#3730a3' } },
-    mantenimiento: { label: '🛠️ Mantenimiento', style: { background: '#fee2e2', color: '#991b1b' } },
-    nomina: { label: '👤 Nómina', style: { background: '#dcfce7', color: '#166534' } },
-    otros: { label: '📑 Otros', style: { background: '#f5f5f4', color: '#57534e' } }
+    insumos: { label: '📦 Insumos', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
+    servicios: { label: '💡 Servicios', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
+    mantenimiento: { label: '🛠️ Mantenimiento', style: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300' },
+    nomina: { label: '👤 Nómina', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+    otros: { label: '📑 Otros', style: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' }
   }
 
   const paymentBadges = {
-    efectivo: { label: '💵 Efectivo', style: { background: '#dcfce7', color: '#166534' } },
-    transferencia: { label: '📱 Transferencia', style: { background: '#e0e7ff', color: '#3730a3' } },
-    mixto: { label: '💳 Mixto', style: { background: '#fef3c7', color: '#92400e' } }
+    efectivo: { label: '💵 Efectivo', style: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
+    transferencia: { label: '📱 Transferencia', style: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
+    mixto: { label: '💳 Mixto', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' }
   }
 
-  if (loading) return <p>Cargando reporte de contabilidad...</p>
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando contabilidad...</p>
 
-  // Movimientos combinados en orden cronológico
   const combinedMovements = [
     ...sales.map((s) => ({
       id: s.id,
@@ -120,81 +120,127 @@ export default function Accounting() {
   ].sort((a, b) => new Date(b.date) - new Date(a.date))
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">Sistema de Contabilidad & Gastos</h2>
-          <p className="page-subtitle">Control financiero completo de ingresos por ventas y registro de egresos</p>
+          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+            Contabilidad & Balance Financiero
+          </h2>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Registro unificado de ventas, ingresos, egresos y flujo de caja
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ width: 160 }}>
+
+        <div className="flex items-center gap-3">
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-3.5 py-2 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+          >
             <option value="today">📅 Hoy</option>
             <option value="week">📅 Esta Semana</option>
             <option value="month">📅 Este Mes</option>
             <option value="all">📅 Histórico Total</option>
           </select>
-          <button onClick={openCreateModal}>
-            + Registrar Gasto
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md cursor-pointer transition-all"
+          >
+            <Plus className="w-4 h-4" /> Registrar Gasto
           </button>
         </div>
       </div>
 
-      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
+      {pageError && (
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+          ⚠️ {pageError}
+        </div>
+      )}
 
-      {/* Tarjetas KPI Financieras */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <span className="kpi-title">Ingresos Totales</span>
-          <span className="kpi-value income">${(summary?.total_income || 0).toLocaleString()}</span>
-          <span className="kpi-sub">Ventas realizadas ({summary?.sales_count || 0})</span>
+      {/* Tarjetas KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
+            <span>Ingresos Totales</span>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-600">
+            ${(summary?.total_income || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Ventas realizadas: {summary?.sales_count || 0}
+          </p>
         </div>
 
-        <div className="kpi-card">
-          <span className="kpi-title">Gastos Totales</span>
-          <span className="kpi-value expense">${(summary?.total_expenses || 0).toLocaleString()}</span>
-          <span className="kpi-sub">Egresos registrados ({summary?.expenses_count || 0})</span>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
+            <span>Gastos Registrados</span>
+            <TrendingDown className="w-4 h-4 text-red-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-red-600">
+            ${(summary?.total_expenses || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Egresos cargados: {summary?.expenses_count || 0}
+          </p>
         </div>
 
-        <div className="kpi-card">
-          <span className="kpi-title">Balance Neto (Ganancia)</span>
-          <span className={`kpi-value ${(summary?.net_balance || 0) >= 0 ? 'income' : 'expense'}`}>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
+            <span>Balance Neto</span>
+            <DollarSign className="w-4 h-4 text-[#9F6839]" />
+          </div>
+          <div className={`text-2xl font-extrabold ${(summary?.net_balance || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             ${(summary?.net_balance || 0).toLocaleString()}
-          </span>
-          <span className="kpi-sub">Ingresos - Gastos</span>
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Ingresos - Egresos
+          </p>
         </div>
 
-        <div className="kpi-card">
-          <span className="kpi-title">Ingresos por Método</span>
-          <div style={{ fontSize: '0.9rem', marginTop: '0.25rem' }}>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
+            <span>Desglose Métodos Pago</span>
+            <Wallet className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-xs space-y-1 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
             <div>💵 Efectivo: <strong>${(summary?.income_by_payment_method?.efectivo || 0).toLocaleString()}</strong></div>
             <div>📱 Transferencia: <strong>${(summary?.income_by_payment_method?.transferencia || 0).toLocaleString()}</strong></div>
           </div>
         </div>
       </div>
 
-      {/* Selector de Pestañas (Ingresos / Gastos / Flujo de Caja) */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+      {/* Pestañas (Ingresos / Gastos / Flujo Combinado) */}
+      <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2">
         <button
-          type="button"
-          className={activeTab === 'sales' ? '' : 'secondary'}
           onClick={() => setActiveTab('sales')}
-          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'sales'
+              ? 'bg-[#9F6839] text-white shadow-xs'
+              : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+          }`}
         >
-          🟢 Ingresos (Ventas)
+          🟢 Ingresos por Ventas
         </button>
         <button
-          type="button"
-          className={activeTab === 'expenses' ? '' : 'secondary'}
           onClick={() => setActiveTab('expenses')}
-          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'expenses'
+              ? 'bg-[#9F6839] text-white shadow-xs'
+              : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+          }`}
         >
-          🔴 Gastos (Egresos)
+          🔴 Gastos & Egresos
         </button>
         <button
-          type="button"
-          className={activeTab === 'all' ? '' : 'secondary'}
           onClick={() => setActiveTab('all')}
-          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'all'
+              ? 'bg-[#9F6839] text-white shadow-xs'
+              : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
+          }`}
         >
           📋 Flujo de Caja Combinado
         </button>
@@ -202,31 +248,31 @@ export default function Accounting() {
 
       {/* Pestaña 1: Ingresos por Ventas */}
       {activeTab === 'sales' && (
-        <div className="table-container">
-          <table>
-            <thead>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
               <tr>
-                <th>Fecha / Hora</th>
-                <th>Cliente</th>
-                <th>Método de Pago</th>
-                <th>Vendido Por</th>
-                <th>Monto Ingresado</th>
+                <th className="py-3.5 px-4">Fecha / Hora</th>
+                <th className="py-3.5 px-4">Cliente</th>
+                <th className="py-3.5 px-4">Método de Pago</th>
+                <th className="py-3.5 px-4">Vendido Por</th>
+                <th className="py-3.5 px-4 text-right">Monto Ingresado</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {sales.map((s) => {
                 const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
                 return (
                   <tr key={s.id}>
-                    <td>{new Date(s.created_at).toLocaleString()}</td>
-                    <td style={{ fontWeight: 600 }}>{s.customer_name || 'Cliente General'}</td>
-                    <td>
-                      <span style={{ ...pBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <td className="py-3.5 px-4 font-semibold">{new Date(s.created_at).toLocaleString()}</td>
+                    <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] ${pBadge.style}`}>
                         {pBadge.label}
                       </span>
                     </td>
-                    <td>{s.sold_by_username || 'Vendedor'}</td>
-                    <td style={{ fontWeight: 800, color: 'var(--success)' }}>
+                    <td className="py-3.5 px-4">{s.sold_by_username || 'Vendedor'}</td>
+                    <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
                       +${s.total.toLocaleString()}
                     </td>
                   </tr>
@@ -234,7 +280,7 @@ export default function Accounting() {
               })}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                  <td colSpan={5} className="text-center py-8 text-[#9F6839] font-medium">
                     No hay ingresos registrados en este periodo.
                   </td>
                 </tr>
@@ -246,51 +292,49 @@ export default function Accounting() {
 
       {/* Pestaña 2: Gastos Registrados */}
       {activeTab === 'expenses' && (
-        <div className="table-container">
-          <table>
-            <thead>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
               <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th>Categoría</th>
-                <th>Forma Pago</th>
-                <th>Insumo Asociado</th>
-                <th>Monto Erogado</th>
-                <th>Registrado Por</th>
+                <th className="py-3.5 px-4">Fecha</th>
+                <th className="py-3.5 px-4">Descripción</th>
+                <th className="py-3.5 px-4">Categoría</th>
+                <th className="py-3.5 px-4">Forma Pago</th>
+                <th className="py-3.5 px-4">Insumo Asociado</th>
+                <th className="py-3.5 px-4 text-right">Monto Erogado</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {expenses.map((exp) => {
                 const catBadge = categoryBadges[exp.category] || categoryBadges.otros
                 return (
                   <tr key={exp.id}>
-                    <td>{new Date(exp.created_at).toLocaleDateString()}</td>
-                    <td style={{ fontWeight: 600 }}>{exp.description}</td>
-                    <td>
-                      <span style={{ ...catBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <td className="py-3.5 px-4 font-semibold">{new Date(exp.created_at).toLocaleDateString()}</td>
+                    <td className="py-3.5 px-4 font-bold">{exp.description}</td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] ${catBadge.style}`}>
                         {catBadge.label}
                       </span>
                     </td>
-                    <td>{exp.payment_method === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}</td>
-                    <td>
+                    <td className="py-3.5 px-4">{exp.payment_method === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}</td>
+                    <td className="py-3.5 px-4">
                       {exp.ingredient_name ? (
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                        <span className="text-emerald-600 font-bold text-xs">
                           + {exp.quantity_added} unidades de {exp.ingredient_name}
                         </span>
                       ) : (
                         '—'
                       )}
                     </td>
-                    <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
+                    <td className="py-3.5 px-4 text-right font-extrabold text-red-600 text-sm">
                       -${exp.amount.toLocaleString()}
                     </td>
-                    <td>{exp.registerer_name || 'Vendedor'}</td>
                   </tr>
                 )
               })}
               {expenses.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                  <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
                     No hay gastos registrados en este periodo.
                   </td>
                 </tr>
@@ -302,79 +346,72 @@ export default function Accounting() {
 
       {/* Pestaña 3: Flujo de Caja Combinado */}
       {activeTab === 'all' && (
-        <div className="table-container">
-          <table>
-            <thead>
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
               <tr>
-                <th>Fecha / Hora</th>
-                <th>Tipo</th>
-                <th>Concepto / Cliente</th>
-                <th>Detalles</th>
-                <th>Forma Pago</th>
-                <th>Monto</th>
+                <th className="py-3.5 px-4">Fecha / Hora</th>
+                <th className="py-3.5 px-4">Tipo</th>
+                <th className="py-3.5 px-4">Concepto / Cliente</th>
+                <th className="py-3.5 px-4">Detalles</th>
+                <th className="py-3.5 px-4 text-right">Monto</th>
               </tr>
             </thead>
-            <tbody>
-              {combinedMovements.map((m) => {
-                const pBadge = paymentBadges[m.paymentMethod] || paymentBadges.efectivo
-                return (
-                  <tr key={m.id} style={{ background: m.type === 'income' ? '#f0fdf4' : '#fef2f2' }}>
-                    <td>{new Date(m.date).toLocaleString()}</td>
-                    <td>
-                      {m.type === 'income' ? (
-                        <span className="badge-status status-listo">🟢 Ingreso</span>
-                      ) : (
-                        <span className="badge-status status-cancelado">🔴 Gasto</span>
-                      )}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{m.concept}</td>
-                    <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{m.details}</td>
-                    <td>
-                      <span style={{ ...pBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
-                        {pBadge.label}
+            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+              {combinedMovements.map((m) => (
+                <tr key={m.id} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : 'bg-red-50/30 dark:bg-red-950/20'}>
+                  <td className="py-3.5 px-4 font-semibold">{new Date(m.date).toLocaleString()}</td>
+                  <td className="py-3.5 px-4">
+                    {m.type === 'income' ? (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px]">
+                        🟢 Ingreso
                       </span>
-                    </td>
-                    <td style={{ fontWeight: 800, color: m.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
-                      {m.type === 'income' ? `+$${m.amount.toLocaleString()}` : `-$${m.amount.toLocaleString()}`}
-                    </td>
-                  </tr>
-                )
-              })}
-              {combinedMovements.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                    No hay movimientos contables registrados.
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px]">
+                        🔴 Gasto
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 font-bold">{m.concept}</td>
+                  <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">{m.details}</td>
+                  <td className={`py-3.5 px-4 text-right font-extrabold text-sm ${m.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {m.type === 'income' ? `+$${m.amount.toLocaleString()}` : `-$${m.amount.toLocaleString()}`}
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Modal Registrar Nuevo Gasto */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Nuevo Gasto / Compra">
-        <form onSubmit={handleCreateExpense}>
+      {/* Modal Registrar Gasto */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Nuevo Gasto / Egreso">
+        <form onSubmit={handleCreateExpense} className="space-y-4">
           {formError && (
-            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
               ⚠️ {formError}
             </div>
           )}
 
-          <div className="form-group">
-            <label>Descripción del Gasto / Compra</label>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Descripción del Gasto
+            </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ej. Compra de 5kg Café en Grano / Servicio de Luz"
               required
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Monto ($)</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Monto ($)
+              </label>
               <input
                 type="number"
                 step="0.01"
@@ -383,20 +420,33 @@ export default function Accounting() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 required
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               />
             </div>
-            <div className="form-group">
-              <label>Forma de Pago</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Forma de Pago
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              >
                 <option value="efectivo">💵 Efectivo</option>
                 <option value="transferencia">📱 Transferencia</option>
               </select>
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Categoría</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Categoría
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            >
               <option value="insumos">📦 Insumos / Materia Prima</option>
               <option value="servicios">💡 Servicios Básicos</option>
               <option value="mantenimiento">🛠️ Mantenimiento & Equipos</option>
@@ -406,45 +456,52 @@ export default function Accounting() {
           </div>
 
           {category === 'insumos' && (
-            <div style={{ background: '#fffbeb', padding: '1rem', border: '1px solid #fef3c7', borderRadius: '8px', marginBottom: '1.25rem' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#92400e', marginBottom: '0.75rem' }}>
-                📦 Reabastecer Stock en Inventario (Opcional)
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Seleccionar Insumo</label>
-                  <select value={ingredientId} onChange={(e) => setIngredientId(e.target.value)}>
-                    <option value="">No sumar a inventario</option>
-                    {ingredients.map((ing) => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.name} (Stock actual: {ing.quantity} {ing.unit})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E]">
+              <span className="block text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+                📦 Reabastecer Inventario (Opcional)
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={ingredientId}
+                  onChange={(e) => setIngredientId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                >
+                  <option value="">No sumar a inventario</option>
+                  {ingredients.map((ing) => (
+                    <option key={ing.id} value={ing.id}>
+                      {ing.name} ({ing.quantity} {ing.unit})
+                    </option>
+                  ))}
+                </select>
                 {ingredientId && (
-                  <div className="form-group">
-                    <label>Cantidad a Sumar</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={quantityAdded}
-                      onChange={(e) => setQuantityAdded(e.target.value)}
-                      placeholder="Ej. 5.0"
-                      required
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={quantityAdded}
+                    onChange={(e) => setQuantityAdded(e.target.value)}
+                    placeholder="Cantidad a sumar"
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                  />
                 )}
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <button type="button" className="secondary" onClick={() => setIsModalOpen(false)}>
+          <div className="flex gap-3 justify-end pt-3">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+            >
               Cancelar
             </button>
-            <button type="submit" disabled={submitting}>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
+            >
               {submitting ? 'Guardando...' : 'Registrar Gasto'}
             </button>
           </div>

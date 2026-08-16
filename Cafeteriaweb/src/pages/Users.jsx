@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
+import { Users as UsersIcon, UserCheck, Shield, Key, Plus, Edit2, Lock } from 'lucide-react'
 
 export default function Users() {
   const { user: currentUser } = useAuth()
@@ -78,7 +79,6 @@ export default function Users() {
       setIsModalOpen(false)
       await loadUsers()
     } catch (err) {
-      // Mostrar el mensaje de error DENTRO del formulario modal exclusivamente
       setFormError(
         err.message.includes('ya')
           ? 'Ese nombre de usuario ya está registrado'
@@ -89,75 +89,105 @@ export default function Users() {
     }
   }
 
-  const roleLabels = {
-    owner: '👑 Dueño',
-    admin: '🛡️ Administrador',
-    employee: '☕ Empleado'
+  const roleBadges = {
+    owner: { label: '👑 Dueño', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+    admin: { label: '🛡️ Administrador', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+    employee: { label: '☕ Empleado', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' }
   }
 
   const isPrimaryOwner = Boolean(
     editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio')
   )
 
-  if (loading) return <p>Cargando usuarios...</p>
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando usuarios...</p>
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">Gestión de Usuarios</h2>
-          <p className="page-subtitle">Cuentas y roles del personal del sistema</p>
+          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
+            Gestión de Usuarios & Personal
+          </h2>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Cuentas, credenciales de acceso y permisos de caja del equipo Toffe
+          </p>
         </div>
-        <button onClick={openCreateModal}>
+
+        <button
+          onClick={openCreateModal}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
           + Nuevo Usuario
         </button>
       </div>
 
-      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
+      {pageError && (
+        <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold">
+          ⚠️ {pageError}
+        </div>
+      )}
 
-      {/* Tabla de Usuarios */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Rol asignado</th>
-              <th>Fecha de Creación</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td style={{ fontWeight: 600 }}>
-                  {u.username} {currentUser?.id === u.id && <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', marginLeft: '0.35rem' }}>(Tú)</span>}
-                </td>
-                <td>
-                  <span className={`role-badge role-${u.role}`}>
-                    {roleLabels[u.role] || u.role}
+      {/* Grid de Tarjetas de Usuario */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {users.map((u) => {
+          const isCurrentUser = currentUser?.id === u.id
+          const badge = roleBadges[u.role] || roleBadges.employee
+
+          return (
+            <div
+              key={u.id}
+              className={`bg-white dark:bg-[#201009] border rounded-3xl p-5 flex flex-col justify-between shadow-xs transition-all ${
+                isCurrentUser
+                  ? 'border-[#9F6839] ring-2 ring-[#9F6839]/30 shadow-md'
+                  : 'border-[#D4B28E]/60 dark:border-[#9F6839]/40 hover:border-[#9F6839]'
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-xl flex items-center justify-center border border-[#D4B28E]/50">
+                    {u.username.charAt(0).toUpperCase()}
+                  </div>
+
+                  <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase tracking-wider ${badge.style}`}>
+                    {badge.label}
                   </span>
-                </td>
-                <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    className="secondary"
-                    onClick={() => openEditModal(u)}
-                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}
-                  >
-                    ✏️ Editar
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  No hay usuarios registrados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </div>
+
+                <h3 className="text-base font-bold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
+                  {u.username}
+                  {isCurrentUser && (
+                    <span className="text-[10px] font-bold bg-[#FEE4D7] text-[#9F6839] px-2 py-0.5 rounded-full border border-[#D4B28E]">
+                      (Tú)
+                    </span>
+                  )}
+                </h3>
+
+                <div className="mt-4 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 space-y-1.5 text-xs text-[#9F6839] dark:text-[#DABA8C]">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-3.5 h-3.5 text-[#9F6839]" />
+                    <span>Permisos: {u.role === 'owner' ? 'Acceso Total' : u.role === 'admin' ? 'Administración' : 'POS & Ventas'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Key className="w-3.5 h-3.5 text-[#9F6839]" />
+                    <span>Creado: {new Date(u.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30">
+                <button
+                  onClick={() => openEditModal(u)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] hover:bg-[#9F6839] text-[#432414] dark:text-[#FEE4D7] hover:text-white border border-[#D4B28E]/60 dark:border-[#9F6839]/50 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar Usuario & Rol</span>
+                </button>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Modal Crear / Editar Usuario */}
@@ -166,28 +196,30 @@ export default function Users() {
         onClose={() => setIsModalOpen(false)}
         title={editingUser ? `Editar Usuario: ${editingUser.username}` : 'Nuevo Usuario'}
       >
-        <form onSubmit={handleSubmit}>
-          {/* Alerta de Error DENTRO del Modal */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+            <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold">
               ⚠️ {formError}
             </div>
           )}
 
-          <div className="form-group">
-            <label>Nombre de Usuario</label>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Nombre de Usuario
+            </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Ej. carlos_barista"
               required
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 
-          <div className="form-group">
-            <label>
-              Contraseña {editingUser ? '(Opcional: Dejar en blanco para conservar la actual)' : '(Mínimo 8 caracteres)'}
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Contraseña {editingUser ? '(Opcional: Vacío para conservar actual)' : '(Mínimo 8 caracteres)'}
             </label>
             <input
               type="password"
@@ -196,32 +228,45 @@ export default function Users() {
               placeholder={editingUser ? '•••••••• (vacío para no cambiar)' : 'Escribe una contraseña segura'}
               required={!editingUser}
               minLength={password ? 8 : undefined}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 
-          <div className="form-group">
-            <label>Rol de Sistema</label>
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Rol de Sistema
+            </label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
               disabled={isPrimaryOwner}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             >
               <option value="employee">☕ Empleado (Ventas, Comandas, Inventario lectura)</option>
               <option value="admin">🛡️ Administrador (Acceso completo salvo gestión usuarios)</option>
               <option value="owner">👑 Dueño (Control total del sistema)</option>
             </select>
             {isPrimaryOwner && (
-              <p style={{ fontSize: '0.78rem', color: '#92400e', background: '#fffbeb', padding: '6px 10px', borderRadius: '6px', marginTop: '0.35rem', border: '1px solid #fef3c7' }}>
-                🔒 El rol del dueño principal está protegido y no se puede modificar.
+              <p className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-semibold flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+                El rol del dueño principal está protegido permanentemente por ID y no se puede modificar.
               </p>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <button type="button" className="secondary" onClick={() => setIsModalOpen(false)}>
+          <div className="flex gap-3 justify-end pt-4 border-t border-[#D4B28E]/40">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] hover:bg-[#FEE4D7]/50 cursor-pointer"
+            >
               Cancelar
             </button>
-            <button type="submit" disabled={submitting}>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md disabled:opacity-50 cursor-pointer"
+            >
               {submitting ? 'Guardando...' : editingUser ? 'Actualizar Usuario' : 'Crear Usuario'}
             </button>
           </div>

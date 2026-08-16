@@ -1,213 +1,306 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import {
+  ShoppingBag,
+  FileText,
+  UtensilsCrossed,
+  Package,
+  Coffee,
+  DollarSign,
+  BarChart3,
+  CheckSquare,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Sun,
+  Moon,
+  Menu,
+  X
+} from 'lucide-react'
+import { ToffeeMarblePattern } from './ToffeeMarblePattern'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [mobileOpen, setMobileOpen] = useState(false)
+
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true'
   })
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('toffe_dark_mode')
+    if (saved !== null) return saved === 'true'
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  useEffect(() => {
+    localStorage.setItem('toffe_dark_mode', String(isDarkMode))
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [isDarkMode])
+
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev)
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar_collapsed', String(next))
+      return next
+    })
+  }
 
   function handleLogout() {
     logout()
     navigate('/login')
   }
 
-  function toggleCollapse() {
-    setIsCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem('sidebar_collapsed', next.toString())
-      return next
-    })
+  const roleLabels = {
+    owner: '👑 DUEÑO',
+    admin: '🛡️ ADMIN',
+    employee: '☕ EMPLEADO'
   }
 
   const isOwner = user?.role === 'owner'
-  const isAdmin = user?.role === 'admin' || isOwner
+  const isAdmin = isOwner || user?.role === 'admin'
 
-  const roleLabels = {
-    owner: 'Dueño',
-    admin: 'Administrador',
-    employee: 'Empleado'
-  }
+  const navItems = [
+    { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true, show: true },
+    { to: '/sales/history', label: 'Historial Ventas', icon: FileText, show: true },
+    { to: '/comandas', label: 'Comandas (Cocina)', icon: UtensilsCrossed, show: true },
+    { to: '/inventory', label: 'Inventario', icon: Package, show: true },
+    { to: '/products', label: 'Productos', icon: Coffee, show: true },
+    { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isAdmin },
+    { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
+    { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true },
+    { to: '/users', label: 'Usuarios', icon: Users, show: isOwner }
+  ]
 
   return (
-    <div className="app-shell">
-      {/* Botón de toggle móvil */}
-      <header className="mobile-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+    <div className="flex h-screen w-screen overflow-hidden bg-[#FEE4D7]/40 dark:bg-[#150904] text-[#432414] dark:text-[#FEE4D7] transition-colors duration-200">
+      {/* Mobile Top Header */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white dark:bg-[#201009] border-b border-[#D4B28E]/60 dark:border-[#9F6839]/40 px-4 flex items-center justify-between z-40 shadow-sm">
+        <div className="flex items-center gap-3">
           <button
-            className="mobile-menu-btn"
             onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-1.5 rounded-xl text-[#432414] dark:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#2A150C]"
             aria-label="Abrir menú"
           >
-            ☰
+            <Menu className="w-6 h-6" />
           </button>
-          <div className="mobile-brand-block">
-            <span className="mobile-title">☕ Toffe</span>
-            <span className="mobile-slogan">"Hecho por y para estudiantes"</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[#432414] text-[#DABA8C] flex items-center justify-center font-bold text-sm">
+              ☕
+            </div>
+            <div>
+              <span className="font-extrabold text-sm text-[#432414] dark:text-[#FEE4D7] block leading-tight">
+                Toffe
+              </span>
+              <span className="text-[9px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider block">
+                "Hecho por y para estudiantes"
+              </span>
+            </div>
           </div>
         </div>
+
+        <button
+          onClick={toggleDarkMode}
+          className="p-2 rounded-xl text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#FEE4D7] dark:hover:bg-[#2A150C]"
+        >
+          {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </button>
       </header>
 
-      {/* Overlay para cerrar sidebar en móvil */}
+      {/* Mobile Backdrop */}
       {mobileOpen && (
-        <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />
+        <div
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-45"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
-      {/* Sidebar Lateral */}
-      <aside className={`app-sidebar ${mobileOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-brand">
-          <div className="brand-logo-wrapper">
-            <div className="brand-logo">☕</div>
-            {!isCollapsed && (
-              <div className="brand-text">
-                <h1 className="brand-title">Toffe</h1>
-                <span className="brand-subtitle">"Hecho por y para estudiantes"</span>
+      {/* Sidebar Navigation */}
+      <aside
+        className={`fixed lg:static top-0 bottom-0 left-0 flex flex-col justify-between h-full bg-white dark:bg-[#201009] border-r border-[#D4B28E]/60 dark:border-[#9F6839]/40 shadow-sm transition-all duration-300 z-50 select-none ${
+          mobileOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'
+        } ${isCollapsed ? 'lg:w-20' : 'lg:w-64 lg:min-w-[16rem]'}`}
+      >
+        <div className="flex-1 overflow-y-auto">
+          {/* Header & Logo */}
+          <div className="relative overflow-hidden p-4 border-b border-[#D4B28E]/50 dark:border-[#9F6839]/30 bg-[#FEE4D7]/40 dark:bg-[#2A150C]">
+            <div className="absolute inset-0 opacity-15 pointer-events-none">
+              <ToffeeMarblePattern />
+            </div>
+
+            <div className="relative flex items-center justify-between z-10">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-[#432414] dark:bg-[#34180D] border border-[#9F6839] text-[#DABA8C] shrink-0 shadow-xs">
+                  <Coffee className="w-5 h-5 text-[#DABA8C]" />
+                </div>
+                {!isCollapsed && (
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-lg text-[#432414] dark:text-[#FEE4D7] tracking-tight leading-tight">
+                      Toffe Coffee
+                    </span>
+                    <span className="text-[9px] font-bold tracking-wider text-[#9F6839] dark:text-[#DABA8C] uppercase truncate">
+                      "Hecho por y para estudiantes"
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Toggle in desktop */}
+              <button
+                onClick={toggleCollapse}
+                className="hidden lg:flex p-1.5 rounded-xl text-[#432414]/70 dark:text-[#DABA8C]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114] transition-colors"
+                title={isCollapsed ? 'Expandir menú' : 'Contraer menú'}
+              >
+                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+
+              {/* Close in mobile */}
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="lg:hidden p-1.5 rounded-xl text-[#432414] dark:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="sidebar-collapse-btn desktop-only"
-            onClick={toggleCollapse}
-            title={isCollapsed ? 'Expandir panel lateral' : 'Colapsar panel lateral'}
-          >
-            {isCollapsed ? '❯' : '❮'}
-          </button>
-          <button
-            type="button"
-            className="sidebar-close-btn mobile-only"
-            onClick={() => setMobileOpen(false)}
-            title="Cerrar menú"
-          >
-            ✕
-          </button>
+
+          {/* Navigation Items */}
+          <nav className="p-3 space-y-1.5 mt-2">
+            {navItems.filter(item => item.show).map((item) => {
+              const Icon = item.icon
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 group relative ${
+                      isActive
+                        ? 'bg-[#9F6839] text-white shadow-xs'
+                        : 'text-[#432414]/80 dark:text-[#FEE4D7]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7]/70 dark:hover:bg-[#2E180E]'
+                    } ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`
+                  }
+                  title={isCollapsed ? item.label : undefined}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
+                          isActive ? 'text-[#FEE4D7]' : 'text-[#9F6839] dark:text-[#DABA8C]'
+                        }`}
+                      />
+                      {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
+                    </>
+                  )}
+                </NavLink>
+              )
+            })}
+          </nav>
         </div>
 
-        <nav className="sidebar-nav">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Ventas (POS)"
-          >
-            <span className="nav-icon">🛒</span>
-            {!isCollapsed && <span>Ventas (POS)</span>}
-          </NavLink>
-
-          <NavLink
-            to="/sales/history"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Historial Ventas"
-          >
-            <span className="nav-icon">📜</span>
-            {!isCollapsed && <span>Historial Ventas</span>}
-          </NavLink>
-
-          <NavLink
-            to="/comandas"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Comandas (Cocina)"
-          >
-            <span className="nav-icon">🛎️</span>
-            {!isCollapsed && <span>Comandas (Cocina)</span>}
-          </NavLink>
-
-          <NavLink
-            to="/inventory"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Inventario"
-          >
-            <span className="nav-icon">📦</span>
-            {!isCollapsed && <span>Inventario</span>}
-          </NavLink>
-
-          <NavLink
-            to="/products"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Productos"
-          >
-            <span className="nav-icon">☕</span>
-            {!isCollapsed && <span>Productos</span>}
-          </NavLink>
-
-          {isAdmin && (
-            <NavLink
-              to="/accounting"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-              title="Contabilidad"
-            >
-              <span className="nav-icon">💰</span>
-              {!isCollapsed && <span>Contabilidad</span>}
-            </NavLink>
-          )}
-
-          {isOwner && (
-            <NavLink
-              to="/stats"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-              title="Estadísticas"
-            >
-              <span className="nav-icon">📊</span>
-              {!isCollapsed && <span>Estadísticas</span>}
-            </NavLink>
-          )}
-
-          <NavLink
-            to="/tasks"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => setMobileOpen(false)}
-            title="Tareas"
-          >
-            <span className="nav-icon">✅</span>
-            {!isCollapsed && <span>Tareas</span>}
-          </NavLink>
-
-          {isOwner && (
-            <NavLink
-              to="/users"
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-              title="Usuarios"
-            >
-              <span className="nav-icon">👥</span>
-              {!isCollapsed && <span>Usuarios</span>}
-            </NavLink>
-          )}
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-profile">
-            <div className="avatar">
-              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-            </div>
-            {!isCollapsed && (
-              <div className="user-info">
-                <span className="username">{user?.username}</span>
-                <span className={`role-badge role-${user?.role}`}>
-                  {roleLabels[user?.role] || user?.role}
-                </span>
+        {/* Dark Mode Switcher Section */}
+        <div className="px-3 py-2 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 bg-[#FEE4D7]/20 dark:bg-[#1B0C06]">
+          {!isCollapsed ? (
+            <div className="flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-[#2B160C] border border-[#D4B28E]/70 dark:border-[#9F6839]/50 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`p-1.5 rounded-xl transition-colors ${
+                    isDarkMode ? 'bg-[#432414] text-[#DABA8C]' : 'bg-[#FEE4D7] text-[#9F6839]'
+                  }`}
+                >
+                  {isDarkMode ? <Moon className="w-3.5 h-3.5 text-[#DABA8C]" /> : <Sun className="w-3.5 h-3.5 text-[#9F6839]" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] leading-none">
+                    {isDarkMode ? 'Modo Oscuro' : 'Modo Claro'}
+                  </span>
+                  <span className="text-[9px] font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5 leading-none">
+                    Paleta Tostada
+                  </span>
+                </div>
               </div>
-            )}
+
+              <button
+                type="button"
+                onClick={toggleDarkMode}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  isDarkMode ? 'bg-[#9F6839]' : 'bg-[#D4B28E]'
+                }`}
+                title={isDarkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+              >
+                <span
+                  className={`pointer-events-none inline-flex items-center justify-center h-5 w-5 transform rounded-full bg-white dark:bg-[#FEE4D7] shadow-lg transition duration-200 ${
+                    isDarkMode ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                >
+                  {isDarkMode ? <Moon className="w-2.5 h-2.5 text-[#432414]" /> : <Sun className="w-2.5 h-2.5 text-[#9F6839]" />}
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <button
+                onClick={toggleDarkMode}
+                className={`p-2.5 rounded-2xl border transition-all ${
+                  isDarkMode
+                    ? 'bg-[#2B160C] border-[#9F6839] text-[#DABA8C] hover:bg-[#3B1F11]'
+                    : 'bg-white border-[#D4B28E] text-[#9F6839] hover:bg-[#FEE4D7]'
+                }`}
+                title={isDarkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+              >
+                {isDarkMode ? <Moon className="w-4 h-4 text-[#DABA8C]" /> : <Sun className="w-4 h-4 text-[#9F6839]" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Active User Footer */}
+        <div className="p-3 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/40 bg-[#FEE4D7]/50 dark:bg-[#241209]">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 overflow-hidden text-left flex-1 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-[#9F6839] text-[#FEE4D7] font-bold flex items-center justify-center text-sm shrink-0 shadow-xs">
+                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
+              </div>
+              {!isCollapsed && (
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] truncate">
+                    {user?.username}
+                  </span>
+                  <span className="inline-block mt-0.5">
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-[#1C0D07] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] dark:border-[#9F6839] uppercase tracking-wider">
+                      {roleLabels[user?.role] || user?.role}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-[#9F6839] dark:text-[#DABA8C] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <button className="logout-btn" onClick={handleLogout} title="Cerrar sesión">
-            🚪 {!isCollapsed && 'Salir'}
-          </button>
         </div>
       </aside>
 
-      {/* Ámbito de Contenido Principal */}
-      <main className={`app-main-content ${isCollapsed ? 'collapsed' : ''}`}>
-        <Outlet />
+      {/* Main Screen Content */}
+      <main className="flex-1 flex flex-col h-full overflow-y-auto pt-14 lg:pt-0 bg-[#FEE4D7]/30 dark:bg-[#150904]">
+        <div className="p-4 lg:p-8 max-w-7xl mx-auto w-full">
+          <Outlet />
+        </div>
       </main>
     </div>
   )

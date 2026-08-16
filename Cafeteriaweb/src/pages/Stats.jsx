@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, Award, Flame, Users, Calendar } from 'lucide-react'
 
 export default function Stats() {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   async function loadStats() {
     try {
       const data = await api.get('/accounting/summary?period=month')
       setSummary(data)
     } catch (err) {
-      setError('No se pudieron cargar las estadísticas del mes')
+      setPageError('No se pudieron cargar las estadísticas ejecutivas')
     } finally {
       setLoading(false)
     }
@@ -21,126 +22,148 @@ export default function Stats() {
     loadStats()
   }, [])
 
-  if (loading) return <p>Cargando estadísticas ejecutivas...</p>
+  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando estadísticas ejecutivas...</p>
 
   const mStats = summary?.monthly_stats
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">📊 Estadísticas Ejecutivas del Mes</h2>
-          <p className="page-subtitle">Reporte exclusivo de rendimiento comercial, ranking de ventas y clientes para el Dueño</p>
+          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight flex items-center gap-2">
+            <span>👑</span> Estadísticas Ejecutivo & Reporte Mensual
+          </h2>
+          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
+            Dashboard exclusivo del dueño con ranking de ventas, productos estrella y clientes top
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-white dark:bg-[#201009] border border-[#D4B28E] px-3.5 py-2 rounded-2xl text-xs font-bold text-[#432414] dark:text-[#FEE4D7]">
+          <Calendar className="w-4 h-4 text-[#9F6839]" />
+          <span>Mes Actual (Toffe Coffee)</span>
         </div>
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
-
-      {mStats ? (
-        <div>
-          {/* Tarjetas KPI Principales */}
-          <div className="kpi-grid" style={{ marginBottom: '1.75rem' }}>
-            <div className="kpi-card" style={{ background: '#ffffff', borderLeft: '4px solid #10b981' }}>
-              <span className="kpi-title">Ventas Totales del Mes</span>
-              <span className="kpi-value income">${mStats.monthly_income.toLocaleString()}</span>
-              <span className="kpi-sub">Ingresos por transacciones de venta</span>
-            </div>
-
-            <div className="kpi-card" style={{ background: '#ffffff', borderLeft: '4px solid #ef4444' }}>
-              <span className="kpi-title">Gastos Totales del Mes</span>
-              <span className="kpi-value expense">${mStats.monthly_expenses.toLocaleString()}</span>
-              <span className="kpi-sub">Egresos y compras de insumos</span>
-            </div>
-
-            <div className="kpi-card" style={{ background: '#ffffff', borderLeft: `4px solid ${mStats.net_profit >= 0 ? '#10b981' : '#ef4444'}` }}>
-              <span className="kpi-title">Ganancia Neta del Mes</span>
-              <span className={`kpi-value ${mStats.net_profit >= 0 ? 'income' : 'expense'}`}>
-                ${mStats.net_profit.toLocaleString()}
-              </span>
-              <span className="kpi-sub">Ventas - Gastos</span>
-            </div>
-
-            <div className="kpi-card" style={{ background: '#ffffff', borderLeft: '4px solid #f59e0b' }}>
-              <span className="kpi-title">🥇 Mejor Vendedor del Mes</span>
-              {mStats.top_seller ? (
-                <div style={{ marginTop: '0.25rem' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--primary)' }}>
-                    {mStats.top_seller.username} <span style={{ fontSize: '0.75rem', background: '#f5f5f4', padding: '2px 8px', borderRadius: '4px', color: '#57534e' }}>({mStats.top_seller.role})</span>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Total vendido: <strong style={{ color: 'var(--success)' }}>${mStats.top_seller.total_amount.toLocaleString()}</strong> ({mStats.top_seller.sales_count} ventas)
-                  </div>
-                </div>
-              ) : (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Sin ventas este mes</div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-            {/* Tarjeta Producto Estrella */}
-            <div className="card" style={{ background: '#ffffff', border: '1px solid var(--border)' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🔥</span> Producto Más Vendido del Mes
-              </h3>
-              {mStats.top_product ? (
-                <div style={{ background: '#fffbeb', padding: '1.25rem', borderRadius: '12px', border: '1px solid #fef3c7' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#92400e' }}>
-                    {mStats.top_product.product_name}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', fontSize: '0.95rem' }}>
-                    <span>Cantidad Vendida:</span>
-                    <strong style={{ color: 'var(--primary)' }}>{mStats.top_product.total_qty} unidades</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem', fontSize: '0.95rem' }}>
-                    <span>Ingresos Generados:</span>
-                    <strong style={{ color: 'var(--success)' }}>${mStats.top_product.total_amount.toLocaleString()}</strong>
-                  </div>
-                </div>
-              ) : (
-                <p style={{ color: 'var(--text-muted)' }}>No hay productos vendidos este mes.</p>
-              )}
-            </div>
-
-            {/* Tarjeta Top 5 Clientes */}
-            <div className="card" style={{ background: '#ffffff', border: '1px solid var(--border)' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>🏆</span> Top 5 Clientes que Más Compraron
-              </h3>
-              {mStats.top_customers && mStats.top_customers.length > 0 ? (
-                <div className="table-container" style={{ border: 'none', boxShadow: 'none' }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Puesto</th>
-                        <th>Cliente</th>
-                        <th>Órdenes</th>
-                        <th>Total Comprado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mStats.top_customers.map((c, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: 800, color: 'var(--primary)' }}>#{idx + 1}</td>
-                          <td style={{ fontWeight: 600 }}>{c.customer_name}</td>
-                          <td>{c.orders_count} ord</td>
-                          <td style={{ fontWeight: 800, color: 'var(--success)' }}>
-                            ${c.total_spent.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p style={{ color: 'var(--text-muted)' }}>No hay clientes registrados este mes.</p>
-              )}
-            </div>
-          </div>
+      {pageError && (
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+          ⚠️ {pageError}
         </div>
-      ) : (
-        <p style={{ color: 'var(--text-muted)' }}>No hay estadísticas disponibles.</p>
       )}
+
+      {/* Tarjetas KPI Financieras Exec */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <span>Ventas del Mes</span>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-600">
+            ${(mStats?.monthly_income || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Ingreso bruto facturado
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <span>Gastos del Mes</span>
+            <TrendingDown className="w-4 h-4 text-red-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-red-600">
+            ${(mStats?.monthly_expenses || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Egresos operativos del mes
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <span>Ganancia Neta</span>
+            <DollarSign className="w-4 h-4 text-[#9F6839]" />
+          </div>
+          <div className={`text-2xl font-extrabold ${(mStats?.net_profit || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            ${(mStats?.net_profit || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Utilidad disponible
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <span>🥇 Mejor Vendedor</span>
+            <Award className="w-4 h-4 text-amber-600" />
+          </div>
+          {mStats?.top_seller ? (
+            <div>
+              <div className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                {mStats.top_seller.username} <span className="text-[10px] bg-[#FEE4D7] dark:bg-[#34180D] px-2 py-0.5 rounded-full border border-[#D4B28E]">({mStats.top_seller.role})</span>
+              </div>
+              <div className="text-xs font-bold text-emerald-600 mt-1">
+                ${mStats.top_seller.total_amount.toLocaleString()} ({mStats.top_seller.sales_count} ventas)
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#9F6839]">Sin ventas este mes</p>
+          )}
+        </div>
+      </div>
+
+      {/* Rankings Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Producto Más Vendido */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40 mb-4">
+            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-600" /> Producto Más Vendido del Mes
+            </h3>
+          </div>
+          {mStats?.top_product ? (
+            <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2E180E] border border-[#D4B28E]">
+              <div className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                {mStats.top_product.product_name}
+              </div>
+              <div className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-2">
+                Cantidad Vendida: <strong className="text-[#432414] dark:text-[#FEE4D7]">{mStats.top_product.total_qty} unidades</strong>
+              </div>
+              <div className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-1">
+                Ingreso Generado: <strong className="text-emerald-600">${mStats.top_product.total_amount.toLocaleString()}</strong>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-[#9F6839]">Sin datos de productos este mes</p>
+          )}
+        </div>
+
+        {/* Top 5 Clientes */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40 mb-4">
+            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-600" /> Top 5 Clientes que Más Compraron
+            </h3>
+          </div>
+          {mStats?.top_customers && mStats.top_customers.length > 0 ? (
+            <div className="space-y-2">
+              {mStats.top_customers.map((c, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/60 text-xs">
+                  <span className="font-bold text-[#432414] dark:text-[#FEE4D7]">
+                    <span className="text-[#9F6839] mr-2">#{idx + 1}</span>
+                    {c.customer_name}
+                  </span>
+                  <span className="font-extrabold text-emerald-600">
+                    ${c.total_spent.toLocaleString()} <span className="text-[10px] text-[#9F6839] font-normal">({c.orders_count} ord)</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-[#9F6839]">Sin clientes registrados este mes</p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
