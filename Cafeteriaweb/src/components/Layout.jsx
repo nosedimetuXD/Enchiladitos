@@ -139,13 +139,25 @@ export default function Layout() {
               <ToffeeMarblePattern />
             </div>
 
-            <div className={`relative flex items-center justify-between z-10 ${isCollapsed ? 'flex-col gap-2' : ''}`}>
-              <div className="flex items-center gap-3 overflow-hidden">
-                <img
-                  src="/icon-192.png"
-                  alt="Toffe Logo"
-                  className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shrink-0 shadow-xs"
-                />
+            <div className={`relative flex items-center justify-between z-10 ${isCollapsed ? 'justify-center' : ''}`}>
+              <div
+                onClick={toggleCollapse}
+                className="flex items-center gap-3 overflow-hidden cursor-pointer group"
+                title={isCollapsed ? 'Haz clic en el logo para expandir el menú' : 'Haz clic para contraer el menú'}
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src="/icon-192.png"
+                    alt="Toffe Logo"
+                    className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shadow-xs group-hover:scale-105 transition-transform"
+                  />
+                  {isCollapsed && (
+                    <div className="absolute -bottom-1 -right-1 bg-[#9F6839] text-white p-0.5 rounded-full shadow-xs">
+                      <ChevronRight className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+
                 {!isCollapsed && (
                   <div className="flex flex-col min-w-0">
                     <span className="font-bold text-lg text-[#432414] dark:text-[#FEE4D7] tracking-tight leading-tight">
@@ -158,14 +170,16 @@ export default function Layout() {
                 )}
               </div>
 
-              {/* Toggle in desktop */}
-              <button
-                onClick={toggleCollapse}
-                className="hidden lg:flex p-1.5 rounded-xl text-[#432414]/70 dark:text-[#DABA8C]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114] transition-colors"
-                title={isCollapsed ? 'Expandir menú' : 'Contraer menú'}
-              >
-                {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-              </button>
+              {/* Toggle Arrow Button in desktop */}
+              {!isCollapsed && (
+                <button
+                  onClick={toggleCollapse}
+                  className="hidden lg:flex p-1.5 rounded-xl text-[#432414]/70 dark:text-[#DABA8C]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7] dark:hover:bg-[#3E2114] transition-colors"
+                  title="Contraer menú"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              )}
 
               {/* Close in mobile */}
               <button
