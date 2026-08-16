@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 
 export default function Accounting() {
-  const { user } = useAuth()
-  const isOwner = user?.role === 'owner'
-
   const [summary, setSummary] = useState(null)
   const [expenses, setExpenses] = useState([])
+  const [sales, setSales] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [period, setPeriod] = useState('month')
+  const [activeTab, setActiveTab] = useState('sales') // 'sales' | 'expenses' | 'all'
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
@@ -27,14 +25,16 @@ export default function Accounting() {
 
   async function loadData() {
     try {
-      const [sumData, expData, ingData] = await Promise.all([
+      const [sumData, expData, ingData, salesData] = await Promise.all([
         api.get(`/accounting/summary?period=${period}`),
         api.get('/expenses'),
-        api.get('/ingredients')
+        api.get('/ingredients'),
+        api.get('/sales')
       ])
       setSummary(sumData)
       setExpenses(expData || [])
       setIngredients(ingData || [])
+      setSales(salesData || [])
     } catch (err) {
       setPageError('No se pudo cargar la información de contabilidad')
     } finally {
@@ -89,16 +89,42 @@ export default function Accounting() {
     otros: { label: '📑 Otros', style: { background: '#f5f5f4', color: '#57534e' } }
   }
 
+  const paymentBadges = {
+    efectivo: { label: '💵 Efectivo', style: { background: '#dcfce7', color: '#166534' } },
+    transferencia: { label: '📱 Transferencia', style: { background: '#e0e7ff', color: '#3730a3' } },
+    mixto: { label: '💳 Mixto', style: { background: '#fef3c7', color: '#92400e' } }
+  }
+
   if (loading) return <p>Cargando reporte de contabilidad...</p>
 
-  const mStats = summary?.monthly_stats
+  // Movimientos combinados en orden cronológico
+  const combinedMovements = [
+    ...sales.map((s) => ({
+      id: s.id,
+      type: 'income',
+      date: s.created_at,
+      concept: `Venta - ${s.customer_name || 'Cliente General'}`,
+      details: s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS',
+      paymentMethod: s.payment_method,
+      amount: s.total
+    })),
+    ...expenses.map((e) => ({
+      id: e.id,
+      type: 'expense',
+      date: e.created_at,
+      concept: e.description,
+      details: e.registerer_name ? `Registrado por ${e.registerer_name}` : 'Gasto operativo',
+      paymentMethod: e.payment_method,
+      amount: e.amount
+    }))
+  ].sort((a, b) => new Date(b.date) - new Date(a.date))
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h2 className="page-title">Sistema de Contabilidad & Gastos</h2>
-          <p className="page-subtitle">Control financiero de ingresos por ventas y registro de egresos</p>
+          <p className="page-subtitle">Control financiero completo de ingresos por ventas y registro de egresos</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ width: 160 }}>
@@ -114,108 +140,6 @@ export default function Accounting() {
       </div>
 
       {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
-
-      {/* Sección Exclusiva de Estadísticas del Mes (Solo Dueño) */}
-      {isOwner && mStats && (
-        <div style={{ background: '#1c1917', borderRadius: '16px', padding: '1.75rem', marginBottom: '2.25rem', color: '#fff', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #292524', paddingBottom: '0.85rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>👑</span> Reporte Ejecutivo & Estadísticas del Mes (Exclusivo Dueño)
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: '#a8a29e', marginTop: '2px' }}>Resumen del rendimiento comercial y ranking mensual</p>
-            </div>
-            <span style={{ background: '#581c87', color: '#f3e8ff', padding: '0.3rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
-              SOLO DUEÑO
-            </span>
-          </div>
-
-          <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Ventas Totales del Mes</span>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10b981', marginTop: '0.2rem' }}>
-                ${mStats.monthly_income.toLocaleString()}
-              </div>
-            </div>
-
-            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Gastos Totales del Mes</span>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ef4444', marginTop: '0.2rem' }}>
-                ${mStats.monthly_expenses.toLocaleString()}
-              </div>
-            </div>
-
-            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Ganancia Neta del Mes</span>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: mStats.net_profit >= 0 ? '#10b981' : '#ef4444', marginTop: '0.2rem' }}>
-                ${mStats.net_profit.toLocaleString()}
-              </div>
-            </div>
-
-            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>🥇 Mejor Vendedor del Mes</span>
-              {mStats.top_seller ? (
-                <div style={{ marginTop: '0.3rem' }}>
-                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#f59e0b' }}>
-                    {mStats.top_seller.username} <span style={{ fontSize: '0.72rem', background: '#44403c', padding: '2px 6px', borderRadius: '4px', color: '#fff', fontWeight: 500 }}>({mStats.top_seller.role})</span>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#d6d3d1' }}>
-                    Vendió <strong>${mStats.top_seller.total_amount.toLocaleString()}</strong> ({mStats.top_seller.sales_count} ventas)
-                  </div>
-                </div>
-              ) : (
-                <div style={{ fontSize: '0.85rem', color: '#a8a29e', marginTop: '0.4rem' }}>Sin ventas este mes</div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            {/* Producto Más Vendido */}
-            <div style={{ background: '#292524', padding: '1.25rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>🔥</span> Producto Más Vendido del Mes
-              </h4>
-              {mStats.top_product ? (
-                <div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{mStats.top_product.product_name}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#a8a29e', marginTop: '0.2rem' }}>
-                    Cantidad Vendida: <strong style={{ color: '#fff' }}>{mStats.top_product.total_qty} unidades</strong>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#a8a29e' }}>
-                    Ingreso Generado: <strong style={{ color: '#10b981' }}>${mStats.top_product.total_amount.toLocaleString()}</strong>
-                  </div>
-                </div>
-              ) : (
-                <p style={{ fontSize: '0.85rem', color: '#a8a29e' }}>Sin datos disponibles</p>
-              )}
-            </div>
-
-            {/* Top 5 Clientes */}
-            <div style={{ background: '#292524', padding: '1.25rem', borderRadius: '12px', border: '1px solid #44403c' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>🏆</span> Top 5 Clientes que Más Compraron
-              </h4>
-              {mStats.top_customers && mStats.top_customers.length > 0 ? (
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {mStats.top_customers.map((c, idx) => (
-                    <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', paddingBottom: '0.35rem', borderBottom: '1px solid #383532' }}>
-                      <span>
-                        <strong style={{ color: '#f59e0b', marginRight: '0.4rem' }}>#{idx + 1}</strong>
-                        {c.customer_name}
-                      </span>
-                      <span style={{ fontWeight: 700, color: '#10b981' }}>
-                        ${c.total_spent.toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#a8a29e', fontWeight: 400 }}>({c.orders_count} ord)</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ fontSize: '0.85rem', color: '#a8a29e' }}>Sin clientes registrados este mes</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Tarjetas KPI Financieras */}
       <div className="kpi-grid">
@@ -248,60 +172,185 @@ export default function Accounting() {
         </div>
       </div>
 
-      {/* Tabla de Historial de Gastos */}
-      <h3 style={{ marginBottom: '1rem' }}>Historial de Gastos Registrados</h3>
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Descripción</th>
-              <th>Categoría</th>
-              <th>Forma Pago</th>
-              <th>Insumo Asociado</th>
-              <th>Monto</th>
-              <th>Registrado Por</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.map((exp) => {
-              const catBadge = categoryBadges[exp.category] || categoryBadges.otros
-              return (
-                <tr key={exp.id}>
-                  <td>{new Date(exp.created_at).toLocaleDateString()}</td>
-                  <td style={{ fontWeight: 600 }}>{exp.description}</td>
-                  <td>
-                    <span style={{ ...catBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
-                      {catBadge.label}
-                    </span>
-                  </td>
-                  <td>{exp.payment_method === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}</td>
-                  <td>
-                    {exp.ingredient_name ? (
-                      <span style={{ color: 'var(--success)', fontWeight: 600 }}>
-                        + {exp.quantity_added} unidades de {exp.ingredient_name}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
-                    -${exp.amount.toLocaleString()}
-                  </td>
-                  <td>{exp.registerer_name || 'Vendedor'}</td>
-                </tr>
-              )
-            })}
-            {expenses.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  No hay gastos registrados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* Selector de Pestañas (Ingresos / Gastos / Flujo de Caja) */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+        <button
+          type="button"
+          className={activeTab === 'sales' ? '' : 'secondary'}
+          onClick={() => setActiveTab('sales')}
+          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+        >
+          🟢 Ingresos (Ventas)
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'expenses' ? '' : 'secondary'}
+          onClick={() => setActiveTab('expenses')}
+          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+        >
+          🔴 Gastos (Egresos)
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'all' ? '' : 'secondary'}
+          onClick={() => setActiveTab('all')}
+          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+        >
+          📋 Flujo de Caja Combinado
+        </button>
       </div>
+
+      {/* Pestaña 1: Ingresos por Ventas */}
+      {activeTab === 'sales' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Cliente</th>
+                <th>Método de Pago</th>
+                <th>Vendido Por</th>
+                <th>Monto Ingresado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sales.map((s) => {
+                const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
+                return (
+                  <tr key={s.id}>
+                    <td>{new Date(s.created_at).toLocaleString()}</td>
+                    <td style={{ fontWeight: 600 }}>{s.customer_name || 'Cliente General'}</td>
+                    <td>
+                      <span style={{ ...pBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                        {pBadge.label}
+                      </span>
+                    </td>
+                    <td>{s.sold_by_username || 'Vendedor'}</td>
+                    <td style={{ fontWeight: 800, color: 'var(--success)' }}>
+                      +${s.total.toLocaleString()}
+                    </td>
+                  </tr>
+                )
+              })}
+              {sales.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                    No hay ingresos registrados en este periodo.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pestaña 2: Gastos Registrados */}
+      {activeTab === 'expenses' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Categoría</th>
+                <th>Forma Pago</th>
+                <th>Insumo Asociado</th>
+                <th>Monto Erogado</th>
+                <th>Registrado Por</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map((exp) => {
+                const catBadge = categoryBadges[exp.category] || categoryBadges.otros
+                return (
+                  <tr key={exp.id}>
+                    <td>{new Date(exp.created_at).toLocaleDateString()}</td>
+                    <td style={{ fontWeight: 600 }}>{exp.description}</td>
+                    <td>
+                      <span style={{ ...catBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                        {catBadge.label}
+                      </span>
+                    </td>
+                    <td>{exp.payment_method === 'efectivo' ? '💵 Efectivo' : '📱 Transferencia'}</td>
+                    <td>
+                      {exp.ingredient_name ? (
+                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                          + {exp.quantity_added} unidades de {exp.ingredient_name}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 800, color: 'var(--danger)' }}>
+                      -${exp.amount.toLocaleString()}
+                    </td>
+                    <td>{exp.registerer_name || 'Vendedor'}</td>
+                  </tr>
+                )
+              })}
+              {expenses.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                    No hay gastos registrados en este periodo.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pestaña 3: Flujo de Caja Combinado */}
+      {activeTab === 'all' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Tipo</th>
+                <th>Concepto / Cliente</th>
+                <th>Detalles</th>
+                <th>Forma Pago</th>
+                <th>Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {combinedMovements.map((m) => {
+                const pBadge = paymentBadges[m.paymentMethod] || paymentBadges.efectivo
+                return (
+                  <tr key={m.id} style={{ background: m.type === 'income' ? '#f0fdf4' : '#fef2f2' }}>
+                    <td>{new Date(m.date).toLocaleString()}</td>
+                    <td>
+                      {m.type === 'income' ? (
+                        <span className="badge-status status-listo">🟢 Ingreso</span>
+                      ) : (
+                        <span className="badge-status status-cancelado">🔴 Gasto</span>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{m.concept}</td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{m.details}</td>
+                    <td>
+                      <span style={{ ...pBadge.style, padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                        {pBadge.label}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 800, color: m.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
+                      {m.type === 'income' ? `+$${m.amount.toLocaleString()}` : `-$${m.amount.toLocaleString()}`}
+                    </td>
+                  </tr>
+                )
+              })}
+              {combinedMovements.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                    No hay movimientos contables registrados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Modal Registrar Nuevo Gasto */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Nuevo Gasto / Compra">
