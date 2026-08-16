@@ -20,4 +20,5 @@ type User struct {
 	Role      UserRole   `json:"role"`
 	CreatedBy *uuid.UUID `json:"created_by,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
+	IsPrimary bool       `json:"is_primary"`
 }

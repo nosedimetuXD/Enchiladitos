@@ -123,12 +123,12 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Protección: El rol del usuario principal Camilo Osorio no se puede cambiar
-	var existingUsername string
-	_ = h.DB.QueryRow(r.Context(), `SELECT username FROM users WHERE id = $1`, id).Scan(&existingUsername)
+	// Protección por UUID: El rol del usuario principal (primer dueño creado) no se puede cambiar
+	var primaryOwnerID uuid.UUID
+	_ = h.DB.QueryRow(r.Context(), `SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1`).Scan(&primaryOwnerID)
 
-	if (strings.EqualFold(strings.TrimSpace(existingUsername), "camilo osorio") || strings.EqualFold(username, "camilo osorio")) && req.Role != models.RoleOwner {
-		http.Error(w, "El rol del usuario principal Camilo Osorio está protegido y no se puede modificar", http.StatusForbidden)
+	if id == primaryOwnerID && req.Role != models.RoleOwner {
+		http.Error(w, "El rol del dueño principal está protegido y no se puede modificar", http.StatusForbidden)
 		return
 	}
 
@@ -178,6 +178,8 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user.IsPrimary = (user.ID == primaryOwnerID)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
@@ -185,7 +187,8 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 // GET /users
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, username, role, created_by, created_at
+		`SELECT id, username, role, created_by, created_at,
+		        (id = (SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1)) AS is_primary
 		 FROM users ORDER BY username`)
 	if err != nil {
 		log.Printf("error consultando usuarios: %v", err)
@@ -197,7 +200,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedBy, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedBy, &u.CreatedAt, &u.IsPrimary); err != nil {
 			log.Printf("error leyendo usuarios: %v", err)
 			http.Error(w, "error leyendo usuarios", http.StatusInternalServerError)
 			return

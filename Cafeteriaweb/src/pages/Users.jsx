@@ -189,15 +189,15 @@ export default function Users() {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              disabled={editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio'}
+              disabled={Boolean(editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio'))}
             >
               <option value="employee">☕ Empleado (Ventas, Comandas, Inventario lectura)</option>
               <option value="admin">🛡️ Administrador (Acceso completo salvo gestión usuarios)</option>
               <option value="owner">👑 Dueño (Control total del sistema)</option>
             </select>
-            {editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio' && (
+            {Boolean(editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio')) && (
               <p style={{ fontSize: '0.78rem', color: '#92400e', background: '#fffbeb', padding: '6px 10px', borderRadius: '6px', marginTop: '0.35rem', border: '1px solid #fef3c7' }}>
-                🔒 El rol del usuario principal (Camilo Osorio) está protegido y no se puede modificar.
+                🔒 El rol del dueño principal está protegido permanentemente por ID y no se puede modificar.
               </p>
             )}
           </div>
