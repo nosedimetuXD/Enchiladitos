@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 
 export default function Users() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Modal Nuevo Usuario
+  // Modal Crear / Editar Usuario
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('employee')
-  const [creating, setCreating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   async function loadUsers() {
     try {
@@ -29,22 +32,56 @@ export default function Users() {
     loadUsers()
   }, [])
 
-  async function handleCreate(e) {
+  function openCreateModal() {
+    setEditingUser(null)
+    setUsername('')
+    setPassword('')
+    setRole('employee')
+    setIsModalOpen(true)
+  }
+
+  function openEditModal(userItem) {
+    setEditingUser(userItem)
+    setUsername(userItem.username)
+    setPassword('')
+    setRole(userItem.role)
+    setIsModalOpen(true)
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault()
-    setCreating(true)
+    setSubmitting(true)
     setError('')
 
     try {
-      await api.post('/users', { username, password, role })
-      setUsername('')
-      setPassword('')
-      setRole('employee')
+      if (editingUser) {
+        // Editar usuario existente
+        const updated = await api.put(`/users/${editingUser.id}`, {
+          username,
+          password: password ? password : undefined,
+          role
+        })
+
+        // Si el dueño se editó a sí mismo, actualizar el localStorage para reflejar el nuevo nombre/rol en pantalla
+        if (currentUser && currentUser.id === editingUser.id) {
+          const updatedAuthUser = { ...currentUser, username: updated.username, role: updated.role }
+          localStorage.setItem('user', JSON.stringify(updatedAuthUser))
+        }
+      } else {
+        // Crear nuevo usuario
+        await api.post('/users', { username, password, role })
+      }
+
       setIsModalOpen(false)
       await loadUsers()
     } catch (err) {
-      setError(err.message.includes('ya existe') ? 'Ese nombre de usuario ya existe' : 'No se pudo crear el usuario')
+      setError(
+        err.message.includes('ya')
+          ? 'Ese nombre de usuario ya está registrado'
+          : err.message || 'No se pudo guardar el usuario'
+      )
     } finally {
-      setCreating(false)
+      setSubmitting(false)
     }
   }
 
@@ -63,7 +100,7 @@ export default function Users() {
           <h2 className="page-title">Gestión de Usuarios</h2>
           <p className="page-subtitle">Cuentas y roles del personal del sistema</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)}>
+        <button onClick={openCreateModal}>
           + Nuevo Usuario
         </button>
       </div>
@@ -78,23 +115,35 @@ export default function Users() {
               <th>Usuario</th>
               <th>Rol asignado</th>
               <th>Fecha de Creación</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td style={{ fontWeight: 600 }}>{u.username}</td>
+                <td style={{ fontWeight: 600 }}>
+                  {u.username} {currentUser?.id === u.id && <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', marginLeft: '0.35rem' }}>(Tú)</span>}
+                </td>
                 <td>
                   <span className={`role-badge role-${u.role}`}>
                     {roleLabels[u.role] || u.role}
                   </span>
                 </td>
                 <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                <td>
+                  <button
+                    className="secondary"
+                    onClick={() => openEditModal(u)}
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.82rem' }}
+                  >
+                    ✏️ Editar
+                  </button>
+                </td>
               </tr>
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
                   No hay usuarios registrados.
                 </td>
               </tr>
@@ -103,9 +152,13 @@ export default function Users() {
         </table>
       </div>
 
-      {/* Modal Nuevo Usuario */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuevo Usuario">
-        <form onSubmit={handleCreate}>
+      {/* Modal Crear / Editar Usuario */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingUser ? `Editar Usuario: ${editingUser.username}` : 'Nuevo Usuario'}
+      >
+        <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Nombre de Usuario</label>
             <input
@@ -118,13 +171,16 @@ export default function Users() {
           </div>
 
           <div className="form-group">
-            <label>Contraseña (mínimo 8 caracteres)</label>
+            <label>
+              Contraseña {editingUser ? '(Opcional: Dejar en blanco para conservar la actual)' : '(Mínimo 8 caracteres)'}
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
+              placeholder={editingUser ? '•••••••• (vacío para no cambiar)' : 'Escribe una contraseña segura'}
+              required={!editingUser}
+              minLength={password ? 8 : undefined}
             />
           </div>
 
@@ -141,8 +197,8 @@ export default function Users() {
             <button type="button" className="secondary" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </button>
-            <button type="submit" disabled={creating}>
-              {creating ? 'Creando...' : 'Crear Usuario'}
+            <button type="submit" disabled={submitting}>
+              {submitting ? 'Guardando...' : editingUser ? 'Actualizar Usuario' : 'Crear Usuario'}
             </button>
           </div>
         </form>

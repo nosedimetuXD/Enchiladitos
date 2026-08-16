@@ -86,8 +86,14 @@ func main() {
 		r.Put("/products/{id}", productHandler.Update)
 		r.Delete("/products/{id}", productHandler.Delete)
 		r.Put("/products/{id}/recipe", recipeHandler.Set)
+	})
 
+	// Gestión de usuarios: solo el Dueño (Owner)
+	r.Group(func(r chi.Router) {
+		r.Use(custommw.RequireAuth)
+		r.Use(custommw.RequireRole(models.RoleOwner))
 		r.Post("/users", userHandler.Create)
+		r.Put("/users/{id}", userHandler.Update)
 	})
 
 	// Modificar inventario directamente: solo dueño y admin (empleados ya NO pueden editar inventario libremente)

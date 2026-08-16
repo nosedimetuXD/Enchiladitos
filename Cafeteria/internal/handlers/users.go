@@ -5,7 +5,11 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -82,6 +86,90 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(user)
+}
+
+type updateUserRequest struct {
+	Username string          `json:"username"`
+	Password string          `json:"password,omitempty"`
+	Role     models.UserRole `json:"role"`
+}
+
+// PUT /users/{id}
+func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "id de usuario inválido", http.StatusBadRequest)
+		return
+	}
+
+	var req updateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "cuerpo inválido", http.StatusBadRequest)
+		return
+	}
+
+	username := strings.TrimSpace(req.Username)
+	if username == "" {
+		http.Error(w, "el nombre de usuario es obligatorio", http.StatusBadRequest)
+		return
+	}
+
+	switch req.Role {
+	case models.RoleOwner, models.RoleAdmin, models.RoleEmployee:
+		// rol válido
+	default:
+		http.Error(w, "rol inválido, debe ser owner, admin o employee", http.StatusBadRequest)
+		return
+	}
+
+	var user models.User
+	if strings.TrimSpace(req.Password) != "" {
+		if len(req.Password) < 8 {
+			http.Error(w, "la contraseña debe tener al menos 8 caracteres", http.StatusBadRequest)
+			return
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("error generando hash: %v", err)
+			http.Error(w, "error interno", http.StatusInternalServerError)
+			return
+		}
+
+		err = h.DB.QueryRow(r.Context(),
+			`UPDATE users
+			 SET username = $1, password_hash = $2, role = $3
+			 WHERE id = $4
+			 RETURNING id, username, role, created_by, created_at`,
+			username, string(hash), req.Role, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+	} else {
+		err = h.DB.QueryRow(r.Context(),
+			`UPDATE users
+			 SET username = $1, role = $2
+			 WHERE id = $3
+			 RETURNING id, username, role, created_by, created_at`,
+			username, req.Role, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "usuario no encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			http.Error(w, "ese nombre de usuario ya está en uso", http.StatusConflict)
+			return
+		}
+		log.Printf("error actualizando usuario: %v", err)
+		http.Error(w, "error actualizando usuario", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
 }
 
