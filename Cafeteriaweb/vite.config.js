@@ -8,22 +8,37 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Cafetería',
-        short_name: 'Cafetería',
-        description: 'Gestión de inventario, ventas y tareas',
-        theme_color: '#6f4e37',
-        background_color: '#ffffff',
+        name: 'Toffe',
+        short_name: 'Toffe',
+        description: 'Toffe — "Hecho por y para estudiantes". Sistema de POS, comandas y gestión.',
+        theme_color: '#46231d',
+        background_color: '#46231d',
         display: 'standalone',
+        orientation: 'any',
         icons: [
           {
             src: 'icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'icon-512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'icon-maskable-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          },
+          {
+            src: 'icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       }
