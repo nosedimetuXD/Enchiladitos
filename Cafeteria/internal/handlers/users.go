@@ -297,8 +297,9 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	var primaryOwnerID uuid.UUID
-	_ = h.DB.QueryRow(r.Context(), `SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1`).Scan(&primaryOwnerID)
+	_ = h.DB.QueryRow(ctx, `SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1`).Scan(&primaryOwnerID)
 
 	if id == primaryOwnerID {
 		http.Error(w, "El dueño principal está protegido permanentemente y no se puede eliminar", http.StatusForbidden)
@@ -306,7 +307,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// No permitir que el usuario se elimine a sí mismo
-	userVal := r.Context().Value(custommw.ContextUserID)
+	userVal := ctx.Value(custommw.ContextUserID)
 	if userVal != nil {
 		var currentID uuid.UUID
 		if val, ok := userVal.(uuid.UUID); ok {
@@ -320,7 +321,22 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tag, err := h.DB.Exec(r.Context(), `DELETE FROM users WHERE id = $1`, id)
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("error iniciando transacción de borrado de usuario: %v", err)
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Desvincular referencias de clave foránea para preservar el historial contable/operativo intacto
+	_, _ = tx.Exec(ctx, `UPDATE sales SET sold_by = NULL WHERE sold_by = $1`, id)
+	_, _ = tx.Exec(ctx, `UPDATE expenses SET registered_by = NULL WHERE registered_by = $1`, id)
+	_, _ = tx.Exec(ctx, `UPDATE tasks SET assigned_to = NULL WHERE assigned_to = $1`, id)
+	_, _ = tx.Exec(ctx, `UPDATE tasks SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID)
+	_, _ = tx.Exec(ctx, `UPDATE users SET created_by = $2 WHERE created_by = $1`, id, primaryOwnerID)
+
+	tag, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando usuario: %v", err)
 		http.Error(w, "error eliminando usuario", http.StatusInternalServerError)
@@ -328,6 +344,12 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		http.Error(w, "usuario no encontrado", http.StatusNotFound)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("error confirmando eliminación de usuario: %v", err)
+		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
 
