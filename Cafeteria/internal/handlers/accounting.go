@@ -111,19 +111,21 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		errSeller := h.DB.QueryRow(r.Context(),
 			`SELECT u.username, u.role, COALESCE(SUM(s.total), 0) as total_amount, COUNT(s.id) as sales_count
 			 FROM sales s
-			 JOIN users u ON s.user_id = u.id
+			 JOIN users u ON s.sold_by = u.id
 			 WHERE s.created_at >= date_trunc('month', now())
 			 GROUP BY u.id, u.username, u.role
 			 ORDER BY total_amount DESC
 			 LIMIT 1`).Scan(&topSeller.Username, &topSeller.Role, &topSeller.TotalAmount, &topSeller.SalesCount)
 		if errSeller == nil {
 			mStats.TopSeller = &topSeller
+		} else {
+			log.Printf("error mejor vendedor: %v", errSeller)
 		}
 
 		// Producto más vendido del mes
 		var topProd models.TopProductStat
 		errProd := h.DB.QueryRow(r.Context(),
-			`SELECT p.name, COALESCE(SUM(si.quantity), 0) as total_qty, COALESCE(SUM(si.subtotal), 0) as total_amount
+			`SELECT p.name, COALESCE(SUM(si.quantity), 0) as total_qty, COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
 			 FROM sale_items si
 			 JOIN sales s ON si.sale_id = s.id
 			 JOIN products p ON si.product_id = p.id
@@ -133,6 +135,8 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			 LIMIT 1`).Scan(&topProd.ProductName, &topProd.TotalQty, &topProd.TotalAmount)
 		if errProd == nil {
 			mStats.TopProduct = &topProd
+		} else {
+			log.Printf("error producto mas vendido: %v", errProd)
 		}
 
 		// Top 5 Clientes que más compraron en el mes
