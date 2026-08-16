@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
-import { Users as UsersIcon, UserCheck, Shield, Key, Plus, Edit2, Lock, Camera } from 'lucide-react'
+import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
+import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload } from 'lucide-react'
 
 export default function Users() {
   const { user: currentUser, updateUser } = useAuth()
@@ -63,12 +64,22 @@ export default function Users() {
     setIsModalOpen(true)
   }
 
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    compressAndReadFile(file, (compressedDataUrl) => {
+      setAvatarUrl(compressedDataUrl)
+    })
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
     setFormError('')
 
     try {
+      const finalAvatar = avatarUrl.trim()
+
       if (editingUser) {
         // Editar usuario existente por el Dueño
         const updated = await api.put(`/users/${editingUser.id}`, {
@@ -78,20 +89,20 @@ export default function Users() {
         })
 
         if (editingUser.id) {
-          const nextAvatars = { ...avatars, [editingUser.id]: avatarUrl.trim() }
+          const nextAvatars = { ...avatars, [editingUser.id]: finalAvatar }
           setAvatars(nextAvatars)
           localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
         }
 
         // Si el dueño se editó a sí mismo, actualizar el localStorage para reflejar el nuevo nombre/rol en pantalla
         if (currentUser && currentUser.id === editingUser.id) {
-          updateUser({ username: updated.username, role: updated.role, avatar_url: avatarUrl.trim() })
+          updateUser({ username: updated.username, role: updated.role, avatar_url: finalAvatar })
         }
       } else {
         // Crear nuevo usuario
         const created = await api.post('/users', { username, password, role })
-        if (created && created.id && avatarUrl.trim()) {
-          const nextAvatars = { ...avatars, [created.id]: avatarUrl.trim() }
+        if (created && created.id && finalAvatar) {
+          const nextAvatars = { ...avatars, [created.id]: finalAvatar }
           setAvatars(nextAvatars)
           localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
         }
@@ -155,7 +166,8 @@ export default function Users() {
         {users.map((u) => {
           const isCurrentUser = currentUser?.id === u.id
           const badge = roleBadges[u.role] || roleBadges.employee
-          const uAvatar = avatars[u.id] || ''
+          const rawUAvatar = avatars[u.id] || ''
+          const uAvatar = processImageUrl(rawUAvatar)
 
           return (
             <div
@@ -265,16 +277,31 @@ export default function Users() {
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> URL de Foto de Perfil (Opcional)
+              <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> Foto de Perfil (Avatar)
             </label>
+
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#FEE4D7] dark:bg-[#2A150C] border border-[#D4B28E] hover:bg-[#9F6839] hover:text-white text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] transition-all cursor-pointer shadow-xs">
+                <Upload className="w-4 h-4" />
+                <span>Subir imagen</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-[11px] text-[#9F6839] font-medium">o escribe URL enlace</span>
+            </div>
+
             <input
-              type="url"
+              type="text"
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://ejemplo.com/avatar.jpg"
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              placeholder="https://drive.google.com/file/d/... o enlace de imagen"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 

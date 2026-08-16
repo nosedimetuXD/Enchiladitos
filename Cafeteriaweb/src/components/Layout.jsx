@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { processImageUrl } from '../utils/imageUtils'
 import {
   ShoppingBag,
   FileText,
@@ -13,7 +14,6 @@ import {
   Users,
   User as UserIcon,
   ChevronLeft,
-  ChevronRight,
   LogOut,
   Sun,
   Moon,
@@ -78,19 +78,40 @@ export default function Layout() {
   const isOwner = user?.role === 'owner'
   const isAdmin = isOwner || user?.role === 'admin'
 
-  const userAvatarUrl = (user && user.id && userAvatars[user.id]) || user?.avatar_url || ''
+  const rawAvatarUrl = (user && user.id && userAvatars[user.id]) || user?.avatar_url || ''
+  const userAvatarUrl = processImageUrl(rawAvatarUrl)
 
-  const navItems = [
-    { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true, show: true },
-    { to: '/sales/history', label: 'Historial Ventas', icon: FileText, show: true },
-    { to: '/comandas', label: 'Comandas (Cocina)', icon: UtensilsCrossed, show: true },
-    { to: '/inventory', label: 'Inventario', icon: Package, show: true },
-    { to: '/products', label: 'Productos', icon: Coffee, show: true },
-    { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isAdmin },
-    { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
-    { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true },
-    { to: '/users', label: 'Usuarios', icon: Users, show: isOwner },
-    { to: '/profile', label: 'Mi Perfil', icon: UserIcon, show: true }
+  const navSections = [
+    {
+      title: 'OPERACIÓN & VENTAS',
+      items: [
+        { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true, show: true },
+        { to: '/sales/history', label: 'Historial Ventas', icon: FileText, show: true },
+        { to: '/comandas', label: 'Comandas (Cocina)', icon: UtensilsCrossed, show: true }
+      ]
+    },
+    {
+      title: 'CATÁLOGO & INVENTARIO',
+      items: [
+        { to: '/inventory', label: 'Inventario', icon: Package, show: true },
+        { to: '/products', label: 'Productos', icon: Coffee, show: true }
+      ]
+    },
+    {
+      title: 'FINANZAS & CONTROL',
+      items: [
+        { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isAdmin },
+        { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
+        { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true }
+      ]
+    },
+    {
+      title: 'SISTEMA & CUENTA',
+      items: [
+        { to: '/users', label: 'Usuarios', icon: Users, show: isOwner },
+        { to: '/profile', label: 'Mi Perfil', icon: UserIcon, show: true }
+      ]
+    }
   ]
 
   return (
@@ -197,36 +218,53 @@ export default function Layout() {
             </div>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="p-3 space-y-1.5 mt-2">
-            {navItems.filter(item => item.show).map((item) => {
-              const Icon = item.icon
+          {/* Navigation Items (Categorizadas por Área) */}
+          <nav className="p-3 space-y-4">
+            {navSections.map((section, sIdx) => {
+              const visibleItems = section.items.filter((it) => it.show)
+              if (visibleItems.length === 0) return null
+
               return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 group relative ${
-                      isActive
-                        ? 'bg-[#9F6839] text-white shadow-xs'
-                        : 'text-[#432414]/80 dark:text-[#FEE4D7]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7]/70 dark:hover:bg-[#2E180E]'
-                    } ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`
-                  }
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
-                          isActive ? 'text-[#FEE4D7]' : 'text-[#9F6839] dark:text-[#DABA8C]'
-                        }`}
-                      />
-                      {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
-                    </>
+                <div key={section.title} className="space-y-1">
+                  {!isCollapsed ? (
+                    <span className="text-[10px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider px-3 pb-1 block">
+                      {section.title}
+                    </span>
+                  ) : (
+                    sIdx > 0 && <div className="my-2 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30" />
                   )}
-                </NavLink>
+
+                  {visibleItems.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.end}
+                        onClick={() => setMobileOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 group relative ${
+                            isActive
+                              ? 'bg-[#9F6839] text-white shadow-xs'
+                              : 'text-[#432414]/80 dark:text-[#FEE4D7]/80 hover:text-[#432414] dark:hover:text-[#FEE4D7] hover:bg-[#FEE4D7]/70 dark:hover:bg-[#2E180E]'
+                          } ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`
+                        }
+                        title={isCollapsed ? item.label : undefined}
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <Icon
+                              className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
+                                isActive ? 'text-[#FEE4D7]' : 'text-[#9F6839] dark:text-[#DABA8C]'
+                              }`}
+                            />
+                            {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
+                          </>
+                        )}
+                      </NavLink>
+                    )
+                  })}
+                </div>
               )
             })}
           </nav>
