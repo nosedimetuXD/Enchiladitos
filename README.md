@@ -2,53 +2,66 @@
 
 > *"Hecho por y para estudiantes"*
 
-**Toffe** es un sistema web completo de punto de venta (POS), gestión operativa, comandas en tiempo real y contabilidad diseñado específicamente para la administración eficiente de cafeterías.
+**Toffe** es un sistema web completo de punto de venta (POS), gestión operativa, comandas en tiempo real, contabilidad avanzada y estadísticas ejecutivas diseñado para la administración eficiente de cafeterías universitarias y comerciales.
 
 ---
 
 ## 🚀 Características Principales
 
-1. **🛒 Punto de Venta (POS)**
-   - Catálogo interactivo de productos con filtrado rápido.
+1. **🛒 Punto de Venta (POS) & Autocompletado de Clientes**
+   - Catálogo interactivo de productos con búsqueda por nombre.
    - Carrito de compras responsivo.
-   - Modal emergente de cobro con registro de **Nombre del Cliente** y **Método de Pago** (`Efectivo`, `Transferencia` o `Mixto`).
-   - Calculadora automática de cambio a entregar.
+   - Modal emergente de cobro con **autocompletado de clientes anteriores** (`datalist`), permitiendo elegir clientes frecuentes o ingresar clientes nuevos libremente.
+   - Opciones de pago: `Efectivo`, `Transferencia bancaria` o `Pago Mixto`.
+   - Cálculo automático de cambio a entregar.
 
-2. **📜 Registro e Historial de Ventas**
-   - Historial detallado de transacciones con búsqueda por cliente o vendedor.
-   - Filtros dinámicos por forma de pago.
-   - Modal de desglose de orden mostrando productos, cantidad, precio unitario y total.
+2. **📜 Historial Detallado de Ventas**
+   - Registro de transacciones con búsqueda por cliente o vendedor.
+   - Filtros por forma de pago.
+   - Modal de desglose de orden mostrando productos, cantidades, precio unitario y total.
 
-3. **🛎️ Sistema de Comandas en Tiempo Real (Cocina / Barra)**
-   - Generación automática de tickets de pedido al realizar una venta.
-   - Tablero Kanban interactivo con estados: `Pendientes` ➔ `En preparación` ➔ `Listo` ➔ `Entregados`.
-   - Sincronización en tiempo real vía Server-Sent Events (SSE).
-   - Acceso para actualización de estado disponible para cualquier rol del equipo.
+3. **🛎️ Sistema de Comandas Diarias en Tiempo Real (Cocina & Barra)**
+   - Generación automática de tickets de pedido al confirmar una venta en el POS.
+   - **Reinicio Diario Automático**: El tablero filtra pedidos por el día en curso y comandas activas pendientes para iniciar cada mañana limpio.
+   - Tablero Kanban con estados: `Pendientes` ➔ `En preparación` ➔ `Listo` ➔ `Entregados`.
+   - Sincronización en vivo vía Server-Sent Events (SSE).
 
-4. **📦 Control de Inventario con Seguridad por Roles**
+4. **📊 Módulo de Estadísticas Ejecutivas del Mes (Exclusivo Dueño)**
+   - Panel de control ejecutivo accesible únicamente para el **Dueño (`owner`)** en `/stats` y `/accounting`.
+   - **Métricas Clave**: Ventas Totales del Mes, Gastos Totales del Mes y Ganancia Neta.
+   - 🥇 **Mejor Vendedor del Mes**: Usuario de cualquier rol que registró el mayor monto vendido en el mes.
+   - 🔥 **Producto Más Vendido del Mes**: Producto estrella con mayor volumen de unidades vendidas e ingreso generado.
+   - 🏆 **Top 5 Clientes**: Ranking de los 5 clientes que más han comprado en el mes con monto total y número de órdenes.
+
+5. **📦 Control de Inventario con Seguridad por Roles**
    - Monitoreo de insumos con alertas de stock mínimo.
-   - **Permisos por rol**: Los empleados tienen vista de solo lectura; la creación/edición/eliminación directa queda restringida a Administradores y Dueños.
+   - Permisos restringidos: La edición directa de inventario queda reservada a Administradores y Dueños.
 
-5. **💰 Sistema de Contabilidad y Reabastecimiento**
-   - Panel KPI con ingresos totales, gastos totales, balance neto (ganancias) y desglose de efectivo vs. transferencia.
-   - Registro de egresos por categorías (Insumos, Servicios, Mantenimiento, Nómina, Otros).
-   - **Integración con Inventario**: Al registrar compras de insumos en Contabilidad, las unidades compradas se suman automáticamente al inventario en la misma transacción.
+6. **💰 Sistema de Contabilidad & Reabastecimiento**
+   - Reporte de ingresos, gastos y balance neto por periodos (`Hoy`, `Semana`, `Mes`, `Histórico`).
+   - Registro de gastos por categorías (Insumos, Servicios, Mantenimiento, Nómina, Otros).
+   - **Reabastecimiento Directo**: Al registrar compras de materia prima, la cantidad comprada se suma automáticamente al stock de inventario en una sola transacción SQL.
 
-6. **✅ Gestión de Tareas del Personal**
-   - Asignación y seguimiento de pendientes con fechas límite.
+7. **📱 Interfaz Adaptativa & Panel Lateral Colapsable**
+   - **Sidebar Colapsable (`❮` / `❯`)**: Permite colapsar el menú a modo compacto de íconos o expandirlo libremente (con persistencia en `localStorage`).
+   - Diseño responsivo ajustado para celulares, tablets y computadoras de escritorio.
 
-7. **👤 Roles y Permisos de Usuario**
-   - 👑 **Dueño (`owner`)**: Control total del sistema y gestión de usuarios.
-   - 🛡️ **Administrador (`admin`)**: Gestión de catálogo, recetas, inventario, tareas y contabilidad.
-   - ☕ **Empleado (`employee`)**: Operación del POS, registro de ventas, comandas y lectura de inventario.
+8. **👤 Roles y Permisos de Usuario**
+   - 👑 **Dueño (`owner`)**: Control total, reportes ejecutivos, estadísticas mensuales y gestión de usuarios.
+   - 🛡️ **Administrador (`admin`)**: Gestión de productos, recetas, inventario, tareas y contabilidad.
+   - ☕ **Empleado (`employee`)**: Operación del POS, ventas, comandas de cocina y consulta de inventario.
 
 ---
 
 ## 🛠️ Tecnologías Utilizadas
 
-- **Backend**: Go 1.26, Router `Chi`, Driver PostgreSQL `pgx/v5`, Autenticación JWT, Server-Sent Events (SSE) para eventos en vivo.
-- **Frontend**: React 19, Vite, React Router v7, Sistema de diseño en Vanilla CSS (Espresso & Amber Theme), PWA Support.
-- **Base de Datos**: PostgreSQL 14+.
+- **Backend**: Go 1.26, Router `Chi`, Driver PostgreSQL `pgx/v5`, Autenticación JWT, Server-Sent Events (SSE).
+- **Frontend**: React 19, Vite, React Router v7, Vanilla CSS (Espresso & Amber Theme), PWA Support.
+- **Base de Datos**: PostgreSQL 14+ (Supabase / Local).
+- **Infraestructura**:
+  - 🗄️ **Base de Datos**: Supabase PostgreSQL.
+  - ⚡ **Backend**: Render.com (Go Web Service).
+  - 🌐 **Frontend**: Vercel.com (React Vite App).
 
 ---
 
@@ -59,61 +72,38 @@
 - Node.js 18+ y npm
 - PostgreSQL corriendo localmente
 
-### 1. Configuración de la Base de Datos y Backend (Go)
+### 1. Backend en Go (`Cafeteria/`)
 
 1. Crea la base de datos en PostgreSQL:
    ```sql
    CREATE DATABASE "Cafeteria";
    ```
 
-2. Ejecuta las migraciones SQL en la carpeta `Cafeteria/migrations`:
-   ```bash
-   psql "postgres://postgres:TU_PASSWORD@localhost:5432/Cafeteria?sslmode=disable" -f Cafeteria/migrations/000001_create_users.up.sql
-   # ... Ejecutar secuencialmente hasta la 000012:
-   psql "postgres://postgres:TU_PASSWORD@localhost:5432/Cafeteria?sslmode=disable" -f Cafeteria/migrations/000012_update_sales_and_create_comandas_accounting.up.sql
-   ```
-
-3. Crea el archivo `.env` en la carpeta `Cafeteria/`:
+2. Configura las variables en `Cafeteria/.env`:
    ```env
    DB_URL=postgres://postgres:TU_PASSWORD@localhost:5432/Cafeteria?sslmode=disable
    JWT_SECRET=tu_clave_secreta_super_segura
    ```
 
-4. Compila y ejecuta el servidor backend:
+3. Compila y ejecuta el servidor backend:
    ```bash
    cd Cafeteria
    go run ./cmd/server
    ```
    *El servidor iniciará en `http://localhost:8080`.*
 
-### 2. Configuración del Frontend (React / Vite)
+### 2. Frontend en React (`Cafeteriaweb/`)
 
-1. Ingresa a la carpeta `Cafeteriaweb`:
+1. Instala las dependencias e inicia Vite:
    ```bash
    cd Cafeteriaweb
    npm install
-   ```
-
-2. Inicia el servidor de desarrollo:
-   ```bash
    npm run dev
    ```
    *El frontend abrirá en `http://localhost:5173`.*
 
 ---
 
-## ☁️ Guía de Despliegue en la Nube
-
-Para desplegar en producción de forma gratuita o económica:
-
-- **Base de Datos & Backend**: [Render.com](https://render.com) o [Railway.app](https://railway.app)
-  - Configura el servicio de Go especificando Root Directory `Cafeteria`, Build Command `go build -o server ./cmd/server` y Start Command `./server`.
-  - Define las variables de entorno `DB_URL` y `JWT_SECRET`.
-- **Frontend**: [Vercel.com](https://vercel.com)
-  - Despliega seleccionando Root Directory `Cafeteriaweb` y Framework `Vite`.
-
----
-
 ## 📄 Licencia
 
-Este proyecto fue desarrollado con ❤️ para la comunidad estudiantil.
+Desarrollado con ❤️ para la gestión eficiente de cafeterías universitarias.
