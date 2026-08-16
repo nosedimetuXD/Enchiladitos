@@ -142,6 +142,18 @@ export default function Layout() {
             </NavLink>
           )}
 
+          {isOwner && (
+            <NavLink
+              to="/stats"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+              title="Estadísticas"
+            >
+              <span className="nav-icon">📊</span>
+              {!isCollapsed && <span>Estadísticas</span>}
+            </NavLink>
+          )}
+
           <NavLink
             to="/tasks"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}

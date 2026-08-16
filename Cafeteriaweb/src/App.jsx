@@ -8,6 +8,7 @@ import Sales from './pages/Sales'
 import SalesHistory from './pages/SalesHistory'
 import Comandas from './pages/Comandas'
 import Accounting from './pages/Accounting'
+import Stats from './pages/Stats'
 import Tasks from './pages/Tasks'
 import Recipe from './pages/Recipe'
 import Layout from './components/Layout'
@@ -47,6 +48,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute roles={['owner', 'admin']}>
               <Accounting />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="stats"
+          element={
+            <ProtectedRoute roles={['owner']}>
+              <Stats />
             </ProtectedRoute>
           }
         />
