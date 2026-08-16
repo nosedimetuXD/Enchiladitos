@@ -11,6 +11,7 @@ import {
   BarChart3,
   CheckSquare,
   Users,
+  User as UserIcon,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -34,6 +35,14 @@ export default function Layout() {
     const saved = localStorage.getItem('toffe_dark_mode')
     if (saved !== null) return saved === 'true'
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  const [userAvatars, setUserAvatars] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('toffe_user_avatars') || '{}')
+    } catch (e) {
+      return {}
+    }
   })
 
   useEffect(() => {
@@ -69,6 +78,8 @@ export default function Layout() {
   const isOwner = user?.role === 'owner'
   const isAdmin = isOwner || user?.role === 'admin'
 
+  const userAvatarUrl = (user && user.id && userAvatars[user.id]) || user?.avatar_url || ''
+
   const navItems = [
     { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true, show: true },
     { to: '/sales/history', label: 'Historial Ventas', icon: FileText, show: true },
@@ -78,7 +89,8 @@ export default function Layout() {
     { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isAdmin },
     { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
     { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true },
-    { to: '/users', label: 'Usuarios', icon: Users, show: isOwner }
+    { to: '/users', label: 'Usuarios', icon: Users, show: isOwner },
+    { to: '/profile', label: 'Mi Perfil', icon: UserIcon, show: true }
   ]
 
   return (
@@ -279,17 +291,26 @@ export default function Layout() {
         {/* Active User Footer */}
         <div className="p-3 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/40 bg-[#FEE4D7]/50 dark:bg-[#241209]">
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between gap-2'}`}>
-            <div className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'overflow-hidden text-left flex-1 min-w-0'}`}>
-              <div
-                className="w-9 h-9 rounded-full bg-[#9F6839] text-[#FEE4D7] font-bold flex items-center justify-center text-sm shrink-0 shadow-xs cursor-pointer"
-                title={user?.username ? `${user.username} (${roleLabels[user?.role] || user?.role})` : 'Usuario'}
-                onClick={isCollapsed ? toggleCollapse : undefined}
-              >
-                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-              </div>
+            <div
+              onClick={() => navigate('/profile')}
+              className={`flex items-center gap-2.5 cursor-pointer group ${isCollapsed ? 'justify-center' : 'overflow-hidden text-left flex-1 min-w-0'}`}
+              title="Ver mi perfil"
+            >
+              {userAvatarUrl ? (
+                <img
+                  src={userAvatarUrl}
+                  alt={user?.username}
+                  className="w-9 h-9 rounded-full object-cover border border-[#9F6839] shrink-0 shadow-xs group-hover:scale-105 transition-transform"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-[#9F6839] text-[#FEE4D7] font-bold flex items-center justify-center text-sm shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                </div>
+              )}
+
               {!isCollapsed && (
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] truncate">
+                  <span className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] truncate group-hover:text-[#9F6839] transition-colors">
                     {user?.username}
                   </span>
                   <span className="inline-block mt-0.5">

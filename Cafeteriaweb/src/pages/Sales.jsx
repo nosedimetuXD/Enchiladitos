@@ -11,7 +11,6 @@ import {
   ShoppingBag,
   Utensils,
   Bike,
-  GraduationCap,
   Heart,
   CheckCircle2,
   Image as ImageIcon
@@ -40,7 +39,6 @@ export default function Sales() {
   const [cartItems, setCartItems] = useState([])
   const [orderType, setOrderType] = useState('Para Llevar')
   const [tableNumber, setTableNumber] = useState('')
-  const [studentDiscountApplied, setStudentDiscountApplied] = useState(false)
   const [tipAmount, setTipAmount] = useState(0)
 
   // Modal de cobro y cliente
@@ -126,7 +124,6 @@ export default function Sales() {
   function clearCart() {
     setCartItems([])
     setTableNumber('')
-    setStudentDiscountApplied(false)
     setTipAmount(0)
   }
 
@@ -136,14 +133,9 @@ export default function Sales() {
     [cartItems]
   )
 
-  const cartDiscount = useMemo(
-    () => (studentDiscountApplied ? Math.round(cartSubtotal * 0.1) : 0),
-    [cartSubtotal, studentDiscountApplied]
-  )
-
   const cartTotal = useMemo(
-    () => Math.max(0, cartSubtotal - cartDiscount + tipAmount),
-    [cartSubtotal, cartDiscount, tipAmount]
+    () => Math.max(0, cartSubtotal + tipAmount),
+    [cartSubtotal, tipAmount]
   )
 
   // Mostrar solo productos activos en POS
@@ -350,10 +342,10 @@ export default function Sales() {
                       <button
                         type="button"
                         onClick={() => addToCart(product, 1)}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>{qty > 0 ? 'Agregar +1' : 'Agregar'}</span>
+                        <span>Agregar</span>
                       </button>
                     </div>
                   </div>
@@ -422,7 +414,7 @@ export default function Sales() {
           )}
 
           {/* Ítems en Carrito */}
-          <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1 my-2">
+          <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1 my-2">
             {cartItems.length === 0 ? (
               <div className="text-center py-12 text-[#9F6839]">
                 <Coffee className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -475,35 +467,11 @@ export default function Sales() {
 
         {/* Totales y Botón de Cobro */}
         <div className="pt-4 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/30 space-y-3">
-          {/* Promo Descuento Estudiantil */}
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2A150C] border border-[#D4B28E] text-xs">
-            <span className="font-bold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
-              <GraduationCap className="w-4 h-4 text-[#9F6839]" /> Descuento Estudiantil (10%)
-            </span>
-            <button
-              type="button"
-              onClick={() => setStudentDiscountApplied(!studentDiscountApplied)}
-              className={`px-3 py-1 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
-                studentDiscountApplied
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-white dark:bg-[#150904] text-[#9F6839] border border-[#D4B28E]'
-              }`}
-            >
-              {studentDiscountApplied ? '✓ Aplicado' : '+ Aplicar'}
-            </button>
-          </div>
-
           <div className="space-y-1.5 text-xs text-[#9F6839] font-semibold">
             <div className="flex justify-between">
               <span>Subtotal:</span>
               <span className="font-bold text-[#432414] dark:text-[#FEE4D7]">${cartSubtotal.toLocaleString()}</span>
             </div>
-            {studentDiscountApplied && (
-              <div className="flex justify-between text-emerald-600">
-                <span>Descuento Estudiantil (10%):</span>
-                <span className="font-bold">-${cartDiscount.toLocaleString()}</span>
-              </div>
-            )}
             <div className="flex justify-between text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] pt-2 border-t border-[#D4B28E]/40">
               <span>Total a Pagar:</span>
               <span className="text-lg text-emerald-600">${cartTotal.toLocaleString()}</span>

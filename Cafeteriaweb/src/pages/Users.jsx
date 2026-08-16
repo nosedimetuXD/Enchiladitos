@@ -2,13 +2,21 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
-import { Users as UsersIcon, UserCheck, Shield, Key, Plus, Edit2, Lock } from 'lucide-react'
+import { Users as UsersIcon, UserCheck, Shield, Key, Plus, Edit2, Lock, Camera } from 'lucide-react'
 
 export default function Users() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, updateUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
+
+  const [avatars, setAvatars] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('toffe_user_avatars') || '{}')
+    } catch (e) {
+      return {}
+    }
+  })
 
   // Modal Crear / Editar Usuario
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -16,6 +24,7 @@ export default function Users() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('employee')
+  const [avatarUrl, setAvatarUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -39,6 +48,7 @@ export default function Users() {
     setUsername('')
     setPassword('')
     setRole('employee')
+    setAvatarUrl('')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -48,6 +58,7 @@ export default function Users() {
     setUsername(userItem.username)
     setPassword('')
     setRole(userItem.role)
+    setAvatarUrl(avatars[userItem.id] || '')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -59,21 +70,31 @@ export default function Users() {
 
     try {
       if (editingUser) {
-        // Editar usuario existente
+        // Editar usuario existente por el Dueño
         const updated = await api.put(`/users/${editingUser.id}`, {
           username,
           password: password ? password : undefined,
           role
         })
 
+        if (editingUser.id) {
+          const nextAvatars = { ...avatars, [editingUser.id]: avatarUrl.trim() }
+          setAvatars(nextAvatars)
+          localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
+        }
+
         // Si el dueño se editó a sí mismo, actualizar el localStorage para reflejar el nuevo nombre/rol en pantalla
         if (currentUser && currentUser.id === editingUser.id) {
-          const updatedAuthUser = { ...currentUser, username: updated.username, role: updated.role }
-          localStorage.setItem('user', JSON.stringify(updatedAuthUser))
+          updateUser({ username: updated.username, role: updated.role, avatar_url: avatarUrl.trim() })
         }
       } else {
         // Crear nuevo usuario
-        await api.post('/users', { username, password, role })
+        const created = await api.post('/users', { username, password, role })
+        if (created && created.id && avatarUrl.trim()) {
+          const nextAvatars = { ...avatars, [created.id]: avatarUrl.trim() }
+          setAvatars(nextAvatars)
+          localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
+        }
       }
 
       setIsModalOpen(false)
@@ -134,6 +155,7 @@ export default function Users() {
         {users.map((u) => {
           const isCurrentUser = currentUser?.id === u.id
           const badge = roleBadges[u.role] || roleBadges.employee
+          const uAvatar = avatars[u.id] || ''
 
           return (
             <div
@@ -146,9 +168,20 @@ export default function Users() {
             >
               <div>
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-xl flex items-center justify-center border border-[#D4B28E]/50">
-                    {u.username.charAt(0).toUpperCase()}
-                  </div>
+                  {uAvatar ? (
+                    <img
+                      src={uAvatar}
+                      alt={u.username}
+                      className="w-12 h-12 rounded-2xl object-cover border border-[#D4B28E]/50 shadow-xs"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-xl flex items-center justify-center border border-[#D4B28E]/50">
+                      {u.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
 
                   <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase tracking-wider ${badge.style}`}>
                     {badge.label}
@@ -228,6 +261,19 @@ export default function Users() {
               placeholder={editingUser ? '•••••••• (vacío para no cambiar)' : 'Escribe una contraseña segura'}
               required={!editingUser}
               minLength={password ? 8 : undefined}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> URL de Foto de Perfil (Opcional)
+            </label>
+            <input
+              type="url"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://ejemplo.com/avatar.jpg"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>

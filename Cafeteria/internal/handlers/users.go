@@ -211,3 +211,80 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(users)
 }
+
+type updateSelfRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password,omitempty"`
+}
+
+// PUT /users/me - Permite a cualquier usuario autenticado actualizar su propio nombre y contraseña
+func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
+	userVal := r.Context().Value(custommw.ContextUserID)
+	if userVal == nil {
+		http.Error(w, "no autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	var id uuid.UUID
+	if val, ok := userVal.(uuid.UUID); ok {
+		id = val
+	} else if valStr, ok := userVal.(string); ok {
+		id, _ = uuid.Parse(valStr)
+	}
+
+	var req updateSelfRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "cuerpo inválido", http.StatusBadRequest)
+		return
+	}
+
+	username := strings.TrimSpace(req.Username)
+	if username == "" {
+		http.Error(w, "el nombre de usuario es obligatorio", http.StatusBadRequest)
+		return
+	}
+
+	var user models.User
+	var queryErr error
+
+	if strings.TrimSpace(req.Password) != "" {
+		if len(req.Password) < 8 {
+			http.Error(w, "la contraseña debe tener al menos 8 caracteres", http.StatusBadRequest)
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("error generando hash: %v", err)
+			http.Error(w, "error interno", http.StatusInternalServerError)
+			return
+		}
+
+		queryErr = h.DB.QueryRow(r.Context(),
+			`UPDATE users SET username = $1, password_hash = $2 WHERE id = $3 RETURNING id, username, role, created_by, created_at`,
+			username, string(hash), id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+	} else {
+		queryErr = h.DB.QueryRow(r.Context(),
+			`UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, role, created_by, created_at`,
+			username, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+	}
+
+	if errors.Is(queryErr, pgx.ErrNoRows) {
+		http.Error(w, "usuario no encontrado", http.StatusNotFound)
+		return
+	}
+	if queryErr != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(queryErr, &pgErr) && pgErr.Code == "23505" {
+			http.Error(w, "ese nombre de usuario ya está en uso", http.StatusConflict)
+			return
+		}
+		log.Printf("error actualizando perfil: %v", queryErr)
+		http.Error(w, "error actualizando perfil", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}

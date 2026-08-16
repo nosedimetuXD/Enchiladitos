@@ -76,6 +76,7 @@ func main() {
 		r.Get("/ingredients/{id}", ingredientHandler.Get)
 		r.Get("/products/{id}/recipe", recipeHandler.Get)
 		r.Get("/users", userHandler.List)
+		r.Put("/users/me", userHandler.UpdateSelf)
 	})
 
 	// Crear/editar/borrar productos y recetas: solo owner y admin
