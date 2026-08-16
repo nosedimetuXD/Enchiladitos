@@ -7,7 +7,7 @@ import Modal from '../components/Modal'
 export default function Inventory() {
   const [ingredients, setIngredients] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'admin'
@@ -20,13 +20,14 @@ export default function Inventory() {
   const [quantity, setQuantity] = useState('')
   const [minThreshold, setMinThreshold] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   async function loadIngredients() {
     try {
       const data = await api.get('/ingredients')
       setIngredients(data || [])
     } catch (err) {
-      setError('No se pudieron cargar los insumos de inventario')
+      setPageError('No se pudieron cargar los insumos de inventario')
     } finally {
       setLoading(false)
     }
@@ -48,6 +49,7 @@ export default function Inventory() {
     setUnit('')
     setQuantity('')
     setMinThreshold('')
+    setFormError('')
     setIsModalOpen(true)
   }
 
@@ -57,13 +59,14 @@ export default function Inventory() {
     setUnit(ing.unit)
     setQuantity(ing.quantity.toString())
     setMinThreshold(ing.min_threshold != null ? ing.min_threshold.toString() : '')
+    setFormError('')
     setIsModalOpen(true)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
-    setError('')
+    setFormError('')
 
     try {
       if (editingIngredient) {
@@ -85,7 +88,7 @@ export default function Inventory() {
       setIsModalOpen(false)
       await loadIngredients()
     } catch (err) {
-      setError(err.message || (editingIngredient ? 'No se pudo actualizar el insumo' : 'No se pudo crear el insumo'))
+      setFormError(err.message || (editingIngredient ? 'No se pudo actualizar el insumo' : 'No se pudo crear el insumo'))
     } finally {
       setSubmitting(false)
     }
@@ -98,7 +101,7 @@ export default function Inventory() {
       await api.delete(`/ingredients/${id}`)
       await loadIngredients()
     } catch (err) {
-      setError('No se pudo eliminar el insumo')
+      setPageError('No se pudo eliminar el insumo')
     }
   }
 
@@ -118,9 +121,7 @@ export default function Inventory() {
         )}
       </div>
 
-
-
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
 
       {/* Tabla de Inventario */}
       <div className="table-container">
@@ -187,6 +188,12 @@ export default function Inventory() {
           title={editingIngredient ? 'Editar Insumo' : 'Nuevo Insumo'}
         >
           <form onSubmit={handleSubmit}>
+            {formError && (
+              <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+                ⚠️ {formError}
+              </div>
+            )}
+
             <div className="form-group">
               <label>Nombre del Insumo</label>
               <input

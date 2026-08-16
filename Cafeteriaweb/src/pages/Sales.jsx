@@ -239,9 +239,9 @@ export default function Sales() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Finalizar Venta & Cobro">
         <form onSubmit={handleConfirmSale}>
           {checkoutError && (
-            <p className="error-text" style={{ marginBottom: '1rem', background: '#fee2e2', padding: '0.5rem', borderRadius: '6px' }}>
-              {checkoutError}
-            </p>
+            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+              ⚠️ {checkoutError}
+            </div>
           )}
 
           <div className="form-group">

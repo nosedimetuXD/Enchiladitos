@@ -12,7 +12,7 @@ export default function Accounting() {
   const [ingredients, setIngredients] = useState([])
   const [period, setPeriod] = useState('month')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   // Modal para registrar gastos
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -23,6 +23,7 @@ export default function Accounting() {
   const [ingredientId, setIngredientId] = useState('')
   const [quantityAdded, setQuantityAdded] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   async function loadData() {
     try {
@@ -35,7 +36,7 @@ export default function Accounting() {
       setExpenses(expData || [])
       setIngredients(ingData || [])
     } catch (err) {
-      setError('No se pudo cargar la información de contabilidad')
+      setPageError('No se pudo cargar la información de contabilidad')
     } finally {
       setLoading(false)
     }
@@ -45,10 +46,21 @@ export default function Accounting() {
     loadData()
   }, [period])
 
+  function openCreateModal() {
+    setDescription('')
+    setAmount('')
+    setCategory('insumos')
+    setPaymentMethod('efectivo')
+    setIngredientId('')
+    setQuantityAdded('')
+    setFormError('')
+    setIsModalOpen(true)
+  }
+
   async function handleCreateExpense(e) {
     e.preventDefault()
     setSubmitting(true)
-    setError('')
+    setFormError('')
 
     try {
       await api.post('/expenses', {
@@ -60,16 +72,10 @@ export default function Accounting() {
         quantity_added: category === 'insumos' && quantityAdded ? Number(quantityAdded) : 0
       })
 
-      setDescription('')
-      setAmount('')
-      setCategory('insumos')
-      setPaymentMethod('efectivo')
-      setIngredientId('')
-      setQuantityAdded('')
       setIsModalOpen(false)
       await loadData()
     } catch (err) {
-      setError(err.message || 'No se pudo registrar el gasto')
+      setFormError(err.message || 'No se pudo registrar el gasto')
     } finally {
       setSubmitting(false)
     }
@@ -101,13 +107,13 @@ export default function Accounting() {
             <option value="month">📅 Este Mes</option>
             <option value="all">📅 Histórico Total</option>
           </select>
-          <button onClick={() => setIsModalOpen(true)}>
+          <button onClick={openCreateModal}>
             + Registrar Gasto
           </button>
         </div>
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
 
       {/* Sección Exclusiva de Estadísticas del Mes (Solo Dueño) */}
       {isOwner && mStats && (
@@ -300,6 +306,12 @@ export default function Accounting() {
       {/* Modal Registrar Nuevo Gasto */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Nuevo Gasto / Compra">
         <form onSubmit={handleCreateExpense}>
+          {formError && (
+            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+              ⚠️ {formError}
+            </div>
+          )}
+
           <div className="form-group">
             <label>Descripción del Gasto / Compra</label>
             <input

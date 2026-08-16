@@ -7,7 +7,7 @@ import Modal from '../components/Modal'
 export default function Products() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   // Modal Nuevo Producto
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -15,6 +15,7 @@ export default function Products() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [creating, setCreating] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const { user } = useAuth()
   const isOwner = user?.role === 'owner' || user?.role === 'admin'
@@ -24,7 +25,7 @@ export default function Products() {
       const data = await api.get('/products')
       setProducts(data || [])
     } catch (err) {
-      setError('No se pudieron cargar los productos')
+      setPageError('No se pudieron cargar los productos')
     } finally {
       setLoading(false)
     }
@@ -34,10 +35,18 @@ export default function Products() {
     loadProducts()
   }, [])
 
+  function openCreateModal() {
+    setName('')
+    setDescription('')
+    setPrice('')
+    setFormError('')
+    setIsModalOpen(true)
+  }
+
   async function handleCreate(e) {
     e.preventDefault()
     setCreating(true)
-    setError('')
+    setFormError('')
 
     try {
       await api.post('/products', {
@@ -45,13 +54,10 @@ export default function Products() {
         description,
         price: Number(price)
       })
-      setName('')
-      setDescription('')
-      setPrice('')
       setIsModalOpen(false)
       await loadProducts()
     } catch (err) {
-      setError(err.message || 'No se pudo crear el producto')
+      setFormError(err.message || 'No se pudo crear el producto')
     } finally {
       setCreating(false)
     }
@@ -64,7 +70,7 @@ export default function Products() {
       await api.delete(`/products/${id}`)
       await loadProducts()
     } catch (err) {
-      setError('No se pudo eliminar el producto')
+      setPageError('No se pudo eliminar el producto')
     }
   }
 
@@ -78,13 +84,13 @@ export default function Products() {
           <p className="page-subtitle">Gestión de productos y recetas de la cafetería</p>
         </div>
         {isOwner && (
-          <button onClick={() => setIsModalOpen(true)}>
+          <button onClick={openCreateModal}>
             + Nuevo Producto
           </button>
         )}
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
 
       {/* Tabla de Productos */}
       <div className="table-container">
@@ -142,6 +148,12 @@ export default function Products() {
       {isOwner && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuevo Producto">
           <form onSubmit={handleCreate}>
+            {formError && (
+              <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+                ⚠️ {formError}
+              </div>
+            )}
+
             <div className="form-group">
               <label>Nombre del Producto</label>
               <input

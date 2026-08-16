@@ -14,7 +14,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   // Modal Nueva Tarea
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -23,6 +23,7 @@ export default function Tasks() {
   const [dueDate, setDueDate] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
   const [creating, setCreating] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'admin'
@@ -36,7 +37,7 @@ export default function Tasks() {
       setTasks(tasksData || [])
       setUsers(usersData || [])
     } catch (err) {
-      setError('No se pudieron cargar las tareas')
+      setPageError('No se pudieron cargar las tareas')
     } finally {
       setLoading(false)
     }
@@ -52,10 +53,19 @@ export default function Tasks() {
 
   useEvents(['task_created', 'task_status_updated'], handleTaskEvent)
 
+  function openCreateModal() {
+    setTitle('')
+    setDescription('')
+    setDueDate('')
+    setAssignedTo('')
+    setFormError('')
+    setIsModalOpen(true)
+  }
+
   async function handleCreate(e) {
     e.preventDefault()
     setCreating(true)
-    setError('')
+    setFormError('')
 
     try {
       await api.post('/tasks', {
@@ -64,14 +74,10 @@ export default function Tasks() {
         due_date: dueDate || null,
         assigned_to: assignedTo || null
       })
-      setTitle('')
-      setDescription('')
-      setDueDate('')
-      setAssignedTo('')
       setIsModalOpen(false)
       await loadData()
     } catch (err) {
-      setError(err.message || 'No se pudo crear la tarea')
+      setFormError(err.message || 'No se pudo crear la tarea')
     } finally {
       setCreating(false)
     }
@@ -82,7 +88,7 @@ export default function Tasks() {
       await api.patch(`/tasks/${taskId}/status`, { status })
       await loadData()
     } catch (err) {
-      setError('No se pudo actualizar el estado')
+      setPageError('No se pudo actualizar el estado')
     }
   }
 
@@ -93,7 +99,7 @@ export default function Tasks() {
       await api.delete(`/tasks/${id}`)
       await loadData()
     } catch (err) {
-      setError('No se pudo eliminar la tarea')
+      setPageError('No se pudo eliminar la tarea')
     }
   }
 
@@ -107,13 +113,13 @@ export default function Tasks() {
           <p className="page-subtitle">Asignación y seguimiento de pendientes de la cafetería</p>
         </div>
         {canManage && (
-          <button onClick={() => setIsModalOpen(true)}>
+          <button onClick={openCreateModal}>
             + Nueva Tarea
           </button>
         )}
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
 
       {/* Tabla de Tareas */}
       <div className="table-container">
@@ -170,6 +176,12 @@ export default function Tasks() {
       {canManage && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Tarea">
           <form onSubmit={handleCreate}>
+            {formError && (
+              <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+                ⚠️ {formError}
+              </div>
+            )}
+
             <div className="form-group">
               <label>Título de la Tarea</label>
               <input
