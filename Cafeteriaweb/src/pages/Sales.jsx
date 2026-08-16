@@ -335,7 +335,7 @@ export default function Sales() {
 
         {/* Grid de Productos */}
         <div className="flex-1 overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredProducts.map((p) => {
               const rawImg = productImages[p.id] || p.image_url || DEFAULT_PRODUCT_IMAGE
               const displayImg = processImageUrl(rawImg)
@@ -344,10 +344,10 @@ export default function Sales() {
                 <div
                   key={p.id}
                   onClick={() => addToCart(p, 1)}
-                  className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-3 shadow-xs hover:shadow-md hover:border-[#9F6839] transition-all cursor-pointer flex flex-col justify-between group"
+                  className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-3.5 shadow-xs hover:shadow-md hover:border-[#9F6839] transition-all cursor-pointer flex flex-col justify-between group overflow-hidden"
                 >
                   <div className="space-y-2">
-                    <div className="relative w-full h-28 rounded-2xl overflow-hidden bg-[#FEE4D7]/30 dark:bg-[#150904] border border-[#D4B28E]/40">
+                    <div className="relative w-full h-32 rounded-2xl overflow-hidden bg-[#FEE4D7]/30 dark:bg-[#150904] border border-[#D4B28E]/40">
                       <img
                         src={displayImg}
                         alt={p.name}
@@ -356,34 +356,37 @@ export default function Sales() {
                           e.target.src = DEFAULT_PRODUCT_IMAGE
                         }}
                       />
-                      <span className="absolute top-2 right-2 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#432414]/80 text-[#FEE4D7] backdrop-blur-xs uppercase tracking-wider">
+                      <span className="absolute top-2 right-2 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#432414]/85 text-[#FEE4D7] backdrop-blur-xs uppercase tracking-wider">
                         {p.category}
                       </span>
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] line-clamp-1 group-hover:text-[#9F6839]">
+                      <h4 className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] line-clamp-1 group-hover:text-[#9F6839]">
                         {p.name}
                       </h4>
-                      <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] font-bold mt-0.5">
+                      <p className="text-xs text-[#9F6839] dark:text-[#DABA8C] font-extrabold mt-0.5">
                         ${p.price.toLocaleString()}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-[#D4B28E]/30 flex items-center justify-between">
-                    <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Disponible
-                    </span>
+                  <div className="mt-3 pt-2.5 border-t border-[#D4B28E]/30 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 shrink-0" /> Disponible
+                      </span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         addToCart(p, 1)
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                      className="w-full py-2 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4 shrink-0" />
                       <span>Agregar 1</span>
                     </button>
                   </div>
