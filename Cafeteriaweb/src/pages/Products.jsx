@@ -51,7 +51,7 @@ export default function Products() {
       setIsModalOpen(false)
       await loadProducts()
     } catch (err) {
-      setError('No se pudo crear el producto')
+      setError(err.message || 'No se pudo crear el producto')
     } finally {
       setCreating(false)
     }

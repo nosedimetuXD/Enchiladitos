@@ -85,7 +85,7 @@ export default function Inventory() {
       setIsModalOpen(false)
       await loadIngredients()
     } catch (err) {
-      setError(editingIngredient ? 'No se pudo actualizar el insumo' : 'No se pudo crear el insumo')
+      setError(err.message || (editingIngredient ? 'No se pudo actualizar el insumo' : 'No se pudo crear el insumo'))
     } finally {
       setSubmitting(false)
     }

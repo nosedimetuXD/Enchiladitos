@@ -71,7 +71,7 @@ export default function Tasks() {
       setIsModalOpen(false)
       await loadData()
     } catch (err) {
-      setError('No se pudo crear la tarea')
+      setError(err.message || 'No se pudo crear la tarea')
     } finally {
       setCreating(false)
     }

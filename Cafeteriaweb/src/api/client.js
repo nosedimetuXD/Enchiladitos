@@ -17,6 +17,13 @@ async function request(path, options = {}) {
     })
 
     if (!response.ok) {
+        if (response.status === 401) {
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login'
+            }
+        }
         const errorText = await response.text()
         throw new Error(errorText || `Error ${response.status}`)
     }
