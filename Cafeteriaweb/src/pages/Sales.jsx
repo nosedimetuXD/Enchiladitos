@@ -226,39 +226,103 @@ export default function Sales() {
 
     if (paymentMethod === 'efectivo') {
       if (numCash < cartTotal) {
-        setCheckoutError(`El efectivo entregado ($${numCash.toLocaleString()}) es menor al total ($${cartTotal.toLocaleString()})`)
+        setCheckoutError(`El efectivo entregado ($${numCash.toLocaleString()}) es menor al total del pedido ($${cartTotal.toLocaleString()})`)
         setSubmitting(false)
         return
       }
       numTransfer = 0
     } else if (paymentMethod === 'transferencia') {
       numCash = 0
-      const validBankLines = bankPayments.filter((b) => b.bank && Number(b.amount) > 0)
-      if (validBankLines.length === 0) {
-        setCheckoutError('Por favor especifica al menos un banco/entidad y el monto abonado.')
-        setSubmitting(false)
-        return
+      const bankNamesSeen = new Set()
+
+      for (const b of bankPayments) {
+        const bankNameClean = b.bank.trim().toLowerCase()
+        const bankAmountNum = Number(b.amount) || 0
+
+        if (!bankNameClean) {
+          setCheckoutError('Por favor selecciona o escribe el nombre del banco/entidad para cada transferencia.')
+          setSubmitting(false)
+          return
+        }
+
+        if (bankAmountNum <= 0) {
+          setCheckoutError(`El monto asignado a "${b.bank}" debe ser mayor a $0.`)
+          setSubmitting(false)
+          return
+        }
+
+        if (bankNamesSeen.has(bankNameClean)) {
+          setCheckoutError(`Has ingresado "${b.bank}" más de una vez. Por favor consolida el monto en una sola línea.`)
+          setSubmitting(false)
+          return
+        }
+        bankNamesSeen.add(bankNameClean)
       }
-      numTransfer = validBankLines.reduce((sum, b) => sum + Number(b.amount), 0)
-      if (numTransfer < cartTotal) {
-        setCheckoutError(`La suma de transferencias ($${numTransfer.toLocaleString()}) es inferior al total ($${cartTotal.toLocaleString()})`)
-        setSubmitting(false)
-        return
-      }
-      bankDetailsStr = validBankLines.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
-    } else if (paymentMethod === 'mixto') {
-      const validBankLines = bankPayments.filter((b) => b.bank && Number(b.amount) > 0)
-      numTransfer = validBankLines.reduce((sum, b) => sum + Number(b.amount), 0)
-      
-      if (numCash + numTransfer < cartTotal) {
-        setCheckoutError(`La suma de efectivo + transferencias ($${(numCash + numTransfer).toLocaleString()}) no cubre el total ($${cartTotal.toLocaleString()})`)
+
+      numTransfer = bankPayments.reduce((sum, b) => sum + (Number(b.amount) || 0), 0)
+
+      if (numTransfer !== cartTotal) {
+        if (numTransfer < cartTotal) {
+          setCheckoutError(`La suma de transferencias ($${numTransfer.toLocaleString()}) es inferior al total del pedido ($${cartTotal.toLocaleString()}).`)
+        } else {
+          setCheckoutError(`La suma de transferencias ($${numTransfer.toLocaleString()}) supera el total del pedido ($${cartTotal.toLocaleString()}).`)
+        }
         setSubmitting(false)
         return
       }
 
-      if (validBankLines.length > 0) {
-        bankDetailsStr = validBankLines.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
+      bankDetailsStr = bankPayments.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
+    } else if (paymentMethod === 'mixto') {
+      if (numCash <= 0) {
+        setCheckoutError('En Pago Mixto el abono en efectivo debe ser mayor a $0. (Si no hay efectivo, usa el método Transferencia).')
+        setSubmitting(false)
+        return
       }
+
+      const bankNamesSeen = new Set()
+      for (const b of bankPayments) {
+        const bankNameClean = b.bank.trim().toLowerCase()
+        const bankAmountNum = Number(b.amount) || 0
+
+        if (!bankNameClean) {
+          setCheckoutError('Por favor selecciona o escribe el nombre del banco/entidad.')
+          setSubmitting(false)
+          return
+        }
+
+        if (bankAmountNum <= 0) {
+          setCheckoutError(`En Pago Mixto el abono por transferencia en "${b.bank}" debe ser mayor a $0.`)
+          setSubmitting(false)
+          return
+        }
+
+        if (bankNamesSeen.has(bankNameClean)) {
+          setCheckoutError(`Has ingresado "${b.bank}" más de una vez. Por favor consolida el monto en una sola línea.`)
+          setSubmitting(false)
+          return
+        }
+        bankNamesSeen.add(bankNameClean)
+      }
+
+      numTransfer = bankPayments.reduce((sum, b) => sum + (Number(b.amount) || 0), 0)
+
+      if (numTransfer <= 0) {
+        setCheckoutError('En Pago Mixto el abono por transferencia debe ser mayor a $0. (Si no hay transferencia, usa el método Efectivo).')
+        setSubmitting(false)
+        return
+      }
+
+      if (numCash + numTransfer !== cartTotal) {
+        if (numCash + numTransfer < cartTotal) {
+          setCheckoutError(`La suma de efectivo ($${numCash.toLocaleString()}) + transferencias ($${numTransfer.toLocaleString()}) es $${(numCash + numTransfer).toLocaleString()}, inferior al total ($${cartTotal.toLocaleString()}).`)
+        } else {
+          setCheckoutError(`La suma de efectivo ($${numCash.toLocaleString()}) + transferencias ($${numTransfer.toLocaleString()}) es $${(numCash + numTransfer).toLocaleString()}, mayor al total ($${cartTotal.toLocaleString()}).`)
+        }
+        setSubmitting(false)
+        return
+      }
+
+      bankDetailsStr = bankPayments.map((b) => `${b.bank.trim()}: $${Number(b.amount).toLocaleString()}`).join(' | ')
     }
 
     try {
@@ -279,7 +343,14 @@ export default function Sales() {
 
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } })
 
-      setLastOrder({ ...createdSale, items: cartItems, total: cartTotal, customer_name: payload.customer_name })
+      setLastOrder({
+        ...createdSale,
+        items: cartItems,
+        total: cartTotal,
+        customer_name: payload.customer_name,
+        payment_method: payload.payment_method,
+        bank_details: payload.bank_details
+      })
       setIsCheckoutOpen(false)
       clearCart()
       setIsReceiptOpen(true)
