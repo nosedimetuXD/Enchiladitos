@@ -151,7 +151,7 @@ export default function Users() {
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          + Nuevo Usuario
+          <span>Nuevo Usuario</span>
         </button>
       </div>
 

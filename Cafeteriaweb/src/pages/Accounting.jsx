@@ -98,8 +98,46 @@ export default function Accounting() {
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando contabilidad...</p>
 
+  const filteredSales = sales.filter((s) => {
+    if (!s.created_at) return true
+    const saleDate = new Date(s.created_at)
+    const now = new Date()
+
+    if (period === 'today') {
+      return saleDate.toDateString() === now.toDateString()
+    }
+    if (period === 'week') {
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(now.getDate() - 7)
+      return saleDate >= oneWeekAgo
+    }
+    if (period === 'month') {
+      return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
+    }
+    return true // 'all'
+  })
+
+  const filteredExpenses = expenses.filter((e) => {
+    if (!e.created_at) return true
+    const expDate = new Date(e.created_at)
+    const now = new Date()
+
+    if (period === 'today') {
+      return expDate.toDateString() === now.toDateString()
+    }
+    if (period === 'week') {
+      const oneWeekAgo = new Date()
+      oneWeekAgo.setDate(now.getDate() - 7)
+      return expDate >= oneWeekAgo
+    }
+    if (period === 'month') {
+      return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
+    }
+    return true // 'all'
+  })
+
   const combinedMovements = [
-    ...sales.map((s) => ({
+    ...filteredSales.map((s) => ({
       id: s.id,
       type: 'income',
       date: s.created_at,
@@ -108,7 +146,7 @@ export default function Accounting() {
       paymentMethod: s.payment_method,
       amount: s.total
     })),
-    ...expenses.map((e) => ({
+    ...filteredExpenses.map((e) => ({
       id: e.id,
       type: 'expense',
       date: e.created_at,
@@ -260,7 +298,7 @@ export default function Accounting() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {sales.map((s) => {
+              {filteredSales.map((s) => {
                 const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
                 return (
                   <tr key={s.id}>
@@ -278,7 +316,7 @@ export default function Accounting() {
                   </tr>
                 )
               })}
-              {sales.length === 0 && (
+              {filteredSales.length === 0 && (
                 <tr>
                   <td colSpan={5} className="text-center py-8 text-[#9F6839] font-medium">
                     No hay ingresos registrados en este periodo.
@@ -305,7 +343,7 @@ export default function Accounting() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {expenses.map((exp) => {
+              {filteredExpenses.map((exp) => {
                 const catBadge = categoryBadges[exp.category] || categoryBadges.otros
                 return (
                   <tr key={exp.id}>
@@ -332,7 +370,7 @@ export default function Accounting() {
                   </tr>
                 )
               })}
-              {expenses.length === 0 && (
+              {filteredExpenses.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
                     No hay gastos registrados en este periodo.

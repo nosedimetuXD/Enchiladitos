@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../api/client'
+import Modal from '../components/Modal'
 import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
 import {
   User,
@@ -10,11 +11,10 @@ import {
   Shield,
   Upload,
   ShoppingBag,
-  DollarSign,
   TrendingUp,
   Award,
-  Calendar,
-  FileText
+  FileText,
+  Edit2
 } from 'lucide-react'
 
 export default function Profile() {
@@ -31,13 +31,15 @@ export default function Profile() {
   const rawAvatar = (user && user.id && avatars[user.id]) || user?.avatar_url || ''
   const currentAvatarUrl = processImageUrl(rawAvatar)
 
+  // Estado del Modal de Edición
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [username, setUsername] = useState(user?.username || '')
   const [password, setPassword] = useState('')
   const [avatarInput, setAvatarInput] = useState(rawAvatar)
 
   const [saving, setSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const [formError, setFormError] = useState('')
 
   // Métricas personales del usuario
   const [userSales, setUserSales] = useState([])
@@ -100,6 +102,14 @@ export default function Profile() {
 
   const previewAvatarUrl = processImageUrl(avatarInput)
 
+  function openEditModal() {
+    setUsername(user?.username || '')
+    setPassword('')
+    setAvatarInput(rawAvatar)
+    setFormError('')
+    setIsEditModalOpen(true)
+  }
+
   function handleFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -112,7 +122,7 @@ export default function Profile() {
     e.preventDefault()
     setSaving(true)
     setSuccessMsg('')
-    setErrorMsg('')
+    setFormError('')
 
     try {
       const payload = { username: username.trim() }
@@ -132,9 +142,10 @@ export default function Profile() {
       updateUser({ ...updatedUser, avatar_url: finalAvatar })
 
       setPassword('')
+      setIsEditModalOpen(false)
       setSuccessMsg('¡Perfil y foto actualizados con éxito!')
     } catch (err) {
-      setErrorMsg(err.message || 'No se pudo actualizar el perfil')
+      setFormError(err.message || 'No se pudo actualizar el perfil')
     } finally {
       setSaving(false)
     }
@@ -147,13 +158,13 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
           Mi Perfil & Estadísticas Personales
         </h2>
         <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-          Gestiona tus credenciales, foto de perfil y revisa tu rendimiento de ventas
+          Información de cuenta, credenciales de acceso y resumen de rendimiento en caja
         </p>
       </div>
 
@@ -164,131 +175,66 @@ export default function Profile() {
         </div>
       )}
 
-      {errorMsg && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {errorMsg}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Formulario de Perfil (Izquierda / 7 cols) */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-6">
-          {/* Header Avatar Preview */}
-          <div className="flex items-center gap-4 pb-6 border-b border-[#D4B28E]/40">
-            <div className="relative">
-              {previewAvatarUrl ? (
+        {/* Información del Perfil (Izquierda / 5 cols) */}
+        <div className="lg:col-span-5 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-6">
+          <div className="space-y-6">
+            <div className="flex flex-col items-center text-center pb-6 border-b border-[#D4B28E]/40">
+              {currentAvatarUrl ? (
                 <img
-                  src={previewAvatarUrl}
-                  alt={username}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-[#9F6839] shadow-sm"
+                  src={currentAvatarUrl}
+                  alt={user?.username}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-[#9F6839] shadow-md mb-3"
                   onError={(e) => {
                     e.target.style.display = 'none'
                   }}
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-[#9F6839] text-[#FEE4D7] font-extrabold text-2xl flex items-center justify-center border-2 border-[#D4B28E] shadow-sm">
-                  {username ? username.charAt(0).toUpperCase() : 'U'}
+                <div className="w-24 h-24 rounded-full bg-[#9F6839] text-[#FEE4D7] font-extrabold text-3xl flex items-center justify-center border-4 border-[#D4B28E] shadow-md mb-3">
+                  {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
                 </div>
               )}
+
+              <h3 className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7] leading-tight">
+                {user?.username}
+              </h3>
+              <div className="mt-2">
+                <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-[#9F6839]" />
+                  ROL: {roleLabels[user?.role] || user?.role}
+                </span>
+              </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7] leading-tight">
-                {username || user?.username}
-              </h3>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] uppercase tracking-wider inline-flex items-center gap-1">
-                  <Shield className="w-3 h-3 text-[#9F6839]" />
-                  Rol: {roleLabels[user?.role] || user?.role}
-                </span>
+            <div className="space-y-3 text-xs text-[#9F6839] dark:text-[#DABA8C]">
+              <div className="flex justify-between py-1 border-b border-[#D4B28E]/30">
+                <span className="font-semibold">Nombre de Usuario:</span>
+                <strong className="text-[#432414] dark:text-[#FEE4D7]">{user?.username}</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#D4B28E]/30">
+                <span className="font-semibold">Permisos de Acceso:</span>
+                <strong className="text-[#432414] dark:text-[#FEE4D7]">
+                  {user?.role === 'owner' ? 'Acceso Total (Dueño)' : user?.role === 'admin' ? 'Administración' : 'Ventas & Comandas'}
+                </strong>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="font-semibold">Estado de Cuenta:</span>
+                <strong className="text-emerald-600 font-extrabold">✓ Activa & Autenticada</strong>
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-[#9F6839]" /> Nombre de Usuario
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-[#9F6839]" /> Nueva Contraseña (Opcional)
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres..."
-                minLength={8}
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
-            </div>
-
-            {/* Subir Foto de Perfil */}
-            <div className="space-y-2 pt-2 border-t border-[#D4B28E]/30">
-              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> Foto de Perfil (Avatar)
-              </label>
-
-              {/* Botón de subida de archivo desde almacenamiento */}
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#FEE4D7] dark:bg-[#2A150C] border border-[#D4B28E] hover:bg-[#9F6839] hover:text-white text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] transition-all cursor-pointer shadow-xs">
-                  <Upload className="w-4 h-4" />
-                  <span>Subir foto del dispositivo</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-                <span className="text-[11px] text-[#9F6839] font-medium">o pega un enlace abajo</span>
-              </div>
-
-              <input
-                type="text"
-                value={avatarInput}
-                onChange={(e) => setAvatarInput(e.target.value)}
-                placeholder="https://drive.google.com/file/d/... o enlace directo de imagen"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                Rol de Usuario (Solo Lectura)
-              </label>
-              <input
-                type="text"
-                value={roleLabels[user?.role] || user?.role || ''}
-                disabled
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#150904] border border-[#D4B28E] text-sm font-extrabold text-[#9F6839] cursor-not-allowed"
-              />
-            </div>
-
-            <div className="pt-3 flex justify-end">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {saving ? 'Guardando Cambios...' : 'Guardar Mi Perfil'}
-              </button>
-            </div>
-          </form>
+          <button
+            onClick={openEditModal}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all"
+          >
+            <Edit2 className="w-4 h-4" />
+            <span>Editar Mi Perfil</span>
+          </button>
         </div>
 
-        {/* Panel de Estadísticas Personales del Usuario (Derecha / 5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
+        {/* Panel de Estadísticas Personales del Usuario (Derecha / 7 cols) */}
+        <div className="lg:col-span-7 space-y-4">
           <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-4">
             <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2 pb-2 border-b border-[#D4B28E]/40">
               <TrendingUp className="w-4 h-4 text-[#9F6839]" /> Mis Estadísticas Personales
@@ -375,6 +321,101 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Modal Editar Perfil */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Mi Perfil">
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          {formError && (
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+              ⚠️ {formError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-[#9F6839]" /> Nombre de Usuario
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-[#9F6839]" /> Nueva Contraseña (Opcional)
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mínimo 8 caracteres (vacío para conservar)"
+              minLength={8}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-[#D4B28E]/30">
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> Foto de Perfil (Avatar)
+            </label>
+
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#FEE4D7] dark:bg-[#2A150C] border border-[#D4B28E] hover:bg-[#9F6839] hover:text-white text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] transition-all cursor-pointer shadow-xs">
+                <Upload className="w-4 h-4" />
+                <span>Subir foto del dispositivo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-[11px] text-[#9F6839] font-medium">o pega un enlace abajo</span>
+            </div>
+
+            <input
+              type="text"
+              value={avatarInput}
+              onChange={(e) => setAvatarInput(e.target.value)}
+              placeholder="https://drive.google.com/file/d/... o enlace directo de imagen"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Rol de Usuario (Solo Lectura)
+            </label>
+            <input
+              type="text"
+              value={roleLabels[user?.role] || user?.role || ''}
+              disabled
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#150904] border border-[#D4B28E] text-sm font-extrabold text-[#9F6839] cursor-not-allowed"
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-3">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
+            >
+              {saving ? 'Guardando...' : 'Guardar Mi Perfil'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
