@@ -7,7 +7,7 @@ export default function Users() {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [pageError, setPageError] = useState('')
 
   // Modal Crear / Editar Usuario
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -16,13 +16,14 @@ export default function Users() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('employee')
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   async function loadUsers() {
     try {
       const data = await api.get('/users')
       setUsers(data || [])
     } catch (err) {
-      setError('No se pudieron cargar los usuarios')
+      setPageError('No se pudieron cargar los usuarios')
     } finally {
       setLoading(false)
     }
@@ -37,6 +38,7 @@ export default function Users() {
     setUsername('')
     setPassword('')
     setRole('employee')
+    setFormError('')
     setIsModalOpen(true)
   }
 
@@ -45,13 +47,14 @@ export default function Users() {
     setUsername(userItem.username)
     setPassword('')
     setRole(userItem.role)
+    setFormError('')
     setIsModalOpen(true)
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
-    setError('')
+    setFormError('')
 
     try {
       if (editingUser) {
@@ -75,7 +78,8 @@ export default function Users() {
       setIsModalOpen(false)
       await loadUsers()
     } catch (err) {
-      setError(
+      // Mostrar el mensaje de error DENTRO del formulario modal exclusivamente
+      setFormError(
         err.message.includes('ya')
           ? 'Ese nombre de usuario ya está registrado'
           : err.message || 'No se pudo guardar el usuario'
@@ -91,6 +95,10 @@ export default function Users() {
     employee: '☕ Empleado'
   }
 
+  const isPrimaryOwner = Boolean(
+    editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio')
+  )
+
   if (loading) return <p>Cargando usuarios...</p>
 
   return (
@@ -105,7 +113,7 @@ export default function Users() {
         </button>
       </div>
 
-      {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {pageError && <p className="error-text" style={{ marginBottom: '1rem' }}>{pageError}</p>}
 
       {/* Tabla de Usuarios */}
       <div className="table-container">
@@ -159,6 +167,13 @@ export default function Users() {
         title={editingUser ? `Editar Usuario: ${editingUser.username}` : 'Nuevo Usuario'}
       >
         <form onSubmit={handleSubmit}>
+          {/* Alerta de Error DENTRO del Modal */}
+          {formError && (
+            <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 500 }}>
+              ⚠️ {formError}
+            </div>
+          )}
+
           <div className="form-group">
             <label>Nombre de Usuario</label>
             <input
@@ -189,15 +204,15 @@ export default function Users() {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              disabled={Boolean(editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio'))}
+              disabled={isPrimaryOwner}
             >
               <option value="employee">☕ Empleado (Ventas, Comandas, Inventario lectura)</option>
               <option value="admin">🛡️ Administrador (Acceso completo salvo gestión usuarios)</option>
               <option value="owner">👑 Dueño (Control total del sistema)</option>
             </select>
-            {Boolean(editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio')) && (
+            {isPrimaryOwner && (
               <p style={{ fontSize: '0.78rem', color: '#92400e', background: '#fffbeb', padding: '6px 10px', borderRadius: '6px', marginTop: '0.35rem', border: '1px solid #fef3c7' }}>
-                🔒 El rol del dueño principal está protegido permanentemente por ID y no se puede modificar.
+                🔒 El rol del dueño principal está protegido y no se puede modificar.
               </p>
             )}
           </div>
