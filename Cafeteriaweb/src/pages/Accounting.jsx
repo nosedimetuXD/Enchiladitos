@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 
 export default function Accounting() {
+  const { user } = useAuth()
+  const isOwner = user?.role === 'owner'
+
   const [summary, setSummary] = useState(null)
   const [expenses, setExpenses] = useState([])
   const [ingredients, setIngredients] = useState([])
@@ -81,6 +85,8 @@ export default function Accounting() {
 
   if (loading) return <p>Cargando reporte de contabilidad...</p>
 
+  const mStats = summary?.monthly_stats
+
   return (
     <div>
       <div className="page-header">
@@ -102,6 +108,108 @@ export default function Accounting() {
       </div>
 
       {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+
+      {/* Sección Exclusiva de Estadísticas del Mes (Solo Dueño) */}
+      {isOwner && mStats && (
+        <div style={{ background: '#1c1917', borderRadius: '16px', padding: '1.75rem', marginBottom: '2.25rem', color: '#fff', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #292524', paddingBottom: '0.85rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>👑</span> Reporte Ejecutivo & Estadísticas del Mes (Exclusivo Dueño)
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: '#a8a29e', marginTop: '2px' }}>Resumen del rendimiento comercial y ranking mensual</p>
+            </div>
+            <span style={{ background: '#581c87', color: '#f3e8ff', padding: '0.3rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>
+              SOLO DUEÑO
+            </span>
+          </div>
+
+          <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Ventas Totales del Mes</span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#10b981', marginTop: '0.2rem' }}>
+                ${mStats.monthly_income.toLocaleString()}
+              </div>
+            </div>
+
+            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Gastos Totales del Mes</span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ef4444', marginTop: '0.2rem' }}>
+                ${mStats.monthly_expenses.toLocaleString()}
+              </div>
+            </div>
+
+            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>Ganancia Neta del Mes</span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: mStats.net_profit >= 0 ? '#10b981' : '#ef4444', marginTop: '0.2rem' }}>
+                ${mStats.net_profit.toLocaleString()}
+              </div>
+            </div>
+
+            <div style={{ background: '#292524', padding: '1.1rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <span style={{ fontSize: '0.78rem', color: '#a8a29e', textTransform: 'uppercase', fontWeight: 700 }}>🥇 Mejor Vendedor del Mes</span>
+              {mStats.top_seller ? (
+                <div style={{ marginTop: '0.3rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#f59e0b' }}>
+                    {mStats.top_seller.username} <span style={{ fontSize: '0.72rem', background: '#44403c', padding: '2px 6px', borderRadius: '4px', color: '#fff', fontWeight: 500 }}>({mStats.top_seller.role})</span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#d6d3d1' }}>
+                    Vendió <strong>${mStats.top_seller.total_amount.toLocaleString()}</strong> ({mStats.top_seller.sales_count} ventas)
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.85rem', color: '#a8a29e', marginTop: '0.4rem' }}>Sin ventas este mes</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            {/* Producto Más Vendido */}
+            <div style={{ background: '#292524', padding: '1.25rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>🔥</span> Producto Más Vendido del Mes
+              </h4>
+              {mStats.top_product ? (
+                <div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>{mStats.top_product.product_name}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#a8a29e', marginTop: '0.2rem' }}>
+                    Cantidad Vendida: <strong style={{ color: '#fff' }}>{mStats.top_product.total_qty} unidades</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#a8a29e' }}>
+                    Ingreso Generado: <strong style={{ color: '#10b981' }}>${mStats.top_product.total_amount.toLocaleString()}</strong>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: '#a8a29e' }}>Sin datos disponibles</p>
+              )}
+            </div>
+
+            {/* Top 5 Clientes */}
+            <div style={{ background: '#292524', padding: '1.25rem', borderRadius: '12px', border: '1px solid #44403c' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>🏆</span> Top 5 Clientes que Más Compraron
+              </h4>
+              {mStats.top_customers && mStats.top_customers.length > 0 ? (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {mStats.top_customers.map((c, idx) => (
+                    <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', paddingBottom: '0.35rem', borderBottom: '1px solid #383532' }}>
+                      <span>
+                        <strong style={{ color: '#f59e0b', marginRight: '0.4rem' }}>#{idx + 1}</strong>
+                        {c.customer_name}
+                      </span>
+                      <span style={{ fontWeight: 700, color: '#10b981' }}>
+                        ${c.total_spent.toLocaleString()} <span style={{ fontSize: '0.72rem', color: '#a8a29e', fontWeight: 400 }}>({c.orders_count} ord)</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: '#a8a29e' }}>Sin clientes registrados este mes</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tarjetas KPI Financieras */}
       <div className="kpi-grid">

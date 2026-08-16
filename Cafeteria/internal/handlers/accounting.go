@@ -82,6 +82,80 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	summary.NetBalance = summary.TotalIncome - summary.TotalExpenses
 
+	// 4. Estadísticas Mensuales Exclusivas para el Dueño (Owner)
+	roleVal := r.Context().Value(custommw.ContextRole)
+	var userRole models.UserRole
+	if r, ok := roleVal.(models.UserRole); ok {
+		userRole = r
+	} else if rStr, ok := roleVal.(string); ok {
+		userRole = models.UserRole(rStr)
+	}
+
+	if userRole == models.RoleOwner {
+		mStats := &models.MonthlyStats{
+			TopCustomers: []models.CustomerStat{},
+		}
+
+		// Ventas mensuales
+		_ = h.DB.QueryRow(r.Context(),
+			`SELECT COALESCE(SUM(total), 0) FROM sales WHERE created_at >= date_trunc('month', now())`).Scan(&mStats.MonthlyIncome)
+
+		// Gastos mensuales
+		_ = h.DB.QueryRow(r.Context(),
+			`SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE created_at >= date_trunc('month', now())`).Scan(&mStats.MonthlyExpenses)
+
+		mStats.NetProfit = mStats.MonthlyIncome - mStats.MonthlyExpenses
+
+		// Mejor vendedor del mes (cualquier rol)
+		var topSeller models.TopSellerStat
+		errSeller := h.DB.QueryRow(r.Context(),
+			`SELECT u.username, u.role, COALESCE(SUM(s.total), 0) as total_amount, COUNT(s.id) as sales_count
+			 FROM sales s
+			 JOIN users u ON s.user_id = u.id
+			 WHERE s.created_at >= date_trunc('month', now())
+			 GROUP BY u.id, u.username, u.role
+			 ORDER BY total_amount DESC
+			 LIMIT 1`).Scan(&topSeller.Username, &topSeller.Role, &topSeller.TotalAmount, &topSeller.SalesCount)
+		if errSeller == nil {
+			mStats.TopSeller = &topSeller
+		}
+
+		// Producto más vendido del mes
+		var topProd models.TopProductStat
+		errProd := h.DB.QueryRow(r.Context(),
+			`SELECT p.name, COALESCE(SUM(si.quantity), 0) as total_qty, COALESCE(SUM(si.subtotal), 0) as total_amount
+			 FROM sale_items si
+			 JOIN sales s ON si.sale_id = s.id
+			 JOIN products p ON si.product_id = p.id
+			 WHERE s.created_at >= date_trunc('month', now())
+			 GROUP BY p.id, p.name
+			 ORDER BY total_qty DESC
+			 LIMIT 1`).Scan(&topProd.ProductName, &topProd.TotalQty, &topProd.TotalAmount)
+		if errProd == nil {
+			mStats.TopProduct = &topProd
+		}
+
+		// Top 5 Clientes que más compraron en el mes
+		custRows, errCust := h.DB.Query(r.Context(),
+			`SELECT customer_name, COALESCE(SUM(total), 0) as total_spent, COUNT(id) as orders_count
+			 FROM sales
+			 WHERE created_at >= date_trunc('month', now()) AND TRIM(customer_name) != '' AND LOWER(customer_name) != 'cliente general'
+			 GROUP BY customer_name
+			 ORDER BY total_spent DESC
+			 LIMIT 5`)
+		if errCust == nil {
+			for custRows.Next() {
+				var cs models.CustomerStat
+				if err := custRows.Scan(&cs.CustomerName, &cs.TotalSpent, &cs.OrdersCount); err == nil {
+					mStats.TopCustomers = append(mStats.TopCustomers, cs)
+				}
+			}
+			custRows.Close()
+		}
+
+		summary.MonthlyStats = mStats
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
 }

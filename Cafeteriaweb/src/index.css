@@ -146,6 +146,19 @@ body {
   box-shadow: none;
 }
 
+.app-sidebar.collapsed .sidebar-brand {
+  justify-content: center;
+  padding: 1.25rem 0.5rem;
+}
+
+.app-sidebar.collapsed .sidebar-collapse-btn {
+  position: absolute;
+  top: 22px;
+  right: -13px;
+  z-index: 50;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
 .sidebar-collapse-btn:hover {
   background: var(--primary);
   color: #fff;
