@@ -951,11 +951,27 @@ tbody tr:hover {
   margin-top: 0.35rem;
 }
 
+.desktop-only {
+  display: flex !important;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
 /* --------------------------------------------------------------------------
    RESPONSIVIDAD MÓVIL
    -------------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: flex !important;
+  }
+
   .mobile-header {
     display: flex;
     align-items: center;
@@ -967,7 +983,7 @@ tbody tr:hover {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 50;
+    z-index: 30;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
 
@@ -1002,16 +1018,37 @@ tbody tr:hover {
   }
 
   .app-sidebar {
-    width: 260px !important;
+    width: 270px !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
     transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
   }
 
   .app-sidebar.open {
     transform: translateX(0);
   }
 
-  .sidebar-collapse-btn {
-    display: none;
+  .sidebar-brand {
+    padding: 1rem 1.25rem;
+    min-height: 64px;
+  }
+
+  .sidebar-close-btn {
+    background: #292524;
+    color: #fff;
+    border: 1px solid #44403c;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
   }
 
   .sidebar-backdrop {
@@ -1020,8 +1057,9 @@ tbody tr:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 35;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+    z-index: 90;
   }
 
   .app-main-content,

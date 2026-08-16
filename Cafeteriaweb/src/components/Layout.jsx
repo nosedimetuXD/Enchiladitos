@@ -70,11 +70,19 @@ export default function Layout() {
           </div>
           <button
             type="button"
-            className="sidebar-collapse-btn"
+            className="sidebar-collapse-btn desktop-only"
             onClick={toggleCollapse}
             title={isCollapsed ? 'Expandir panel lateral' : 'Colapsar panel lateral'}
           >
             {isCollapsed ? '❯' : '❮'}
+          </button>
+          <button
+            type="button"
+            className="sidebar-close-btn mobile-only"
+            onClick={() => setMobileOpen(false)}
+            title="Cerrar menú"
+          >
+            ✕
           </button>
         </div>
 
