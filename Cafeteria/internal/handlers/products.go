@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -142,6 +143,8 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE comanda_items ALTER COLUMN product_id DROP NOT NULL`)
 	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = NULL WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = NULL WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_ingredients WHERE product_id = $1`, id)
@@ -150,8 +153,8 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM products WHERE id = $1`, id)
 	if err != nil {
-		log.Printf("error borrando producto: %v", err)
-		http.Error(w, "error borrando producto", http.StatusInternalServerError)
+		log.Printf("error borrando producto %s: %v", id, err)
+		http.Error(w, fmt.Sprintf("Error borrando producto: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
