@@ -502,16 +502,16 @@ export default function Accounting() {
             <span>Métodos de Pago</span>
             <Wallet className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-xs space-y-1 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
-            <div className="flex items-center gap-1.5">
-              <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="text-xs space-y-2 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
+            <div className="flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-emerald-600 shrink-0" />
               <span>Efectivo:</span>
-              <strong>${(Number(summary.income_by_payment_method.efectivo) || 0).toLocaleString()}</strong>
+              <strong className="text-sm font-extrabold">${(Number(summary.income_by_payment_method.efectivo) || 0).toLocaleString()}</strong>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-5 h-5 text-blue-600 shrink-0" />
               <span>Transferencia:</span>
-              <strong>${(Number(summary.income_by_payment_method.transferencia) || 0).toLocaleString()}</strong>
+              <strong className="text-sm font-extrabold">${(Number(summary.income_by_payment_method.transferencia) || 0).toLocaleString()}</strong>
             </div>
           </div>
         </div>
@@ -815,8 +815,8 @@ export default function Accounting() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               >
                 <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia / Banco (1 o más bancos)</option>
-                <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="mixto">Pago Mixto</option>
               </select>
             </div>
           </div>

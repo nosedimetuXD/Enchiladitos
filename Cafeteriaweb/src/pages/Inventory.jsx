@@ -559,8 +559,8 @@ export default function Inventory() {
                       className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
                     >
                       <option value="efectivo">Efectivo</option>
-                      <option value="transferencia">Transferencia / Banco (1 o más bancos)</option>
-                      <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="mixto">Pago Mixto</option>
                     </select>
                   </div>
 
