@@ -18,7 +18,8 @@ import {
   CreditCard,
   ArrowUpDown,
   CircleDot,
-  Building2
+  Building2,
+  RefreshCw
 } from 'lucide-react'
 
 export default function Accounting() {
@@ -43,18 +44,21 @@ export default function Accounting() {
   const [formError, setFormError] = useState('')
 
   async function loadData() {
+    setLoading(true)
+    setPageError('')
     try {
       const [sumData, expData, ingData, salesData] = await Promise.all([
-        api.get(`/accounting/summary?period=${period}`),
-        api.get(`/expenses?period=${period}`),
-        api.get('/ingredients'),
-        api.get(`/sales?period=${period}`)
+        api.get(`/accounting/summary?period=${period}`).catch(() => null),
+        api.get(`/expenses?period=${period}`).catch(() => []),
+        api.get('/ingredients').catch(() => []),
+        api.get(`/sales?period=${period}`).catch(() => [])
       ])
-      setSummary(sumData)
-      setExpenses(expData || [])
-      setIngredients(ingData || [])
-      setSales(salesData || [])
+      setSummary(sumData || null)
+      setExpenses(Array.isArray(expData) ? expData : [])
+      setIngredients(Array.isArray(ingData) ? ingData : [])
+      setSales(Array.isArray(salesData) ? salesData : [])
     } catch (err) {
+      console.error('Error cargando contabilidad:', err)
       setPageError('No se pudo cargar la información de contabilidad')
     } finally {
       setLoading(false)
@@ -84,7 +88,7 @@ export default function Accounting() {
     try {
       await api.post('/expenses', {
         description,
-        amount: Number(amount),
+        amount: Number(amount) || 0,
         category,
         payment_method: paymentMethod,
         ingredient_id: category === 'insumos' && ingredientId ? ingredientId : null,
@@ -114,75 +118,86 @@ export default function Accounting() {
     mixto: { label: 'Pago Mixto', style: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' }
   }
 
-  if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando contabilidad...</p>
+  const safeSales = Array.isArray(sales) ? sales : []
+  const safeExpenses = Array.isArray(expenses) ? expenses : []
 
-  const filteredSales = sales.filter((s) => {
-    if (!s.created_at) return true
-    const saleDate = new Date(s.created_at)
-    const now = new Date()
+  const filteredSales = useMemo(() => {
+    return safeSales.filter((s) => {
+      if (!s || !s.created_at) return true
+      const saleDate = new Date(s.created_at)
+      if (isNaN(saleDate.getTime())) return true
+      const now = new Date()
 
-    if (period === 'today') {
-      return saleDate.toDateString() === now.toDateString()
-    }
-    if (period === 'week') {
-      const oneWeekAgo = new Date()
-      oneWeekAgo.setDate(now.getDate() - 7)
-      return saleDate >= oneWeekAgo
-    }
-    if (period === 'month') {
-      return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
-    }
-    return true
-  })
+      if (period === 'today') {
+        return saleDate.toDateString() === now.toDateString()
+      }
+      if (period === 'week') {
+        const oneWeekAgo = new Date()
+        oneWeekAgo.setDate(now.getDate() - 7)
+        return saleDate >= oneWeekAgo
+      }
+      if (period === 'month') {
+        return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
+      }
+      return true
+    })
+  }, [safeSales, period])
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (!e.created_at) return true
-    const expDate = new Date(e.created_at)
-    const now = new Date()
+  const filteredExpenses = useMemo(() => {
+    return safeExpenses.filter((e) => {
+      if (!e || !e.created_at) return true
+      const expDate = new Date(e.created_at)
+      if (isNaN(expDate.getTime())) return true
+      const now = new Date()
 
-    if (period === 'today') {
-      return expDate.toDateString() === now.toDateString()
-    }
-    if (period === 'week') {
-      const oneWeekAgo = new Date()
-      oneWeekAgo.setDate(now.getDate() - 7)
-      return expDate >= oneWeekAgo
-    }
-    if (period === 'month') {
-      return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
-    }
-    return true
-  })
+      if (period === 'today') {
+        return expDate.toDateString() === now.toDateString()
+      }
+      if (period === 'week') {
+        const oneWeekAgo = new Date()
+        oneWeekAgo.setDate(now.getDate() - 7)
+        return expDate >= oneWeekAgo
+      }
+      if (period === 'month') {
+        return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
+      }
+      return true
+    })
+  }, [safeExpenses, period])
 
-  const combinedMovements = [
-    ...filteredSales.map((s) => ({
-      id: s.id,
-      type: 'income',
-      date: s.created_at,
-      concept: `Venta - ${s.customer_name || 'Cliente General'}`,
-      details: `${s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS'}${s.bank_details ? ` (${s.bank_details})` : ''}`,
-      paymentMethod: s.payment_method,
-      amount: s.total
-    })),
-    ...filteredExpenses.map((e) => ({
-      id: e.id,
-      type: 'expense',
-      date: e.created_at,
-      concept: e.description,
-      details: e.registerer_name ? `Registrado por ${e.registerer_name}` : 'Gasto operativo',
-      paymentMethod: e.payment_method,
-      amount: e.amount
-    }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date))
+  const combinedMovements = useMemo(() => {
+    return [
+      ...filteredSales.map((s) => ({
+        id: s.id || Math.random().toString(),
+        type: 'income',
+        date: s.created_at || new Date().toISOString(),
+        concept: `Venta - ${s.customer_name || 'Cliente General'}`,
+        details: `${s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS'}${s.bank_details ? ` (${s.bank_details})` : ''}`,
+        paymentMethod: s.payment_method || 'efectivo',
+        amount: Number(s.total) || 0
+      })),
+      ...filteredExpenses.map((e) => ({
+        id: e.id || Math.random().toString(),
+        type: 'expense',
+        date: e.created_at || new Date().toISOString(),
+        concept: e.description || 'Gasto registrado',
+        details: e.registerer_name ? `Registrado por ${e.registerer_name}` : 'Gasto operativo',
+        paymentMethod: e.payment_method || 'efectivo',
+        amount: Number(e.amount) || 0
+      }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [filteredSales, filteredExpenses])
 
   // Ranking Top 5 Bancos / Entidades más usados
   const topBanksRanking = useMemo(() => {
     const bankStats = {} // bankName -> { count, total }
 
     filteredSales.forEach((s) => {
-      if (s.bank_details && s.bank_details.trim()) {
+      if (!s) return
+      if (s.bank_details && typeof s.bank_details === 'string' && s.bank_details.trim()) {
         const parts = s.bank_details.split('|')
         parts.forEach((part) => {
+          if (!part) return
           const subParts = part.split(':')
           if (subParts.length >= 2) {
             const bName = subParts[0].trim()
@@ -200,7 +215,7 @@ export default function Accounting() {
         const bName = 'Transferencia General'
         if (!bankStats[bName]) bankStats[bName] = { count: 0, total: 0 }
         bankStats[bName].count += 1
-        bankStats[bName].total += (s.transfer_amount || s.total || 0)
+        bankStats[bName].total += (Number(s.transfer_amount) || Number(s.total) || 0)
       }
     })
 
@@ -216,46 +231,61 @@ export default function Accounting() {
     }))
   }, [filteredSales])
 
+  if (loading) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <RefreshCw className="w-6 h-6 text-[#9F6839] animate-spin mx-auto" />
+        <p className="text-sm font-semibold text-[#9F6839]">Cargando contabilidad...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
-            Contabilidad & Balance Financiero
-          </h2>
-          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Registro unificado de ventas, ingresos, egresos y flujo de caja
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40">
-            <Calendar className="w-3.5 h-3.5 text-[#9F6839]" />
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="bg-transparent text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer outline-none"
-            >
-              <option value="today">Hoy</option>
-              <option value="week">Esta Semana</option>
-              <option value="month">Este Mes</option>
-              <option value="all">Histórico Total</option>
-            </select>
+      {/* Header Banner con Fondo de Marca Toffe */}
+      <div className="relative rounded-3xl overflow-hidden p-6 border border-[#D4B28E] dark:border-[#9F6839]/40 shadow-sm bg-[#432414] text-[#FEE4D7]">
+        <div className="absolute inset-0 opacity-15 bg-cover bg-center pointer-events-none" style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }} />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>Contabilidad & Balance Financiero</span>
+            </h2>
+            <p className="text-xs font-semibold text-[#DABA8C] mt-1">
+              Registro unificado de ventas, ingresos, egresos y flujo de caja en Toffe Coffee
+            </p>
           </div>
 
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md cursor-pointer transition-all"
-          >
-            <Plus className="w-4 h-4" /> Registrar Gasto
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+              <Calendar className="w-3.5 h-3.5 text-[#DABA8C]" />
+              <select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="bg-transparent text-xs font-bold text-white cursor-pointer outline-none"
+              >
+                <option value="today" className="text-black">Hoy</option>
+                <option value="week" className="text-black">Esta Semana</option>
+                <option value="month" className="text-black">Este Mes</option>
+                <option value="all" className="text-black">Histórico Total</option>
+              </select>
+            </div>
+
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md cursor-pointer transition-all border border-white/20"
+            >
+              <Plus className="w-4 h-4" /> Registrar Gasto
+            </button>
+          </div>
         </div>
       </div>
 
       {pageError && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {pageError}
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center justify-between">
+          <span>⚠️ {pageError}</span>
+          <button onClick={loadData} className="px-3 py-1 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 text-xs font-extrabold">
+            Reintentar
+          </button>
         </div>
       )}
 
@@ -267,7 +297,7 @@ export default function Accounting() {
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-600">
-            ${(summary?.total_income || 0).toLocaleString()}
+            ${(Number(summary?.total_income) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
             Ventas realizadas: {summary?.sales_count || 0}
@@ -280,7 +310,7 @@ export default function Accounting() {
             <TrendingDown className="w-4 h-4 text-red-600" />
           </div>
           <div className="text-2xl font-extrabold text-red-600">
-            ${(summary?.total_expenses || 0).toLocaleString()}
+            ${(Number(summary?.total_expenses) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
             Egresos cargados: {summary?.expenses_count || 0}
@@ -292,8 +322,8 @@ export default function Accounting() {
             <span>Balance Neto</span>
             <DollarSign className="w-4 h-4 text-[#9F6839]" />
           </div>
-          <div className={`text-2xl font-extrabold ${(summary?.net_balance || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            ${(summary?.net_balance || 0).toLocaleString()}
+          <div className={`text-2xl font-extrabold ${(Number(summary?.net_balance) || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            ${(Number(summary?.net_balance) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
             Ingresos - Egresos
@@ -309,12 +339,12 @@ export default function Accounting() {
             <div className="flex items-center gap-1.5">
               <Banknote className="w-3.5 h-3.5 text-emerald-600" />
               <span>Efectivo:</span>
-              <strong>${(summary?.income_by_payment_method?.efectivo || 0).toLocaleString()}</strong>
+              <strong>${(Number(summary?.income_by_payment_method?.efectivo) || 0).toLocaleString()}</strong>
             </div>
             <div className="flex items-center gap-1.5">
               <Smartphone className="w-3.5 h-3.5 text-blue-600" />
               <span>Transferencia:</span>
-              <strong>${(summary?.income_by_payment_method?.transferencia || 0).toLocaleString()}</strong>
+              <strong>${(Number(summary?.income_by_payment_method?.transferencia) || 0).toLocaleString()}</strong>
             </div>
           </div>
         </div>
@@ -357,7 +387,7 @@ export default function Accounting() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] text-[#9F6839] font-bold">
                     <span>{bank.count} {bank.count === 1 ? 'pago' : 'pagos'}</span>
-                    <span className="text-[#432414] dark:text-[#FEE4D7] font-extrabold">${bank.total.toLocaleString()}</span>
+                    <span className="text-[#432414] dark:text-[#FEE4D7] font-extrabold">${(Number(bank.total) || 0).toLocaleString()}</span>
                   </div>
 
                   <div className="w-full h-1.5 bg-[#D4B28E]/30 rounded-full overflow-hidden">
@@ -426,9 +456,10 @@ export default function Accounting() {
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {filteredSales.map((s) => {
                 const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
+                const amt = Number(s.total) || 0
                 return (
-                  <tr key={s.id}>
-                    <td className="py-3.5 px-4 font-semibold">{new Date(s.created_at).toLocaleString()}</td>
+                  <tr key={s.id || Math.random()}>
+                    <td className="py-3.5 px-4 font-semibold">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
                     <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5">
@@ -444,7 +475,7 @@ export default function Accounting() {
                     </td>
                     <td className="py-3.5 px-4">{s.sold_by_username || 'Vendedor'}</td>
                     <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
-                      +${s.total.toLocaleString()}
+                      +${amt.toLocaleString()}
                     </td>
                   </tr>
                 )
@@ -478,10 +509,11 @@ export default function Accounting() {
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {filteredExpenses.map((exp) => {
                 const catBadge = categoryBadges[exp.category] || categoryBadges.otros
+                const amt = Number(exp.amount) || 0
                 return (
-                  <tr key={exp.id}>
-                    <td className="py-3.5 px-4 font-semibold">{new Date(exp.created_at).toLocaleDateString()}</td>
-                    <td className="py-3.5 px-4 font-bold">{exp.description}</td>
+                  <tr key={exp.id || Math.random()}>
+                    <td className="py-3.5 px-4 font-semibold">{exp.created_at ? new Date(exp.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="py-3.5 px-4 font-bold">{exp.description || 'Gasto'}</td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider ${catBadge.style}`}>
                         {catBadge.label}
@@ -500,7 +532,7 @@ export default function Accounting() {
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-right font-extrabold text-red-600 text-sm">
-                      -${exp.amount.toLocaleString()}
+                      -${amt.toLocaleString()}
                     </td>
                   </tr>
                 )
@@ -532,8 +564,8 @@ export default function Accounting() {
             </thead>
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {combinedMovements.map((m) => (
-                <tr key={m.id} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : 'bg-red-50/30 dark:bg-red-950/20'}>
-                  <td className="py-3.5 px-4 font-semibold">{new Date(m.date).toLocaleString()}</td>
+                <tr key={m.id || Math.random()} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : 'bg-red-50/30 dark:bg-red-950/20'}>
+                  <td className="py-3.5 px-4 font-semibold">{m.date ? new Date(m.date).toLocaleString() : '—'}</td>
                   <td className="py-3.5 px-4">
                     {m.type === 'income' ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
@@ -548,7 +580,7 @@ export default function Accounting() {
                   <td className="py-3.5 px-4 font-bold">{m.concept}</td>
                   <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">{m.details}</td>
                   <td className={`py-3.5 px-4 text-right font-extrabold text-sm ${m.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {m.type === 'income' ? `+$${m.amount.toLocaleString()}` : `-$${m.amount.toLocaleString()}`}
+                    {m.type === 'income' ? `+$${(Number(m.amount) || 0).toLocaleString()}` : `-$${(Number(m.amount) || 0).toLocaleString()}`}
                   </td>
                 </tr>
               ))}

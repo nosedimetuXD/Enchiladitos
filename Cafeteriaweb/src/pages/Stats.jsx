@@ -28,20 +28,22 @@ export default function Stats() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight flex items-center gap-2">
-            <span>👑</span> Estadísticas Ejecutivo & Reporte Mensual
-          </h2>
-          <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Dashboard exclusivo del dueño con ranking de ventas, productos estrella y clientes top
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 bg-white dark:bg-[#201009] border border-[#D4B28E] px-3.5 py-2 rounded-2xl text-xs font-bold text-[#432414] dark:text-[#FEE4D7]">
-          <Calendar className="w-4 h-4 text-[#9F6839]" />
-          <span>Mes Actual (Toffe Coffee)</span>
+      {/* Header Banner con Patron de Marca Toffe */}
+      <div className="relative rounded-3xl overflow-hidden p-6 border border-[#D4B28E] dark:border-[#9F6839]/40 shadow-sm bg-[#432414] text-[#FEE4D7]">
+        <div className="absolute inset-0 opacity-15 bg-cover bg-center pointer-events-none" style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }} />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>Estadísticas Ejecutivas & Reporte Mensual</span>
+            </h2>
+            <p className="text-xs font-semibold text-[#DABA8C] mt-1">
+              Dashboard exclusivo del dueño con ranking de ventas, productos estrella y clientes top
+            </p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white">
+            <Calendar className="w-4 h-4 text-[#DABA8C]" />
+            <span>Mes Actual</span>
+          </div>
         </div>
       </div>
 

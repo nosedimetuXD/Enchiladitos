@@ -30,10 +30,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative bg-[#150904] overflow-hidden p-4">
-      {/* Background Marble Pattern */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <ToffeeMarblePattern />
-      </div>
+      {/* Background Official Toffe Pattern */}
+      <div
+        className="absolute inset-0 opacity-25 pointer-events-none bg-cover bg-center"
+        style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }}
+      />
 
       <div className="relative w-full max-w-md bg-white dark:bg-[#201009] border border-[#D4B28E]/60 dark:border-[#9F6839]/40 rounded-3xl p-8 shadow-2xl z-10 backdrop-blur-md">
         {/* Brand Header */}
