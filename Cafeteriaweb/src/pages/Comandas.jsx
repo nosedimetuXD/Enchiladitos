@@ -74,7 +74,8 @@ export default function Comandas() {
       }
       await loadComandas()
     } catch (err) {
-      alert('Error al actualizar el estado de la comanda')
+      console.error('Error al cambiar estado de comanda:', err)
+      alert(err.message || 'Error al actualizar el estado de la comanda')
     }
   }
 

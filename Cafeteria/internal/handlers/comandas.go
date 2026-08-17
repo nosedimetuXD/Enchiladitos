@@ -36,7 +36,7 @@ func NewComandaHandler(db *pgxpool.Pool, hub *events.Hub) *ComandaHandler {
 // GET /comandas
 func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT c.id, c.order_number, c.sale_id, c.customer_name, c.status, c.notes, c.created_at, c.updated_at, c.ready_at, c.prepared_by, COALESCE(NULLIF(c.prepared_by_username, ''), u.username, '') 
+		`SELECT c.id, c.order_number, COALESCE(c.sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(c.customer_name, ''), c.status, COALESCE(c.notes, ''), c.created_at, c.updated_at, c.ready_at, c.prepared_by, COALESCE(NULLIF(c.prepared_by_username, ''), u.username, '') 
 		 FROM comandas c
 		 LEFT JOIN users u ON c.prepared_by = u.id
 		 WHERE c.created_at >= (now() - INTERVAL '12 hours') OR c.status IN ('pendiente', 'en_preparacion', 'listo')
@@ -68,7 +68,7 @@ func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Cargar los items de cada comanda
 	for i := range comandas {
 		itemRows, err := h.DB.Query(r.Context(),
-			`SELECT product_id, product_name, quantity, notes 
+			`SELECT product_id, product_name, quantity, COALESCE(notes, '') 
 			 FROM comanda_items 
 			 WHERE comanda_id = $1`, comandas[i].ID)
 		if err != nil {
@@ -138,6 +138,7 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var c models.Comanda
+	// Intento 1: Actualizar con columnas prepared_by
 	err = h.DB.QueryRow(r.Context(),
 		`UPDATE comandas 
 		 SET status = $1, 
@@ -146,9 +147,23 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		     prepared_by = COALESCE(prepared_by, $3::uuid),
 		     prepared_by_username = COALESCE(NULLIF(prepared_by_username, ''), NULLIF($4, ''))
 		 WHERE id = $2 
-		 RETURNING id, order_number, sale_id, COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
+		 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 		statusStr, id, userID, unameStr,
 	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
+
+	// Intento 2: Fallback si prepared_by no existe aún en DB
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		log.Printf("intentando fallback update status sin prepared_by debido a: %v", err)
+		err = h.DB.QueryRow(r.Context(),
+			`UPDATE comandas 
+			 SET status = $1, 
+			     updated_at = now(), 
+			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END)
+			 WHERE id = $2 
+			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at`,
+			statusStr, id,
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "comanda no encontrada", http.StatusNotFound)
