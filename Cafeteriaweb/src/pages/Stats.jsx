@@ -114,55 +114,69 @@ export default function Stats() {
         </div>
       </div>
 
-      {/* Rankings Grid */}
+      {/* Rankings Grid: Top 10 Productos Más Vendidos y Top 10 Clientes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Producto Más Vendido */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40 mb-4">
+        {/* Top 10 Productos Más Vendidos */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
             <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-600" /> Producto Más Vendido del Mes
+              <Award className="w-5 h-5 text-amber-500" />
+              <span>Top 10 Productos Más Vendidos</span>
             </h3>
+            <span className="text-xs font-bold text-[#9F6839]">Por unidades vendidas</span>
           </div>
-          {mStats?.top_product ? (
-            <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2E180E] border border-[#D4B28E]">
-              <div className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                {mStats.top_product.product_name}
-              </div>
-              <div className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-2">
-                Cantidad Vendida: <strong className="text-[#432414] dark:text-[#FEE4D7]">{mStats.top_product.total_qty} unidades</strong>
-              </div>
-              <div className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-1">
-                Ingreso Generado: <strong className="text-emerald-600">${mStats.top_product.total_amount.toLocaleString()}</strong>
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-[#9F6839]">Sin datos de productos este mes</p>
-          )}
-        </div>
 
-        {/* Top 5 Clientes */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40 mb-4">
-            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
-              <Users className="w-5 h-5 text-emerald-600" /> Top 5 Clientes que Más Compraron
-            </h3>
-          </div>
-          {mStats?.top_customers && mStats.top_customers.length > 0 ? (
-            <div className="space-y-2">
-              {mStats.top_customers.map((c, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/60 text-xs">
-                  <span className="font-bold text-[#432414] dark:text-[#FEE4D7]">
-                    <span className="text-[#9F6839] mr-2">#{idx + 1}</span>
-                    {c.customer_name}
-                  </span>
-                  <span className="font-extrabold text-emerald-600">
-                    ${c.total_spent.toLocaleString()} <span className="text-[10px] text-[#9F6839] font-normal">({c.orders_count} ord)</span>
-                  </span>
+          {!mStats?.top_products || mStats.top_products.length === 0 ? (
+            <p className="text-xs text-[#9F6839] font-medium py-4 text-center">No hay productos vendidos en este periodo.</p>
+          ) : (
+            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {mStats.top_products.slice(0, 10).map((prod, idx) => (
+                <div key={prod.product_name || idx} className="p-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/50 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={`w-6 h-6 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-amber-500 shadow-xs' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-amber-700' : 'bg-[#9F6839]'}`}>
+                      #{idx + 1}
+                    </span>
+                    <span className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{prod.product_name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] block">{prod.total_qty} ud(s)</span>
+                    <span className="text-[11px] font-bold text-emerald-600">${prod.total_amount.toLocaleString()}</span>
+                  </div>
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* Top 10 Clientes del Periodo */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
+            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-600" />
+              <span>Top 10 Clientes del Periodo</span>
+            </h3>
+            <span className="text-xs font-bold text-[#9F6839]">Por total invertido</span>
+          </div>
+
+          {!mStats?.top_customers || mStats.top_customers.length === 0 ? (
+            <p className="text-xs text-[#9F6839] font-medium py-4 text-center">No hay compras registradas con nombre de cliente este mes.</p>
           ) : (
-            <p className="text-xs text-[#9F6839]">Sin clientes registrados este mes</p>
+            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {mStats.top_customers.slice(0, 10).map((c, idx) => (
+                <div key={c.customer_name || idx} className="p-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/50 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={`w-6 h-6 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-emerald-600 shadow-xs' : idx === 1 ? 'bg-emerald-500' : idx === 2 ? 'bg-teal-600' : 'bg-[#9F6839]'}`}>
+                      #{idx + 1}
+                    </span>
+                    <span className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{c.customer_name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-extrabold text-emerald-600 block">${c.total_spent.toLocaleString()}</span>
+                    <span className="text-[10px] font-bold text-[#9F6839]">{c.orders_count} compra(s)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

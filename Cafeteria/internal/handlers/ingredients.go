@@ -186,6 +186,9 @@ func (h *IngredientHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, _ = h.DB.Exec(r.Context(), `DELETE FROM recipe_items WHERE ingredient_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `DELETE FROM waste_reports WHERE ingredient_id = $1`, id)
+
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM ingredients WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error borrando insumo: %v", err)
