@@ -97,13 +97,25 @@ export default function Recipe() {
 
     const ing = ingredients.find((i) => i.id === newLines[index].ingredient_id)
     if (ing) {
-      const userQty = Number(newLines[index].user_quantity) || 0
-      const userUnit = newLines[index].user_unit
-      const targetUnit = ing.unit || 'L'
+      const u = (ing.unit || '').toLowerCase()
+      if (field === 'ingredient_id') {
+        if (u.includes('l') || u.includes('litro') || u.includes('ml')) {
+          newLines[index].user_unit = 'ml'
+        } else if (u.includes('g') || u.includes('kg') || u.includes('gramo') || u.includes('kilo')) {
+          newLines[index].user_unit = 'g'
+        } else {
+          newLines[index].user_unit = ing.unit || 'unidades'
+        }
+      }
 
-      if (userUnit === 'ml' && (targetUnit === 'L' || targetUnit === 'l')) {
+      const userQty = Number(newLines[index].user_quantity) || 0
+      const userUnitLower = (newLines[index].user_unit || '').toLowerCase()
+
+      if (userUnitLower === 'ml' && (u.includes('l') || u.includes('litro'))) {
         newLines[index].quantity_used = userQty / 1000
-      } else if (userUnit === 'g' && (targetUnit === 'kg' || targetUnit === 'Kg')) {
+      } else if (userUnitLower === 'g' && (u.includes('kg') || u.includes('kilo'))) {
+        newLines[index].quantity_used = userQty / 1000
+      } else if (userUnitLower === 'mg' && (u.includes('g') || u.includes('gramo'))) {
         newLines[index].quantity_used = userQty / 1000
       } else {
         newLines[index].quantity_used = userQty
@@ -185,8 +197,9 @@ export default function Recipe() {
         <div className="space-y-3 pt-2">
           {lines.map((line, index) => {
             const foundIng = ingredients.find((i) => i.id === line.ingredient_id)
-            const isLiquid = foundIng?.unit === 'L' || foundIng?.unit === 'l'
-            const isWeight = foundIng?.unit === 'kg' || foundIng?.unit === 'g'
+            const unitLower = (foundIng?.unit || '').toLowerCase()
+            const isLiquid = unitLower.includes('l') || unitLower.includes('litro') || unitLower.includes('ml')
+            const isWeight = unitLower.includes('g') || unitLower.includes('kg') || unitLower.includes('gramo') || unitLower.includes('kilo') || unitLower.includes('mg')
 
             return (
               <div key={index} className="p-3.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-2">
@@ -245,9 +258,10 @@ export default function Recipe() {
                           <>
                             <option value="g">g (Gramos)</option>
                             <option value="kg">kg (Kilos)</option>
+                            <option value="mg">mg (Miligramos)</option>
                           </>
                         ) : (
-                          <option value="default">{foundIng?.unit || 'unidades'}</option>
+                          <option value={foundIng?.unit || 'unidades'}>{foundIng?.unit || 'unidades'}</option>
                         )}
                       </select>
                     </div>
@@ -264,16 +278,6 @@ export default function Recipe() {
                     )}
                   </div>
                 </div>
-
-                {line.ingredient_id && Number(line.user_quantity) > 0 && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] pt-1">
-                    <Scale className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>
-                      Conversión a inventario: {line.user_quantity} {line.user_unit} ➔{' '}
-                      <strong className="text-emerald-600">{Number(line.quantity_used).toFixed(4)} {foundIng?.unit || ''}</strong>
-                    </span>
-                  </div>
-                )}
               </div>
             )
           })}

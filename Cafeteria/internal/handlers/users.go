@@ -331,6 +331,18 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Desvincular restricción NOT NULL de sales.sold_by antes de iniciar la transacción
+	_, _ = h.DB.Exec(ctx, `ALTER TABLE sales ALTER COLUMN sold_by DROP NOT NULL`)
+	_, _ = h.DB.Exec(ctx, `
+		DO $$ 
+		BEGIN 
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sales_sold_by_fkey') THEN
+				ALTER TABLE sales DROP CONSTRAINT sales_sold_by_fkey;
+			END IF;
+			ALTER TABLE sales ADD CONSTRAINT sales_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL;
+		END $$;
+	`)
+
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
 		log.Printf("error iniciando transacción de borrado de usuario: %v", err)
@@ -341,6 +353,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := tx.Exec(ctx, `UPDATE sales SET sold_by = NULL WHERE sold_by = $1`, id); err != nil {
 		log.Printf("aviso actualizando sales: %v", err)
+		_, _ = tx.Exec(ctx, `UPDATE sales SET sold_by = $2 WHERE sold_by = $1`, id, primaryOwnerID)
 	}
 	if _, err := tx.Exec(ctx, `UPDATE expenses SET registered_by = $2 WHERE registered_by = $1`, id, primaryOwnerID); err != nil {
 		log.Printf("aviso actualizando expenses: %v", err)
