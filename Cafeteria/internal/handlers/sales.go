@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,20 +47,46 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	return &SaleHandler{DB: db, Hub: hub}
 }
 
-// GET /sales?period=today|week|month|all
+// GET /sales?period=today|week|month|all&start_date=...&end_date=...&year=...&month_num=...
 func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
-	var timeCondition string
+	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
+	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
+	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	switch period {
-	case "today":
-		timeCondition = "WHERE s.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
-	case "week":
-		timeCondition = "WHERE s.created_at >= (now() - INTERVAL '7 days')"
-	case "month":
-		timeCondition = "WHERE s.created_at >= (now() - INTERVAL '30 days')"
-	default:
-		timeCondition = ""
+	var rawCond string
+
+	if startDate != "" && endDate != "" {
+		rawCond = fmt.Sprintf("s.created_at >= '%s 00:00:00' AND s.created_at <= '%s 23:59:59'", startDate, endDate)
+	} else if yearParam != "" && monthParam != "" {
+		y, _ := strconv.Atoi(yearParam)
+		m, _ := strconv.Atoi(monthParam)
+		if y > 2000 && m >= 1 && m <= 12 {
+			rawCond = fmt.Sprintf("EXTRACT(YEAR FROM s.created_at) = %d AND EXTRACT(MONTH FROM s.created_at) = %d", y, m)
+		}
+	}
+
+	if rawCond == "" {
+		switch period {
+		case "today":
+			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+		case "week":
+			rawCond = "s.created_at >= (now() - INTERVAL '7 days')"
+		case "month":
+			rawCond = "s.created_at >= date_trunc('month', now())"
+		case "prev_month":
+			rawCond = "s.created_at >= date_trunc('month', now() - INTERVAL '1 month') AND s.created_at < date_trunc('month', now())"
+		case "year":
+			rawCond = "s.created_at >= date_trunc('year', now())"
+		default: // "all"
+			rawCond = ""
+		}
+	}
+
+	var timeCondition string
+	if rawCond != "" {
+		timeCondition = "WHERE " + rawCond
 	}
 
 	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Personal'), COALESCE(s.customer_name, 'Cliente General'), 

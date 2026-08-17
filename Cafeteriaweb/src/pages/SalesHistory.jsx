@@ -1,7 +1,38 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { Search, FileText, Printer, Clock, TrendingUp } from 'lucide-react'
+import {
+  Search,
+  FileText,
+  Printer,
+  Clock,
+  TrendingUp,
+  Calendar,
+  CalendarDays,
+  Zap,
+  Sun,
+  Building2,
+  Globe,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter
+} from 'lucide-react'
+
+const MONTH_NAMES = [
+  { num: 1, short: 'ene.', full: 'Enero' },
+  { num: 2, short: 'feb.', full: 'Febrero' },
+  { num: 3, short: 'mar.', full: 'Marzo' },
+  { num: 4, short: 'abr.', full: 'Abril' },
+  { num: 5, short: 'may.', full: 'Mayo' },
+  { num: 6, short: 'jun.', full: 'Junio' },
+  { num: 7, short: 'jul.', full: 'Julio' },
+  { num: 8, short: 'ago.', full: 'Agosto' },
+  { num: 9, short: 'sep.', full: 'Septiembre' },
+  { num: 10, short: 'oct.', full: 'Octubre' },
+  { num: 11, short: 'nov.', full: 'Noviembre' },
+  { num: 12, short: 'dic.', full: 'Diciembre' }
+]
 
 export default function SalesHistory() {
   const [sales, setSales] = useState([])
@@ -14,9 +45,30 @@ export default function SalesHistory() {
   const [selectedSale, setSelectedSale] = useState(null)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
 
-  async function loadSales() {
+  // Control de filtro de periodos (Predeterminado: Histórico Total)
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('preset')
+  const [displayLabel, setDisplayLabel] = useState('Histórico Total')
+  const [period, setPeriod] = useState('all')
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  async function loadSales(params = {}) {
+    setLoading(true)
+    setPageError('')
     try {
-      const data = await api.get('/sales')
+      let queryStr = ''
+      if (params.startDate && params.endDate) {
+        queryStr = `start_date=${params.startDate}&end_date=${params.endDate}`
+      } else if (params.year && params.monthNum) {
+        queryStr = `year=${params.year}&month_num=${params.monthNum}`
+      } else {
+        queryStr = `period=${params.period || period}`
+      }
+
+      const data = await api.get(`/sales?${queryStr}`)
       setSales(data || [])
     } catch (err) {
       setPageError('No se pudo cargar el historial de ventas')
@@ -26,15 +78,40 @@ export default function SalesHistory() {
   }
 
   useEffect(() => {
-    loadSales()
+    loadSales({ period: 'all' })
   }, [])
+
+  function handleSelectPreset(presetKey, label) {
+    setPeriod(presetKey)
+    setDisplayLabel(label)
+    setIsFilterModalOpen(false)
+    loadSales({ period: presetKey })
+  }
+
+  function handleSelectMonthYear(year, monthNum, monthFull) {
+    setSelectedYear(year)
+    setSelectedMonth(monthNum)
+    setDisplayLabel(`${monthFull} de ${year}`)
+    setIsFilterModalOpen(false)
+    loadSales({ year, monthNum })
+  }
+
+  function handleApplyCustomRange(e) {
+    e.preventDefault()
+    if (!startDate || !endDate) {
+      alert('Por favor selecciona una fecha de inicio y de fin')
+      return
+    }
+    setDisplayLabel(`${startDate} al ${endDate}`)
+    setIsFilterModalOpen(false)
+    loadSales({ startDate, endDate })
+  }
 
   const filteredSales = useMemo(() => {
     return sales.filter((s) => {
       const matchSearch =
         s.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.sold_by_username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(s.id).includes(searchQuery)
+        s.sold_by_username?.toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchMethod = selectedMethod === 'Todos' || s.payment_method === selectedMethod
       return matchSearch && matchMethod
@@ -69,14 +146,27 @@ export default function SalesHistory() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 px-4 py-2.5 rounded-3xl shadow-xs">
-          <div className="p-2 rounded-2xl bg-[#432414] text-[#DABA8C]">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] text-[#9F6839] uppercase font-bold tracking-wider block">Total Facturado</span>
-            <div className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-              ${totalSalesVolume.toLocaleString()}
+        <div className="flex items-center gap-3">
+          {/* Botón Selector de Período */}
+          <button
+            onClick={() => setIsFilterModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-3xl bg-white dark:bg-[#201009] hover:bg-[#FEE4D7]/50 border border-[#D4B28E] dark:border-[#9F6839]/40 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] shadow-xs transition-all cursor-pointer"
+          >
+            <Calendar className="w-4 h-4 text-[#9F6839]" />
+            <span>{displayLabel}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#9F6839]" />
+          </button>
+
+          {/* Tarjeta Total Facturado */}
+          <div className="flex items-center gap-3 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 px-4 py-2.5 rounded-3xl shadow-xs">
+            <div className="p-2 rounded-2xl bg-[#432414] text-[#DABA8C]">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] text-[#9F6839] uppercase font-bold tracking-wider block">Total Facturado</span>
+              <div className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                ${totalSalesVolume.toLocaleString()}
+              </div>
             </div>
           </div>
         </div>
@@ -94,7 +184,7 @@ export default function SalesHistory() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839]" />
           <input
             type="text"
-            placeholder="Buscar por cliente, cajero o ID..."
+            placeholder="Buscar por cliente o cajero..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-2xl pl-10 pr-3 py-2.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
@@ -119,7 +209,6 @@ export default function SalesHistory() {
           <table className="w-full min-w-[650px] text-left text-xs">
             <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
               <tr>
-                <th className="py-3.5 px-4">ID Venta</th>
                 <th className="py-3.5 px-4">Fecha / Hora</th>
                 <th className="py-3.5 px-4">Cliente</th>
                 <th className="py-3.5 px-4">Método de Pago & Entidad</th>
@@ -129,49 +218,55 @@ export default function SalesHistory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {filteredSales.map((s) => (
-                <tr key={s.id} className="hover:bg-[#FEE4D7]/30 transition-colors">
-                  <td className="py-3.5 px-4 font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    #{s.id.slice(0, 8)}
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-[#9F6839] dark:text-[#DABA8C]">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{new Date(s.created_at).toLocaleString()}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px] uppercase tracking-wider w-max">
-                        {s.payment_method}
-                      </span>
-                      {s.bank_details && (
-                        <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
-                          {s.bank_details}
+              {filteredSales.map((s) => {
+                const sDate = new Date(s.created_at)
+                const dateFormatted = sDate.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                const timeFormatted = sDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+
+                return (
+                  <tr key={s.id} className="hover:bg-[#FEE4D7]/30 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-[#9F6839] shrink-0" />
+                        <div className="flex flex-col">
+                          <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">{dateFormatted}</span>
+                          <span className="text-[11px] font-semibold text-[#9F6839] dark:text-[#DABA8C]">{timeFormatted}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px] uppercase tracking-wider w-max">
+                          {s.payment_method}
                         </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold">{s.sold_by_username || 'Vendedor'}</td>
-                  <td className="py-3.5 px-4 text-right font-extrabold text-sm text-emerald-600">
-                    ${s.total.toLocaleString()}
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <button
-                      onClick={() => handlePrintReceipt(s)}
-                      className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
-                      title="Imprimir / Ver Ticket"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        {s.bank_details && (
+                          <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
+                            {s.bank_details}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold">{s.sold_by_username || 'Vendedor'}</td>
+                    <td className="py-3.5 px-4 text-right font-extrabold text-sm text-emerald-600">
+                      ${s.total.toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        onClick={() => handlePrintReceipt(s)}
+                        className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
+                        title="Imprimir / Ver Ticket"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
               {filteredSales.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-[#9F6839] font-medium">
-                    No se encontraron ventas registradas.
+                  <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
+                    No se encontraron ventas registradas en este período.
                   </td>
                 </tr>
               )}
@@ -195,41 +290,235 @@ export default function SalesHistory() {
                 <div><strong>Cliente:</strong> {selectedSale.customer_name || 'Cliente General'}</div>
                 <div><strong>Forma Pago:</strong> {selectedSale.payment_method}</div>
                 <div><strong>Cajero:</strong> {selectedSale.sold_by_username || 'Caja'}</div>
+                <div><strong>Fecha:</strong> {new Date(selectedSale.created_at).toLocaleString()}</div>
               </div>
 
               <div className="border-t border-b py-3 space-y-1 text-left">
                 {(selectedSale.items || []).map((it, idx) => (
-                  <div key={idx} className="flex justify-between">
+                  <div key={idx} className="flex justify-between text-xs">
                     <span>{it.quantity}x {it.product_name}</span>
-                    <span className="font-bold">${(it.unit_price * it.quantity).toLocaleString()}</span>
+                    <span>${(it.unit_price * it.quantity).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
 
-              <div className="flex justify-between text-sm font-extrabold pt-2">
-                <span>TOTAL PAGADO:</span>
-                <span>${selectedSale.total.toLocaleString()}</span>
+              <div className="flex justify-between items-center text-sm font-bold pt-1">
+                <span>TOTAL FACTURADO:</span>
+                <span className="text-base">${selectedSale.total.toLocaleString()}</span>
+              </div>
+
+              <div className="pt-4 border-t border-dashed text-[10px] text-gray-500 text-center">
+                ¡Gracias por tu compra en Toffee! ☕<br />
+                Vuelve pronto.
               </div>
             </div>
 
-            <div className="flex gap-3 justify-end pt-2">
+            <div className="flex justify-end gap-3 pt-2">
               <button
-                type="button"
                 onClick={() => setIsReceiptOpen(false)}
-                className="px-4 py-2.5 rounded-2xl bg-white border border-gray-300 text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-2xl border border-gray-300 text-xs font-extrabold text-gray-600 hover:bg-gray-100 cursor-pointer"
               >
                 Cerrar
               </button>
               <button
-                type="button"
                 onClick={executeBrowserPrint}
-                className="px-5 py-2.5 rounded-2xl bg-[#9F6839] text-white text-xs font-extrabold shadow-md cursor-pointer inline-flex items-center gap-2"
+                className="px-4 py-2 rounded-2xl bg-[#9F6839] text-white text-xs font-extrabold hover:bg-[#835229] shadow-xs cursor-pointer flex items-center gap-2"
               >
-                <Printer className="w-4 h-4" /> Imprimir Comprobante
+                <Printer className="w-4 h-4" />
+                <span>Imprimir Ticket</span>
               </button>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal / Popover de Filtro de Período y Fechas */}
+      <Modal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        title="Filtrar Período de Ventas"
+      >
+        <div className="space-y-5">
+          {/* Navegación por pestañas */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('preset')}
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'preset'
+                  ? 'bg-[#9F6839] text-white shadow-xs'
+                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Rápido</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('month_year')}
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'month_year'
+                  ? 'bg-[#9F6839] text-white shadow-xs'
+                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Mes & Año</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('custom')}
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'custom'
+                  ? 'bg-[#9F6839] text-white shadow-xs'
+                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Rango Calendario</span>
+            </button>
+          </div>
+
+          {/* TAB 1: Opciones Rápidas */}
+          {activeTab === 'preset' && (
+            <div className="grid grid-cols-2 gap-3 p-1">
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('all', 'Histórico Total')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <Globe className="w-4 h-4 text-blue-600" />
+                <span>Histórico Total</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('month', 'Mes Actual')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <Calendar className="w-4 h-4 text-[#9F6839]" />
+                <span>Mes Actual</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('prev_month', 'Mes Anterior')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <Clock className="w-4 h-4 text-[#9F6839]" />
+                <span>Mes Anterior</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('week', 'Esta Semana')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <TrendingUp className="w-4 h-4 text-[#9F6839]" />
+                <span>Esta Semana</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('today', 'Hoy')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span>Hoy</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('year', 'Este Año')}
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
+              >
+                <Building2 className="w-4 h-4 text-[#9F6839]" />
+                <span>Este Año</span>
+              </button>
+            </div>
+          )}
+
+          {/* TAB 2: Mes & Año */}
+          {activeTab === 'month_year' && (
+            <div className="space-y-4 p-4 rounded-3xl bg-white dark:bg-[#150904] border border-[#D4B28E] shadow-2xs">
+              <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
+                <button
+                  type="button"
+                  onClick={() => setSelectedYear(selectedYear - 1)}
+                  className="p-2 rounded-xl border border-[#D4B28E] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  {selectedYear}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedYear(selectedYear + 1)}
+                  className="p-2 rounded-xl border border-[#D4B28E] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2.5 pt-1">
+                {MONTH_NAMES.map((m) => {
+                  const isSelected = selectedMonth === m.num
+
+                  return (
+                    <button
+                      key={m.num}
+                      type="button"
+                      onClick={() => handleSelectMonthYear(selectedYear, m.num, m.full)}
+                      className={`py-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0066FF] text-white font-black shadow-md border-2 border-black dark:border-white ring-2 ring-blue-400'
+                          : 'bg-gray-100 dark:bg-[#2A150C] text-[#432414] dark:text-[#FEE4D7] hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-gray-200 dark:border-[#9F6839]/40'
+                      }`}
+                    >
+                      {m.short}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Rango Calendario */}
+          {activeTab === 'custom' && (
+            <form onSubmit={handleApplyCustomRange} className="space-y-4 p-4 rounded-3xl bg-white dark:bg-[#150904] border border-[#D4B28E]">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
+                    Fecha Inicio
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
+                    Fecha Fin
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Aplicar Rango de Fechas</span>
+              </button>
+            </form>
+          )}
+        </div>
       </Modal>
     </div>
   )
