@@ -129,12 +129,12 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             <img
               src="/icon-192.png"
-              alt="Toffe Logo"
+              alt="Toffee Logo"
               className="w-8 h-8 rounded-xl object-cover border border-[#9F6839]"
             />
             <div>
               <span className="font-extrabold text-sm text-[#432414] dark:text-[#FEE4D7] block leading-tight">
-                Toffe
+                Toffee
               </span>
               <span className="text-[9px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider block">
                 "HECHO POR Y PARA ESTUDIANTES"

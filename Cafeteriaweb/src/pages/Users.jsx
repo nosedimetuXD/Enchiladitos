@@ -15,14 +15,6 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  const [avatars, setAvatars] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('toffe_user_avatars') || '{}')
-    } catch (e) {
-      return {}
-    }
-  })
-
   // Modal Crear / Editar Usuario
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
@@ -76,7 +68,7 @@ export default function Users() {
     setUsername(userItem.username)
     setPassword('')
     setRole(userItem.role)
-    setAvatarUrl(avatars[userItem.id] || '')
+    setAvatarUrl(userItem.avatar_url || '')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -105,25 +97,15 @@ export default function Users() {
         const updated = await api.put(`/users/${editingUser.id}`, {
           username,
           password: password ? password : undefined,
-          role
+          role,
+          avatar_url: finalAvatar
         })
-
-        if (editingUser.id) {
-          const nextAvatars = { ...avatars, [editingUser.id]: finalAvatar }
-          setAvatars(nextAvatars)
-          localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
-        }
 
         if (currentUser && currentUser.id === editingUser.id) {
           updateUser({ username: updated.username, role: updated.role, avatar_url: finalAvatar })
         }
       } else {
-        const created = await api.post('/users', { username, password, role })
-        if (created && created.id && finalAvatar) {
-          const nextAvatars = { ...avatars, [created.id]: finalAvatar }
-          setAvatars(nextAvatars)
-          localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
-        }
+        await api.post('/users', { username, password, role, avatar_url: finalAvatar })
       }
 
       setIsModalOpen(false)
@@ -227,7 +209,7 @@ export default function Users() {
             Gestión de Usuarios & Personal
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Cuentas, credenciales, rendimiento individual y permisos de caja del equipo Toffe
+            Cuentas, credenciales, rendimiento individual y permisos del equipo Toffee Coffee
           </p>
         </div>
 
@@ -251,7 +233,7 @@ export default function Users() {
         {users.map((u) => {
           const isCurrentUser = currentUser?.id === u.id
           const badge = roleBadges[u.role] || roleBadges.employee
-          const rawUAvatar = avatars[u.id] || ''
+          const rawUAvatar = u.avatar_url || ''
           const uAvatar = processImageUrl(rawUAvatar)
           const isPrimary = Boolean(u.is_primary || u.username.trim().toLowerCase() === 'camilo osorio')
 
@@ -350,9 +332,17 @@ export default function Users() {
         >
           <div className="space-y-4">
             <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#9F6839] text-white font-black text-xl flex items-center justify-center">
-                {selectedUserForStats.username.charAt(0).toUpperCase()}
-              </div>
+              {selectedUserForStats.avatar_url ? (
+                <img
+                  src={processImageUrl(selectedUserForStats.avatar_url)}
+                  alt={selectedUserForStats.username}
+                  className="w-12 h-12 rounded-2xl object-cover border border-[#9F6839]"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-[#9F6839] text-white font-black text-xl flex items-center justify-center">
+                  {selectedUserForStats.username.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <h4 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
                   {selectedUserForStats.username}
@@ -496,7 +486,7 @@ export default function Users() {
               type="text"
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://drive.google.com/file/d/... o enlace de imagen"
+              placeholder="https://... o enlace de foto (se guardará en la nube)"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>

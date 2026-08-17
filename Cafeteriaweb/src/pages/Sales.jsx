@@ -876,13 +876,13 @@ export default function Sales() {
         {lastOrder && (
           <div className="space-y-4">
             <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
-              <div className="border-b pb-3 flex flex-col items-center">
-                <img src="/icon-192.png" alt="Toffe Logo" className="w-8 h-8 rounded-xl object-cover border border-[#9F6839] mb-1" />
-                <h2 className="text-base font-extrabold text-[#432414] tracking-tight">TOFFE COFFEE</h2>
-                <p className="text-[10px] text-gray-500">"Hecho por y para estudiantes"</p>
-                <p className="text-[10px] text-gray-500 mt-1">Comprobante de Venta</p>
-                <p className="text-[10px] text-gray-500">{new Date().toLocaleString()}</p>
+              <div className="flex flex-col items-center justify-center border-b border-[#D4B28E]/60 pb-3 text-center">
+                <img src="/icon-192.png" alt="Toffee Logo" className="w-12 h-12 rounded-2xl border border-[#9F6839] mb-1 object-cover" />
+                <h2 className="text-base font-black text-[#432414] uppercase tracking-wider">Toffee Coffee</h2>
+                <p className="text-[10px] text-[#9F6839] font-extrabold uppercase tracking-widest">"Hecho por y para estudiantes"</p>
               </div>
+              <p className="text-[10px] text-gray-500 mt-1">Comprobante de Venta</p>
+              <p className="text-[10px] text-gray-500">{new Date().toLocaleString()}</p>
 
               <div className="text-left space-y-1 text-xs">
                 <div><strong>Cliente:</strong> {lastOrder.customer_name}</div>

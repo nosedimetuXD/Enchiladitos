@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -13,6 +15,20 @@ import (
 
 	"github.com/NosedimetuXD/cafeteria/internal/models"
 )
+
+type ProductHandler struct {
+	DB *pgxpool.Pool
+}
+
+func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`)
+	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Bebidas'`)
+
+	return &ProductHandler{DB: db}
+}
 
 // GET /products/{id}
 func (h *ProductHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -25,9 +41,9 @@ func (h *ProductHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var p models.Product
 	err = h.DB.QueryRow(r.Context(),
-		`SELECT id, name, description, price, active, created_at, updated_at
+		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at
 		 FROM products WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "producto no encontrado", http.StatusNotFound)
@@ -48,6 +64,8 @@ type updateProductRequest struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
+	Category    string  `json:"category"`
+	ImageURL    string  `json:"image_url"`
 	Active      bool    `json:"active"`
 }
 
@@ -69,14 +87,18 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Category == "" {
+		req.Category = "Bebidas"
+	}
+
 	var p models.Product
 	err = h.DB.QueryRow(r.Context(),
 		`UPDATE products
-		 SET name = $1, description = $2, price = $3, active = $4
-		 WHERE id = $5
-		 RETURNING id, name, description, price, active, created_at, updated_at`,
-		req.Name, req.Description, req.Price, req.Active, id,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		 SET name = $1, description = $2, price = $3, category = $4, image_url = $5, active = $6, updated_at = now()
+		 WHERE id = $7
+		 RETURNING id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at`,
+		req.Name, req.Description, req.Price, req.Category, req.ImageURL, req.Active, id,
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "producto no encontrado", http.StatusNotFound)
@@ -115,18 +137,13 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-type ProductHandler struct {
-	DB *pgxpool.Pool
-}
-
-func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
-	return &ProductHandler{DB: db}
-}
-
 // GET /products
 func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Bebidas'`)
+
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, name, description, price, active, created_at, updated_at
+		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at
 		 FROM products
 		 ORDER BY name`)
 	if err != nil {
@@ -138,7 +155,7 @@ func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Active, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			http.Error(w, "error leyendo productos", http.StatusInternalServerError)
 			return
 		}
@@ -154,6 +171,8 @@ type createProductRequest struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	Price       float64 `json:"price"`
+	Category    string  `json:"category"`
+	ImageURL    string  `json:"image_url"`
 }
 
 func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -167,15 +186,19 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Category == "" {
+		req.Category = "Bebidas"
+	}
+
 	var p models.Product
 	err := h.DB.QueryRow(r.Context(),
-		`INSERT INTO products (name, description, price)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, name, description, price, active, created_at, updated_at`,
-		req.Name, req.Description, req.Price,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		`INSERT INTO products (name, description, price, category, image_url)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at`,
+		req.Name, req.Description, req.Price, req.Category, req.ImageURL,
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		log.Printf("error insertando producto: %v", err) // agrega esta línea
+		log.Printf("error insertando producto: %v", err)
 		http.Error(w, "error creando producto", http.StatusInternalServerError)
 		return
 	}

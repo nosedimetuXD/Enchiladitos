@@ -15,9 +15,6 @@ import {
   Award,
   FileText,
   Edit2,
-  Calendar,
-  DollarSign,
-  Key,
   Clock,
   Sparkles
 } from 'lucide-react'
@@ -25,15 +22,7 @@ import {
 export default function Profile() {
   const { user, updateUser } = useAuth()
 
-  const [avatars, setAvatars] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('toffe_user_avatars') || '{}')
-    } catch (e) {
-      return {}
-    }
-  })
-
-  const rawAvatar = (user && user.id && avatars[user.id]) || user?.avatar_url || ''
+  const rawAvatar = user?.avatar_url || ''
   const currentAvatarUrl = processImageUrl(rawAvatar)
 
   // Estado del Modal de Edición
@@ -65,6 +54,13 @@ export default function Profile() {
       }
     }
     fetchUserSales()
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      setUsername(user.username || '')
+      setAvatarInput(user.avatar_url || '')
+    }
   }, [user])
 
   // Cálculo de Estadísticas Personales
@@ -107,7 +103,7 @@ export default function Profile() {
   function openEditModal() {
     setUsername(user?.username || '')
     setPassword('')
-    setAvatarInput(rawAvatar)
+    setAvatarInput(user?.avatar_url || '')
     setFormError('')
     setIsEditModalOpen(true)
   }
@@ -127,25 +123,24 @@ export default function Profile() {
     setFormError('')
 
     try {
-      const payload = { username: username.trim() }
+      const finalAvatar = avatarInput.trim()
+      const payload = {
+        username: username.trim(),
+        avatar_url: finalAvatar
+      }
       if (password.trim()) {
         payload.password = password.trim()
       }
 
+      // Guardar avatar_url en la base de datos PostgreSQL de Supabase
       const updatedUser = await api.put('/users/me', payload)
 
-      const finalAvatar = avatarInput.trim()
-      if (user?.id) {
-        const nextAvatars = { ...avatars, [user.id]: finalAvatar }
-        setAvatars(nextAvatars)
-        localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
-      }
-
+      // Actualizar estado global del AuthContext
       updateUser({ ...updatedUser, avatar_url: finalAvatar })
 
       setPassword('')
       setIsEditModalOpen(false)
-      setSuccessMsg('¡Perfil y foto actualizados con éxito!')
+      setSuccessMsg('¡Perfil y foto guardados en la nube y sincronizados en todos tus dispositivos!')
     } catch (err) {
       setFormError(err.message || 'No se pudo actualizar el perfil')
     } finally {
@@ -167,7 +162,7 @@ export default function Profile() {
           Mi Perfil & Estadísticas Personales
         </h2>
         <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-          Información de cuenta, credenciales de acceso y resumen de rendimiento en caja
+          Información de cuenta Toffee Coffee, credenciales y resumen de rendimiento en caja
         </p>
       </div>
 
@@ -182,7 +177,7 @@ export default function Profile() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Tarjeta Perfil de Usuario (Izquierda / 5 cols) */}
         <div className="lg:col-span-5 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl overflow-hidden shadow-xs">
-          {/* Banner de Fondo de Marca Toffe */}
+          {/* Banner de Fondo de Marca Toffee */}
           <div className="relative h-28 bg-[#432414] p-4">
             <div
               className="absolute inset-0 opacity-30 bg-cover bg-center pointer-events-none"
@@ -237,9 +232,9 @@ export default function Profile() {
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="font-semibold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Estado:
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Estado en Nube:
                 </span>
-                <strong className="text-emerald-600 font-extrabold">✓ Activa & Autenticada</strong>
+                <strong className="text-emerald-600 font-extrabold">✓ Sincronizado Multidispositivo</strong>
               </div>
             </div>
 
@@ -417,7 +412,7 @@ export default function Profile() {
               type="text"
               value={avatarInput}
               onChange={(e) => setAvatarInput(e.target.value)}
-              placeholder="https://drive.google.com/file/d/... o enlace directo de imagen"
+              placeholder="https://... o enlace de foto (se guardará en la nube)"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>

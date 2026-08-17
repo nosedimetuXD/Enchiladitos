@@ -18,6 +18,7 @@ type User struct {
 	ID        uuid.UUID  `json:"id"`
 	Username  string     `json:"username"`
 	Role      UserRole   `json:"role"`
+	AvatarURL string     `json:"avatar_url"`
 	CreatedBy *uuid.UUID `json:"created_by,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	IsPrimary bool       `json:"is_primary"`

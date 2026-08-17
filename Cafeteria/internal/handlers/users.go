@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -24,13 +26,19 @@ type UserHandler struct {
 }
 
 func NewUserHandler(db *pgxpool.Pool) *UserHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, _ = db.Exec(ctx, `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''`)
+
 	return &UserHandler{DB: db}
 }
 
 type createUserRequest struct {
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	Role     models.UserRole `json:"role"`
+	Username  string          `json:"username"`
+	Password  string          `json:"password"`
+	Role      models.UserRole `json:"role"`
+	AvatarURL string          `json:"avatar_url"`
 }
 
 // POST /users
@@ -65,14 +73,13 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// quién está creando este usuario (viene del token, gracias a RequireAuth)
 	var user models.User
 	err = h.DB.QueryRow(r.Context(),
-		`INSERT INTO users (username, password_hash, role, created_by)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, username, role, created_by, created_at`,
-		req.Username, string(hash), req.Role, r.Context().Value(custommw.ContextUserID),
-	).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+		`INSERT INTO users (username, password_hash, role, avatar_url, created_by)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, username, role, COALESCE(avatar_url, ''), created_by, created_at`,
+		req.Username, string(hash), req.Role, req.AvatarURL, r.Context().Value(custommw.ContextUserID),
+	).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &user.CreatedBy, &user.CreatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -91,9 +98,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateUserRequest struct {
-	Username string          `json:"username"`
-	Password string          `json:"password,omitempty"`
-	Role     models.UserRole `json:"role"`
+	Username  string          `json:"username"`
+	Password  string          `json:"password,omitempty"`
+	Role      models.UserRole `json:"role"`
+	AvatarURL string          `json:"avatar_url"`
 }
 
 // PUT /users/{id}
@@ -124,7 +132,6 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Protección por UUID: El rol del usuario principal (primer dueño creado) no se puede cambiar
 	var primaryOwnerID uuid.UUID
 	_ = h.DB.QueryRow(r.Context(), `SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1`).Scan(&primaryOwnerID)
 
@@ -149,19 +156,19 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 		err = h.DB.QueryRow(r.Context(),
 			`UPDATE users
-			 SET username = $1, password_hash = $2, role = $3
-			 WHERE id = $4
-			 RETURNING id, username, role, created_by, created_at`,
-			username, string(hash), req.Role, id,
-		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+			 SET username = $1, password_hash = $2, role = $3, avatar_url = $4
+			 WHERE id = $5
+			 RETURNING id, username, role, COALESCE(avatar_url, ''), created_by, created_at`,
+			username, string(hash), req.Role, req.AvatarURL, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &user.CreatedBy, &user.CreatedAt)
 	} else {
 		err = h.DB.QueryRow(r.Context(),
 			`UPDATE users
-			 SET username = $1, role = $2
-			 WHERE id = $3
-			 RETURNING id, username, role, created_by, created_at`,
-			username, req.Role, id,
-		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+			 SET username = $1, role = $2, avatar_url = $3
+			 WHERE id = $4
+			 RETURNING id, username, role, COALESCE(avatar_url, ''), created_by, created_at`,
+			username, req.Role, req.AvatarURL, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &user.CreatedBy, &user.CreatedAt)
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -187,8 +194,10 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // GET /users
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''`)
+
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, username, role, created_by, created_at,
+		`SELECT id, username, role, COALESCE(avatar_url, ''), created_by, created_at,
 		        (id = (SELECT id FROM users WHERE role = 'owner' ORDER BY created_at ASC LIMIT 1)) AS is_primary
 		 FROM users ORDER BY username`)
 	if err != nil {
@@ -201,7 +210,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedBy, &u.CreatedAt, &u.IsPrimary); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.AvatarURL, &u.CreatedBy, &u.CreatedAt, &u.IsPrimary); err != nil {
 			log.Printf("error leyendo usuarios: %v", err)
 			http.Error(w, "error leyendo usuarios", http.StatusInternalServerError)
 			return
@@ -214,11 +223,12 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateSelfRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password,omitempty"`
+	Username  string `json:"username"`
+	Password  string `json:"password,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
 }
 
-// PUT /users/me - Permite a cualquier usuario autenticado actualizar su propio nombre y contraseña
+// PUT /users/me - Permite a cualquier usuario autenticado actualizar su propio nombre, contraseña y avatar
 func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
 	userVal := r.Context().Value(custommw.ContextUserID)
 	if userVal == nil {
@@ -261,14 +271,14 @@ func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
 		}
 
 		queryErr = h.DB.QueryRow(r.Context(),
-			`UPDATE users SET username = $1, password_hash = $2 WHERE id = $3 RETURNING id, username, role, created_by, created_at`,
-			username, string(hash), id,
-		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+			`UPDATE users SET username = $1, password_hash = $2, avatar_url = $3 WHERE id = $4 RETURNING id, username, role, COALESCE(avatar_url, ''), created_by, created_at`,
+			username, string(hash), req.AvatarURL, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &user.CreatedBy, &user.CreatedAt)
 	} else {
 		queryErr = h.DB.QueryRow(r.Context(),
-			`UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, role, created_by, created_at`,
-			username, id,
-		).Scan(&user.ID, &user.Username, &user.Role, &user.CreatedBy, &user.CreatedAt)
+			`UPDATE users SET username = $1, avatar_url = $2 WHERE id = $3 RETURNING id, username, role, COALESCE(avatar_url, ''), created_by, created_at`,
+			username, req.AvatarURL, id,
+		).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &user.CreatedBy, &user.CreatedAt)
 	}
 
 	if errors.Is(queryErr, pgx.ErrNoRows) {
@@ -290,7 +300,7 @@ func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-// DELETE /users/{id} - Permite únicamente al Dueño eliminar usuarios (salvo el dueño principal)
+// DELETE /users/{id}
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -307,7 +317,6 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// No permitir que el usuario se elimine a sí mismo
 	userVal := ctx.Value(custommw.ContextUserID)
 	if userVal != nil {
 		var currentID uuid.UUID
@@ -330,7 +339,6 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	// Reasignar referencias de clave foránea al dueño principal para cumplir restricciones NOT NULL y preservar la contabilidad intacta
 	if _, err := tx.Exec(ctx, `UPDATE sales SET sold_by = $2 WHERE sold_by = $1`, id, primaryOwnerID); err != nil {
 		log.Printf("aviso actualizando sales: %v", err)
 	}

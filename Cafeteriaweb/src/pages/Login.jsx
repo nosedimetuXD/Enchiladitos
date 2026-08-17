@@ -42,9 +42,9 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#432414] dark:bg-[#34180D] border-2 border-[#9F6839] text-[#DABA8C] shadow-md mb-4">
             <Coffee className="w-8 h-8 text-[#DABA8C]" />
           </div>
-          <h1 className="text-3xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
-            Toffe Coffee
-          </h1>
+            <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7] text-xl tracking-tight leading-none block">
+              Toffee Coffee
+            </span>
           <p className="text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-widest mt-1">
             "Hecho por y para estudiantes"
           </p>

@@ -14,15 +14,6 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  // Almacenamiento local de URLs de imagen por ID de producto
-  const [productImages, setProductImages] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('toffe_product_images') || '{}')
-    } catch (e) {
-      return {}
-    }
-  })
-
   // Modal Crear / Editar Producto
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -71,7 +62,7 @@ export default function Products() {
     setDescription(prod.description || '')
     setPrice(String(prod.price))
     setCategory(prod.category || 'Café')
-    setImageUrl(productImages[prod.id] || prod.image_url || '')
+    setImageUrl(prod.image_url || '')
     const currentActive = typeof prod.active !== 'undefined' ? prod.active : (prod.is_active ?? true)
     setIsActive(currentActive)
     setFormError('')
@@ -84,36 +75,20 @@ export default function Products() {
     setFormError('')
 
     try {
-      let savedProd
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        price: Number(price),
+        category: category.trim() || 'Café',
+        image_url: imageUrl.trim(),
+        active: isActive,
+        is_active: isActive
+      }
+
       if (editingProduct) {
-        savedProd = await api.put(`/products/${editingProduct.id}`, {
-          name,
-          description,
-          price: Number(price),
-          category,
-          active: isActive,
-          is_active: isActive
-        })
-        const prodId = editingProduct.id
-        if (imageUrl.trim()) {
-          const nextImages = { ...productImages, [prodId]: imageUrl.trim() }
-          setProductImages(nextImages)
-          localStorage.setItem('toffe_product_images', JSON.stringify(nextImages))
-        }
+        await api.put(`/products/${editingProduct.id}`, payload)
       } else {
-        savedProd = await api.post('/products', {
-          name,
-          description,
-          price: Number(price),
-          category,
-          active: isActive,
-          is_active: isActive
-        })
-        if (savedProd && savedProd.id && imageUrl.trim()) {
-          const nextImages = { ...productImages, [savedProd.id]: imageUrl.trim() }
-          setProductImages(nextImages)
-          localStorage.setItem('toffe_product_images', JSON.stringify(nextImages))
-        }
+        await api.post('/products', payload)
       }
 
       setIsModalOpen(false)
@@ -134,6 +109,7 @@ export default function Products() {
         description: prod.description || '',
         price: prod.price,
         category: prod.category || 'Café',
+        image_url: prod.image_url || '',
         active: !currentActive,
         is_active: !currentActive
       })
@@ -167,10 +143,10 @@ export default function Products() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
-            Catálogo de Productos & Menú
+            Catálogo de Productos & Menú Toffee Coffee
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Configuración de precios, recetas, fotos e insumos consumidos por venta
+            Configuración de precios, recetas, fotos e insumos sincronizados en todos los dispositivos
           </p>
         </div>
 
@@ -222,7 +198,7 @@ export default function Products() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map((prod) => {
           const activeState = typeof prod.active !== 'undefined' ? prod.active : (prod.is_active ?? true)
-          const img = productImages[prod.id] || prod.image_url || DEFAULT_PRODUCT_IMAGE
+          const img = prod.image_url || DEFAULT_PRODUCT_IMAGE
 
           return (
             <div
@@ -379,17 +355,17 @@ export default function Products() {
 
           <div>
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5 text-[#9F6839]" /> URL de la Imagen (Opcional)
+              <ImageIcon className="w-3.5 h-3.5 text-[#9F6839]" /> URL de la Imagen
             </label>
             <input
-              type="url"
+              type="text"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://ejemplo.com/foto-cafe.jpg"
+              placeholder="https://... o imagen (se guardará en la nube)"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
             <p className="text-[10px] text-[#9F6839] mt-1 font-medium">
-              Puedes colocar el enlace a cualquier imagen en internet para mostrarla en el menú.
+              ℹ️ Se guardará en la nube y se mostrará en todos los dispositivos en tiempo real.
             </p>
           </div>
 
