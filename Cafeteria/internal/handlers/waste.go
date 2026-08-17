@@ -1,0 +1,174 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/NosedimetuXD/cafeteria/internal/events"
+	custommw "github.com/NosedimetuXD/cafeteria/internal/middleware"
+	"github.com/NosedimetuXD/cafeteria/internal/models"
+)
+
+type WasteHandler struct {
+	DB  *pgxpool.Pool
+	Hub *events.Hub
+}
+
+func NewWasteHandler(db *pgxpool.Pool, hub *events.Hub) *WasteHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, _ = db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS waste_reports (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+			quantity_lost NUMERIC NOT NULL,
+			reason TEXT NOT NULL,
+			reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+		)
+	`)
+
+	return &WasteHandler{DB: db, Hub: hub}
+}
+
+// GET /waste — lista todos los reportes de mermas/daños
+func (h *WasteHandler) List(w http.ResponseWriter, r *http.Request) {
+	// Asegurar tabla
+	_, _ = h.DB.Exec(r.Context(), `
+		CREATE TABLE IF NOT EXISTS waste_reports (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+			quantity_lost NUMERIC NOT NULL,
+			reason TEXT NOT NULL,
+			reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+		)
+	`)
+
+	query := `SELECT w.id, w.ingredient_id, COALESCE(i.name, 'Insumo Eliminado'), COALESCE(i.unit, 'unidades'), 
+	                 w.quantity_lost, w.reason, w.reported_by, COALESCE(u.username, 'Personal'), w.created_at
+	          FROM waste_reports w
+	          LEFT JOIN ingredients i ON w.ingredient_id = i.id
+	          LEFT JOIN users u ON w.reported_by = u.id
+	          ORDER BY w.created_at DESC`
+
+	rows, err := h.DB.Query(r.Context(), query)
+	if err != nil {
+		log.Printf("error consultando mermas: %v", err)
+		http.Error(w, "error consultando reporte de daños", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []models.WasteReport
+	for rows.Next() {
+		var item models.WasteReport
+		if err := rows.Scan(&item.ID, &item.IngredientID, &item.IngredientName, &item.Unit,
+			&item.QuantityLost, &item.Reason, &item.ReportedBy, &item.ReporterName, &item.CreatedAt); err != nil {
+			log.Printf("error leyendo mermas: %v", err)
+			http.Error(w, "error leyendo reporte de daños", http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
+}
+
+// POST /waste — registra daño/pérdida de insumo y descuenta la cantidad del inventario
+type createWasteRequest struct {
+	IngredientID uuid.UUID `json:"ingredient_id"`
+	QuantityLost float64   `json:"quantity_lost"`
+	Reason       string    `json:"reason"`
+}
+
+func (h *WasteHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req createWasteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "cuerpo inválido", http.StatusBadRequest)
+		return
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	if req.IngredientID == uuid.Nil || req.QuantityLost <= 0 || reason == "" {
+		http.Error(w, "insumo, cantidad perdida > 0 y motivo son obligatorios", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	userVal := ctx.Value(custommw.ContextUserID)
+	var reportedBy uuid.UUID
+	if userVal != nil {
+		if id, ok := userVal.(uuid.UUID); ok {
+			reportedBy = id
+		} else if idStr, ok := userVal.(string); ok {
+			reportedBy, _ = uuid.Parse(idStr)
+		}
+	}
+
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		log.Printf("error iniciando transacción de merma: %v", err)
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Descontar la cantidad del inventario (sin dejarlo menor a 0)
+	tag, err := tx.Exec(ctx,
+		`UPDATE ingredients SET quantity = GREATEST(0, quantity - $1), updated_at = now() WHERE id = $2`,
+		req.QuantityLost, req.IngredientID)
+	if err != nil {
+		log.Printf("error descontando insumo por daño: %v", err)
+		http.Error(w, "error descontando insumo", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "el insumo especificado no existe", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Insertar el reporte de merma/daño
+	var wasteID uuid.UUID
+	var createdAt time.Time
+	err = tx.QueryRow(ctx,
+		`INSERT INTO waste_reports (ingredient_id, quantity_lost, reason, reported_by)
+		 VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
+		req.IngredientID, req.QuantityLost, reason, reportedBy,
+	).Scan(&wasteID, &createdAt)
+	if err != nil {
+		log.Printf("error creando reporte de merma: %v", err)
+		http.Error(w, "error registrando reporte de daños", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("error confirmando transacción de merma: %v", err)
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+
+	h.Hub.Publish("inventory_updated", map[string]interface{}{
+		"ingredient_id": req.IngredientID,
+		"quantity_lost": req.QuantityLost,
+		"reason":        reason,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":         wasteID,
+		"created_at": createdAt,
+		"message":    fmt.Sprintf("Se descontaron %.2f unidades del inventario", req.QuantityLost),
+	})
+}

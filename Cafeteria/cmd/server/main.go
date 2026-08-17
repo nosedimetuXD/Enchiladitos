@@ -62,12 +62,14 @@ func main() {
 	comandaHandler := handlers.NewComandaHandler(pool, hub)
 	accountingHandler := handlers.NewAccountingHandler(pool, hub)
 
+	wasteHandler := handlers.NewWasteHandler(pool, hub)
+
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuthSSE)
 		r.Get("/events", eventHandler.Stream)
 	})
 
-	// Lectura: cualquier usuario logueado, sin importar el rol
+	// Lectura & Operación común: cualquier usuario logueado, sin importar el rol
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
 		r.Get("/products", productHandler.List)
@@ -77,6 +79,8 @@ func main() {
 		r.Get("/products/{id}/recipe", recipeHandler.Get)
 		r.Get("/users", userHandler.List)
 		r.Put("/users/me", userHandler.UpdateSelf)
+		r.Get("/waste", wasteHandler.List)
+		r.Post("/waste", wasteHandler.Create)
 	})
 
 	// Crear/editar/borrar productos y recetas: solo owner y admin
