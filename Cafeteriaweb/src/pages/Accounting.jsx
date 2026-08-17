@@ -98,11 +98,22 @@ export default function Accounting() {
     setFormError('')
 
     try {
+      let finalPaymentMethod = paymentMethod
+      if (paymentMethod === 'transferencia') {
+        finalPaymentMethod = `transferencia: ${expenseBankDetails || 'General'}`
+      } else if (paymentMethod === 'mixto') {
+        const cash = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
+        const trans = expenseTransferAmount ? `$${Number(expenseTransferAmount).toLocaleString()} ${expenseBankDetails || 'Banco'}` : 'Transferencia'
+        finalPaymentMethod = `mixto (${cash} + ${trans})`
+      } else if (paymentMethod === 'multibanco') {
+        finalPaymentMethod = `multibanco (${expenseMultiBanks || 'Bancos Varios'})`
+      }
+
       await api.post('/expenses', {
         description,
         amount: Number(amount) || 0,
         category,
-        payment_method: paymentMethod,
+        payment_method: finalPaymentMethod,
         ingredient_id: category === 'insumos' && ingredientId ? ingredientId : null,
         quantity_added: category === 'insumos' && ingredientId ? convertedAddedQuantity : 0
       })
@@ -784,10 +795,101 @@ export default function Accounting() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               >
                 <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
+                <option value="transferencia">Transferencia / Banco</option>
+                <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
+                <option value="multibanco">Múltiples Bancos / Transferencias</option>
               </select>
             </div>
           </div>
+
+          {paymentMethod === 'transferencia' && (
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Detalles / Banco (ej. Bre-B/Llave, Nequi, Bancolombia)
+              </label>
+              <input
+                type="text"
+                list="expenseBankList"
+                value={expenseBankDetails}
+                onChange={(e) => setExpenseBankDetails(e.target.value)}
+                placeholder="Bre-B/Llave, Nequi, Bancolombia..."
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+              <datalist id="expenseBankList">
+                <option value="Bre-B/Llave" />
+                <option value="Nequi" />
+                <option value="Bancolombia" />
+                <option value="Daviplata" />
+                <option value="Mercado Pago" />
+              </datalist>
+            </div>
+          )}
+
+          {paymentMethod === 'mixto' && (
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-3">
+              <span className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C]">
+                Desglose de Pago Mixto
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
+                    Monto en Efectivo ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={expenseCashAmount}
+                    onChange={(e) => setExpenseCashAmount(e.target.value)}
+                    placeholder="Ej. 10000"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
+                    Monto Transferencia ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={expenseTransferAmount}
+                    onChange={(e) => setExpenseTransferAmount(e.target.value)}
+                    placeholder="Ej. 15000"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
+                  Banco / Entidad
+                </label>
+                <input
+                  type="text"
+                  list="expenseBankList"
+                  value={expenseBankDetails}
+                  onChange={(e) => setExpenseBankDetails(e.target.value)}
+                  placeholder="Nequi, Bancolombia, Bre-B/Llave..."
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                />
+              </div>
+            </div>
+          )}
+
+          {paymentMethod === 'multibanco' && (
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-2">
+              <label className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase">
+                Detalle de Múltiples Bancos / Transferencias
+              </label>
+              <input
+                type="text"
+                value={expenseMultiBanks}
+                onChange={(e) => setExpenseMultiBanks(e.target.value)}
+                placeholder="Ej. Nequi: $10,000 + Bancolombia: $15,000"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">

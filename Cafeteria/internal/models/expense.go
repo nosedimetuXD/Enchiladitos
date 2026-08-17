@@ -39,6 +39,12 @@ type TopProductStat struct {
 	TotalAmount float64 `json:"total_amount"`
 }
 
+type TopBankStat struct {
+	BankName    string  `json:"bank_name"`
+	Count       int     `json:"count"`
+	TotalAmount float64 `json:"total_amount"`
+}
+
 type MonthlyStats struct {
 	MonthlyIncome   float64          `json:"monthly_income"`
 	MonthlyExpenses float64          `json:"monthly_expenses"`
@@ -47,6 +53,7 @@ type MonthlyStats struct {
 	TopProduct      *TopProductStat  `json:"top_product"`
 	TopProducts     []TopProductStat `json:"top_products"`
 	TopCustomers    []CustomerStat   `json:"top_customers"`
+	TopBanks        []TopBankStat    `json:"top_banks"`
 }
 
 type AccountingSummary struct {

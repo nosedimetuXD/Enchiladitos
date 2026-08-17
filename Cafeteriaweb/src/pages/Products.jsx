@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { compressAndReadFile } from '../utils/imageUtils'
-import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon, Upload } from 'lucide-react'
+import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon, Upload, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
 
@@ -252,7 +252,15 @@ export default function Products() {
                       }`}
                       title={isEmployee ? 'Estado de disponibilidad en POS' : 'Haz clic para activar o desactivar este producto'}
                     >
-                      {activeState ? '✓ Activo' : '✕ Inactivo'}
+                      {activeState ? (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Activo
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <XCircle className="w-3 h-3" /> Inactivo
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>

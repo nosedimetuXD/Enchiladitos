@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { BookOpen, Plus, Trash2, ArrowLeft, Scale, Lock } from 'lucide-react'
+import { BookOpen, Plus, Trash2, ArrowLeft, Scale, Lock, AlertTriangle } from 'lucide-react'
 
 export default function Recipe() {
   const { id } = useParams()
@@ -176,8 +176,9 @@ export default function Recipe() {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {error}
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-600" />
+          <span>{error}</span>
         </div>
       )}
 

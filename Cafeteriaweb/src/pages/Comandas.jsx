@@ -233,8 +233,9 @@ export default function Comandas() {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {error}
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+          <Clock className="w-4 h-4 text-red-600" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -243,8 +244,9 @@ export default function Comandas() {
         {/* Columna 1: Pendientes */}
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
-            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
-              🟡 Pendientes ({pending.length})
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
+              <span>Pendientes ({pending.length})</span>
             </span>
           </div>
           <div className="space-y-3">
@@ -259,8 +261,9 @@ export default function Comandas() {
         {/* Columna 2: En Preparación */}
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
-            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
-              🟠 En Preparación ({inPrep.length})
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+              <UtensilsCrossed className="w-3.5 h-3.5 text-orange-500" />
+              <span>En Preparación ({inPrep.length})</span>
             </span>
           </div>
           <div className="space-y-3">
@@ -275,8 +278,9 @@ export default function Comandas() {
         {/* Columna 3: Listas en Barra */}
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
-            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
-              🟢 Listas en Barra ({ready.length})
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+              <Bell className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Listas en Barra ({ready.length})</span>
             </span>
           </div>
           <div className="space-y-3">
@@ -291,8 +295,9 @@ export default function Comandas() {
         {/* Columna 4: Entregadas */}
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-start items-stretch shadow-xs">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#D4B28E]/60">
-            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider">
-              ✅ Entregadas ({delivered.length})
+            <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Entregadas ({delivered.length})</span>
             </span>
           </div>
           <div className="space-y-3">

@@ -164,6 +164,28 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			custRows.Close()
 		}
 
+		// Top 5 Bancos / Entidades más usados
+		bankRows, errBank := h.DB.Query(r.Context(),
+			`SELECT 
+				COALESCE(NULLIF(TRIM(bank_details), ''), 'Transferencia General') as bank_name,
+				COUNT(id) as count,
+				COALESCE(SUM(CASE WHEN transfer_amount > 0 THEN transfer_amount ELSE total END), 0) as total_amount
+			 FROM sales
+			 WHERE created_at >= date_trunc('month', now()) 
+			   AND (payment_method IN ('transferencia', 'mixto', 'multibanco') OR transfer_amount > 0)
+			 GROUP BY bank_name
+			 ORDER BY count DESC, total_amount DESC
+			 LIMIT 5`)
+		if errBank == nil {
+			for bankRows.Next() {
+				var tb models.TopBankStat
+				if err := bankRows.Scan(&tb.BankName, &tb.Count, &tb.TotalAmount); err == nil {
+					mStats.TopBanks = append(mStats.TopBanks, tb)
+				}
+			}
+			bankRows.Close()
+		}
+
 		summary.MonthlyStats = mStats
 	}
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, API_URL } from '../api/client'
 import Modal from '../components/Modal'
-import { CheckSquare, Plus, CheckCircle2, User } from 'lucide-react'
+import { CheckSquare, Plus, CheckCircle2, User, AlertTriangle } from 'lucide-react'
 
 export default function Tasks() {
   const [tasks, setTasks] = useState([])
@@ -127,8 +127,9 @@ export default function Tasks() {
       </div>
 
       {pageError && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {pageError}
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-600" />
+          <span>{pageError}</span>
         </div>
       )}
 

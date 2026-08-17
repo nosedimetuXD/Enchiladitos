@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
-import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2, BarChart3, TrendingUp, DollarSign, ShoppingBag, CheckSquare, ShieldAlert } from 'lucide-react'
+import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2, BarChart3, TrendingUp, DollarSign, ShoppingBag, CheckSquare, ShieldAlert, AlertCircle } from 'lucide-react'
 
 export default function Users() {
   const { user: currentUser, updateUser } = useAuth()
@@ -223,8 +223,9 @@ export default function Users() {
       </div>
 
       {pageError && (
-        <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold">
-          ⚠️ {pageError}
+        <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          <span>{pageError}</span>
         </div>
       )}
 

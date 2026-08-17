@@ -124,12 +124,23 @@ export default function Inventory() {
         const createdIng = await api.post('/ingredients', payload)
         if (addAsExpense && (Number(quantity) * Number(unitCost)) > 0) {
           const totalExpenseAmount = Number(quantity) * Number(unitCost)
+
+          let finalPaymentMethod = expensePaymentMethod
+          if (expensePaymentMethod === 'transferencia') {
+            finalPaymentMethod = `transferencia: ${expenseBankDetails || 'General'}`
+          } else if (expensePaymentMethod === 'mixto') {
+            const cash = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
+            const trans = expenseTransferAmount ? `$${Number(expenseTransferAmount).toLocaleString()} ${expenseBankDetails || 'Banco'}` : 'Transferencia'
+            finalPaymentMethod = `mixto (${cash} + ${trans})`
+          } else if (expensePaymentMethod === 'multibanco') {
+            finalPaymentMethod = `multibanco (${expenseMultiBanks || 'Bancos Varios'})`
+          }
+
           await api.post('/expenses', {
             description: `Compra inicial de insumo: ${name} (${quantity} ${unit})`,
             amount: totalExpenseAmount,
             category: 'insumos',
-            payment_method: expensePaymentMethod,
-            bank_details: expensePaymentMethod === 'transferencia' ? expenseBankDetails : '',
+            payment_method: finalPaymentMethod,
             ingredient_id: createdIng?.id || null,
             quantity_added: 0
           })
@@ -529,8 +540,10 @@ export default function Inventory() {
                       onChange={(e) => setExpensePaymentMethod(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
                     >
-                      <option value="efectivo">💵 Efectivo</option>
-                      <option value="transferencia">📱 Transferencia / Banco</option>
+                      <option value="efectivo">Efectivo</option>
+                      <option value="transferencia">Transferencia / Banco</option>
+                      <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
+                      <option value="multibanco">Múltiples Bancos / Transferencias</option>
                     </select>
                   </div>
 
@@ -554,6 +567,53 @@ export default function Inventory() {
                         <option value="Daviplata" />
                         <option value="Mercado Pago" />
                       </datalist>
+                    </div>
+                  )}
+
+                  {expensePaymentMethod === 'mixto' && (
+                    <div className="p-3 rounded-xl bg-white/60 dark:bg-[#150904] border border-[#D4B28E] space-y-2">
+                      <span className="block text-[11px] font-extrabold text-[#9F6839]">Desglose de Pago Mixto</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={expenseCashAmount}
+                          onChange={(e) => setExpenseCashAmount(e.target.value)}
+                          placeholder="Monto en Efectivo ($)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={expenseTransferAmount}
+                          onChange={(e) => setExpenseTransferAmount(e.target.value)}
+                          placeholder="Monto Transferencia ($)"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        list="bankSuggestions"
+                        value={expenseBankDetails}
+                        onChange={(e) => setExpenseBankDetails(e.target.value)}
+                        placeholder="Banco / Entidad (ej. Nequi, Bancolombia)"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
+                      />
+                    </div>
+                  )}
+
+                  {expensePaymentMethod === 'multibanco' && (
+                    <div className="p-3 rounded-xl bg-white/60 dark:bg-[#150904] border border-[#D4B28E] space-y-2">
+                      <label className="block text-[11px] font-extrabold text-[#9F6839]">Múltiples Bancos / Transferencias</label>
+                      <input
+                        type="text"
+                        value={expenseMultiBanks}
+                        onChange={(e) => setExpenseMultiBanks(e.target.value)}
+                        placeholder="Ej. Nequi: $10,000 + Bancolombia: $15,000"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
+                      />
                     </div>
                   )}
                 </div>
