@@ -24,7 +24,7 @@ import {
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
 
-const COMMON_BANKS = ['Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Bre-B / Llave']
+const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
 
 export default function Sales() {
   const [products, setProducts] = useState([])
@@ -162,13 +162,15 @@ export default function Sales() {
     })
   }, [products, selectedCategory, searchQuery])
 
+  const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
+
   function openCheckout() {
     if (cartItems.length === 0) return
     setCustomerName('')
     setPaymentMethod('efectivo')
     setCashAmount(String(cartTotal))
     setTransferAmount('0')
-    setBankPayments([{ bank: 'Nequi', amount: String(cartTotal) }])
+    setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
     setCheckoutError('')
     setIsCheckoutOpen(true)
   }
@@ -182,18 +184,18 @@ export default function Sales() {
     } else if (method === 'transferencia') {
       setCashAmount('0')
       setTransferAmount(String(cartTotal))
-      setBankPayments([{ bank: 'Nequi', amount: String(cartTotal) }])
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
     } else if (method === 'mixto') {
       const half = Math.round(cartTotal / 2)
       setCashAmount(String(half))
       setTransferAmount(String(cartTotal - half))
-      setBankPayments([{ bank: 'Nequi', amount: String(cartTotal - half) }])
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal - half) }])
     }
   }
 
-  // Manejo de deslose de bancos
+  // Manejo de desglose de bancos
   function addBankLine() {
-    setBankPayments((prev) => [...prev, { bank: 'Bancolombia', amount: '' }])
+    setBankPayments((prev) => [...prev, { bank: 'Bre-B/Llave', amount: '' }])
   }
 
   function removeBankLine(index) {
@@ -692,6 +694,12 @@ export default function Sales() {
             </div>
           </div>
 
+          <datalist id="banks-list">
+            {COMMON_BANKS.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+
           {/* Pago 1: Solo Efectivo */}
           {paymentMethod === 'efectivo' && (
             <div>
@@ -729,7 +737,7 @@ export default function Sales() {
                     <input
                       type="text"
                       list="banks-list"
-                      placeholder="Banco / Entidad (ej. Nequi, Nu...)"
+                      placeholder="Banco / Entidad (ej. Bre-B/Llave, Nequi...)"
                       value={item.bank}
                       onChange={(e) => updateBankLine(idx, 'bank', e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
@@ -757,12 +765,6 @@ export default function Sales() {
                   )}
                 </div>
               ))}
-
-              <datalist id="banks-list">
-                {COMMON_BANKS.map((b) => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
 
               <button
                 type="button"
@@ -802,7 +804,7 @@ export default function Sales() {
                     <input
                       type="text"
                       list="banks-list"
-                      placeholder="Banco / Entidad (Nequi, Nu...)"
+                      placeholder="Banco / Entidad (ej. Bre-B/Llave, Nequi...)"
                       value={item.bank}
                       onChange={(e) => updateBankLine(idx, 'bank', e.target.value)}
                       className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
