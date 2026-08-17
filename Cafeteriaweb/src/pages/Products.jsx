@@ -139,7 +139,8 @@ export default function Products() {
       await api.delete(`/products/${id}`)
       await loadProducts()
     } catch (err) {
-      alert('Error al eliminar producto')
+      console.error('Error eliminando producto:', err)
+      alert(err.message || 'Error al eliminar producto')
     }
   }
 
