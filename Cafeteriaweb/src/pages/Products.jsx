@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon } from 'lucide-react'
+import { compressAndReadFile } from '../utils/imageUtils'
+import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon, Upload } from 'lucide-react'
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
 
@@ -67,6 +68,14 @@ export default function Products() {
     setIsActive(currentActive)
     setFormError('')
     setIsModalOpen(true)
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    compressAndReadFile(file, (compressedDataUrl) => {
+      setImageUrl(compressedDataUrl)
+    })
   }
 
   async function handleSubmit(e) {
@@ -146,7 +155,7 @@ export default function Products() {
             Catálogo de Productos & Menú Toffee Coffee
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Configuración de precios, recetas, fotos e insumos sincronizados en todos los dispositivos
+            Configuración de precios, recetas, fotos e insumos consumidos por venta
           </p>
         </div>
 
@@ -308,7 +317,7 @@ export default function Products() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej. Capuccino 12oz"
               required
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 
@@ -353,20 +362,32 @@ export default function Products() {
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5 text-[#9F6839]" /> URL de la Imagen
+              <ImageIcon className="w-3.5 h-3.5 text-[#9F6839]" /> Imagen del Producto
             </label>
+
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#FEE4D7] dark:bg-[#2A150C] border border-[#D4B28E] hover:bg-[#9F6839] hover:text-white text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] transition-all cursor-pointer shadow-xs">
+                <Upload className="w-4 h-4" />
+                <span>Subir foto del dispositivo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+              <span className="text-[11px] text-[#9F6839] font-medium">o escribe una URL</span>
+            </div>
+
             <input
               type="text"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://... o imagen (se guardará en la nube)"
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              placeholder="https://... o foto seleccionada"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
-            <p className="text-[10px] text-[#9F6839] mt-1 font-medium">
-              ℹ️ Se guardará en la nube y se mostrará en todos los dispositivos en tiempo real.
-            </p>
           </div>
 
           <div>

@@ -486,7 +486,7 @@ export default function Users() {
               type="text"
               value={avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://... o enlace de foto (se guardará en la nube)"
+              placeholder="https://... o foto seleccionada"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/60 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>

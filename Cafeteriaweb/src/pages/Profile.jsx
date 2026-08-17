@@ -140,7 +140,7 @@ export default function Profile() {
 
       setPassword('')
       setIsEditModalOpen(false)
-      setSuccessMsg('¡Perfil y foto guardados en la nube y sincronizados en todos tus dispositivos!')
+      setSuccessMsg('¡Perfil y foto guardados correctamente!')
     } catch (err) {
       setFormError(err.message || 'No se pudo actualizar el perfil')
     } finally {
@@ -232,9 +232,9 @@ export default function Profile() {
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="font-semibold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Estado en Nube:
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Cuenta:
                 </span>
-                <strong className="text-emerald-600 font-extrabold">✓ Sincronizado Multidispositivo</strong>
+                <strong className="text-emerald-600 font-extrabold">✓ Activa</strong>
               </div>
             </div>
 
@@ -412,7 +412,7 @@ export default function Profile() {
               type="text"
               value={avatarInput}
               onChange={(e) => setAvatarInput(e.target.value)}
-              placeholder="https://... o enlace de foto (se guardará en la nube)"
+              placeholder="https://... o enlace de foto"
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
