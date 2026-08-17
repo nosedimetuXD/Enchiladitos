@@ -6,7 +6,8 @@ import {
   CheckCircle2,
   Bell,
   Play,
-  Check
+  Check,
+  User
 } from 'lucide-react'
 
 export default function Comandas() {
@@ -145,6 +146,13 @@ export default function Comandas() {
           <div className="text-xs text-[#432414] dark:text-[#FEE4D7] mt-2 font-semibold">
             Cliente: <span className="font-bold">{c.customer_name || 'Cliente General'}</span>
           </div>
+
+          {c.prepared_by_username && (
+            <div className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] font-extrabold flex items-center gap-1 mt-1">
+              <User className="w-3 h-3 text-[#9F6839]" />
+              <span>Preparado por: {c.prepared_by_username}</span>
+            </div>
+          )}
 
           <div className="mt-3 space-y-1.5">
             {(c.items || []).map((item, idx) => {

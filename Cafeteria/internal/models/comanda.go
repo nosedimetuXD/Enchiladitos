@@ -24,14 +24,16 @@ type ComandaItem struct {
 }
 
 type Comanda struct {
-	ID           uuid.UUID     `json:"id"`
-	OrderNumber  int           `json:"order_number"`
-	SaleID       uuid.UUID     `json:"sale_id"`
-	CustomerName string        `json:"customer_name"`
-	Status       ComandaStatus `json:"status"`
-	Notes        string        `json:"notes,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
-	ReadyAt      *time.Time    `json:"ready_at,omitempty"`
-	Items        []ComandaItem `json:"items,omitempty"`
+	ID                 uuid.UUID     `json:"id"`
+	OrderNumber        int           `json:"order_number"`
+	SaleID             uuid.UUID     `json:"sale_id"`
+	CustomerName       string        `json:"customer_name"`
+	Status             ComandaStatus `json:"status"`
+	Notes              string        `json:"notes,omitempty"`
+	CreatedAt          time.Time     `json:"created_at"`
+	UpdatedAt          time.Time     `json:"updated_at"`
+	ReadyAt            *time.Time    `json:"ready_at,omitempty"`
+	PreparedBy         *uuid.UUID    `json:"prepared_by,omitempty"`
+	PreparedByUsername string        `json:"prepared_by_username,omitempty"`
+	Items              []ComandaItem `json:"items,omitempty"`
 }

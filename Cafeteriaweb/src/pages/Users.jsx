@@ -176,7 +176,10 @@ export default function Users() {
     let totalPrepMin = 0
     let prepCount = 0
     comandas.forEach((c) => {
-      if ((c.status === 'listo' || c.status === 'entregado') && c.created_at) {
+      const isMyPrep = (selectedUserForStats?.id && c.prepared_by === selectedUserForStats.id) ||
+                       (c.prepared_by_username && c.prepared_by_username.toLowerCase() === selectedUserForStats?.username?.toLowerCase())
+
+      if (isMyPrep && (c.status === 'listo' || c.status === 'entregado') && c.created_at) {
         const end = new Date(c.ready_at || c.updated_at || c.created_at)
         const start = new Date(c.created_at)
         const min = (end - start) / (1000 * 60)

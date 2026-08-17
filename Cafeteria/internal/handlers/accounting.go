@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,24 +26,41 @@ func NewAccountingHandler(db *pgxpool.Pool, hub *events.Hub) *AccountingHandler 
 	return &AccountingHandler{DB: db, Hub: hub}
 }
 
-// GET /accounting/summary?period=today|week|month|all
+// GET /accounting/summary?period=today|week|month|all&start_date=...&end_date=...&year=...&month_num=...
 func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
+	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
+	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
+	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
+
 	var timeCondition string
 
-	switch period {
-	case "today":
-		timeCondition = "created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
-	case "week":
-		timeCondition = "created_at >= (now() - INTERVAL '7 days')"
-	case "month":
-		timeCondition = "created_at >= date_trunc('month', now())"
-	case "prev_month":
-		timeCondition = "created_at >= date_trunc('month', now() - INTERVAL '1 month') AND created_at < date_trunc('month', now())"
-	case "year":
-		timeCondition = "created_at >= date_trunc('year', now())"
-	default: // "all"
-		timeCondition = "1=1"
+	if startDate != "" && endDate != "" {
+		timeCondition = fmt.Sprintf("created_at >= '%s 00:00:00' AND created_at <= '%s 23:59:59'", startDate, endDate)
+	} else if yearParam != "" && monthParam != "" {
+		y, _ := strconv.Atoi(yearParam)
+		m, _ := strconv.Atoi(monthParam)
+		if y > 2000 && m >= 1 && m <= 12 {
+			timeCondition = fmt.Sprintf("EXTRACT(YEAR FROM created_at) = %d AND EXTRACT(MONTH FROM created_at) = %d", y, m)
+		}
+	}
+
+	if timeCondition == "" {
+		switch period {
+		case "today":
+			timeCondition = "created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
+		case "week":
+			timeCondition = "created_at >= (now() - INTERVAL '7 days')"
+		case "month":
+			timeCondition = "created_at >= date_trunc('month', now())"
+		case "prev_month":
+			timeCondition = "created_at >= date_trunc('month', now() - INTERVAL '1 month') AND created_at < date_trunc('month', now())"
+		case "year":
+			timeCondition = "created_at >= date_trunc('year', now())"
+		default: // "all"
+			timeCondition = "1=1"
+		}
 	}
 
 	summary := models.AccountingSummary{
