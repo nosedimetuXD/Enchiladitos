@@ -260,7 +260,7 @@ export default function Inventory() {
                 : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
             }`}
           >
-            <Package className="w-3.5 h-3.5 text-[#9F6839] group-hover:text-white" />
+            <Package className={`w-3.5 h-3.5 ${activeTab === 'inventory' ? 'text-white' : 'text-[#9F6839]'}`} />
             <span>Existencias ({ingredients.length})</span>
           </button>
 
@@ -272,7 +272,7 @@ export default function Inventory() {
                 : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
             }`}
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+            <ShieldAlert className={`w-3.5 h-3.5 ${activeTab === 'waste' ? 'text-white' : 'text-amber-500'}`} />
             <span>Reportes de Mermas ({wasteReports.length})</span>
           </button>
         </div>
@@ -510,9 +510,7 @@ export default function Inventory() {
             </div>
           )}
 
-          <div className="p-3 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] text-xs text-[#9F6839] dark:text-[#DABA8C] font-semibold">
-            ℹ️ Al confirmar, se descontará automáticamente la cantidad equivalente del inventario y se cargará el costo estimado a Contabilidad.
-          </div>
+
 
           <div className="flex gap-3 justify-end pt-3">
             <button

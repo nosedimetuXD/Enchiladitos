@@ -39,8 +39,8 @@ export default function Login() {
       <div className="relative w-full max-w-md bg-white dark:bg-[#201009] border border-[#D4B28E]/60 dark:border-[#9F6839]/40 rounded-3xl p-8 shadow-2xl z-10 backdrop-blur-md">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#432414] dark:bg-[#34180D] border-2 border-[#9F6839] text-[#DABA8C] shadow-md mb-4">
-            <Coffee className="w-8 h-8 text-[#DABA8C]" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#432414] dark:bg-[#34180D] border-2 border-[#9F6839] shadow-md mb-4 overflow-hidden p-1">
+            <img src="/icon-512.png" alt="Toffee Logo" className="w-full h-full object-cover rounded-xl" />
           </div>
             <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7] text-2xl tracking-tight leading-none block">
               Toffee
