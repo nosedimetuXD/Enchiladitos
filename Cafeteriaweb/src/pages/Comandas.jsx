@@ -77,9 +77,18 @@ export default function Comandas() {
     }
   }
 
-  const getElapsedMinutes = (dateStr) => {
-    const elapsed = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
-    return Math.max(0, elapsed)
+  const formatElapsedTime = (dateStr) => {
+    if (!dateStr) return '0 min'
+    const totalMins = Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000))
+    if (totalMins < 60) {
+      return `${totalMins} min`
+    }
+    const hours = Math.floor(totalMins / 60)
+    const remainingMins = totalMins % 60
+    if (remainingMins === 0) {
+      return `${hours} h`
+    }
+    return `${hours} h ${remainingMins} min`
   }
 
   const pending = comandas.filter((c) => c.status === 'pendiente')
@@ -90,7 +99,7 @@ export default function Comandas() {
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando comandas en vivo...</p>
 
   const renderCard = (c, colType) => {
-    const elapsedMins = getElapsedMinutes(c.created_at)
+    const timeLabel = formatElapsedTime(c.created_at)
 
     return (
       <div
@@ -110,7 +119,7 @@ export default function Comandas() {
 
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FEE4D7] text-[#9F6839] dark:bg-[#381C10] dark:text-[#DABA8C] border border-[#D4B28E] dark:border-[#9F6839]/60 whitespace-nowrap shrink-0">
               <Clock className="w-3 h-3 shrink-0 text-[#9F6839] dark:text-[#DABA8C]" />
-              <span>{elapsedMins} min</span>
+              <span>{timeLabel}</span>
             </span>
           </div>
 
