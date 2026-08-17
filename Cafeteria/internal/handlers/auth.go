@@ -40,12 +40,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''`)
+
 	var user models.User
 	var passwordHash string
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id, username, role, password_hash, created_at
+		`SELECT id, username, role, COALESCE(avatar_url, ''), password_hash, created_at
 		 FROM users WHERE username = $1`, req.Username,
-	).Scan(&user.ID, &user.Username, &user.Role, &passwordHash, &user.CreatedAt)
+	).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &passwordHash, &user.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "usuario o contraseña incorrectos", http.StatusUnauthorized)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { api } from '../api/client'
 
 const AuthContext = createContext(null)
@@ -8,6 +8,31 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem('user')
     return saved ? JSON.parse(saved) : null
   })
+
+  // Sincronización automática de perfil con PostgreSQL en cada carga de app
+  useEffect(() => {
+    async function syncUserProfile() {
+      const token = localStorage.getItem('token')
+      if (!token || !user) return
+      try {
+        const users = await api.get('/users')
+        if (Array.isArray(users)) {
+          const freshUser = users.find((u) => u.id === user.id || u.username === user.username)
+          if (freshUser) {
+            setUser((prev) => {
+              const updated = { ...prev, ...freshUser }
+              localStorage.setItem('user', JSON.stringify(updated))
+              return updated
+            })
+          }
+        }
+      } catch (e) {
+        // Token expirado o fallo de red
+      }
+    }
+
+    syncUserProfile()
+  }, [])
 
   async function login(username, password) {
     const data = await api.post('/login', { username, password })

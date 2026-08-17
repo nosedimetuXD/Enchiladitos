@@ -78,7 +78,7 @@ export default function Layout() {
   const isOwner = user?.role === 'owner'
   const isAdmin = isOwner || user?.role === 'admin'
 
-  const rawAvatarUrl = (user && user.id && userAvatars[user.id]) || user?.avatar_url || ''
+  const rawAvatarUrl = user?.avatar_url || (user && user.id && userAvatars[user.id]) || ''
   const userAvatarUrl = processImageUrl(rawAvatarUrl)
 
   const navSections = [
