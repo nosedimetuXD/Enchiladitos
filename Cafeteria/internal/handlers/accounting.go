@@ -55,9 +55,9 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	if timeCondition == "" {
 		switch period {
 		case "today":
-			timeCondition = "created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
-			timeCondSales = "s.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
-			timeCondComandas = "c.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
+			timeCondition = "(created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+			timeCondComandas = "(c.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
 		case "week":
 			timeCondition = "created_at >= (now() - INTERVAL '7 days')"
 			timeCondSales = "s.created_at >= (now() - INTERVAL '7 days')"

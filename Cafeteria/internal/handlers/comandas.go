@@ -143,10 +143,10 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		 SET status = $1, 
 		     updated_at = now(), 
 		     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
-		     prepared_by = COALESCE(prepared_by, $3),
-		     prepared_by_username = COALESCE(NULLIF(prepared_by_username, ''), $4)
+		     prepared_by = COALESCE(prepared_by, $3::uuid),
+		     prepared_by_username = COALESCE(NULLIF(prepared_by_username, ''), NULLIF($4, ''))
 		 WHERE id = $2 
-		 RETURNING id, order_number, sale_id, customer_name, status, notes, created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
+		 RETURNING id, order_number, sale_id, COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 		statusStr, id, userID, unameStr,
 	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 
