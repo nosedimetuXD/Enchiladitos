@@ -72,11 +72,13 @@ export default function Layout() {
   const roleLabels = {
     owner: 'DUEÑO',
     admin: 'ADMINISTRADOR',
-    employee: 'EMPLEADO'
+    employee: 'EMPLEADO',
+    empleado: 'EMPLEADO'
   }
 
-  const isOwner = user?.role === 'owner'
-  const isAdmin = isOwner || user?.role === 'admin'
+  const currentRole = (user?.role || '').toLowerCase()
+  const isOwner = currentRole === 'owner'
+  const isAdmin = isOwner || currentRole === 'admin'
 
   const rawAvatarUrl = user?.avatar_url || (user && user.id && userAvatars[user.id]) || ''
   const userAvatarUrl = processImageUrl(rawAvatarUrl)

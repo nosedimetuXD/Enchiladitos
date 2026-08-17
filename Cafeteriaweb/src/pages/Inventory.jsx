@@ -7,7 +7,8 @@ import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, Histor
 
 export default function Inventory() {
   const { user } = useAuth()
-  const isEmployee = user?.role === 'empleado'
+  const userRole = (user?.role || '').toLowerCase()
+  const isEmployee = userRole === 'empleado' || userRole === 'employee' || !['owner', 'admin'].includes(userRole)
 
   const [ingredients, setIngredients] = useState([])
   const [wasteReports, setWasteReports] = useState([])

@@ -8,7 +8,8 @@ export default function Recipe() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const isEmployee = user?.role === 'empleado'
+  const userRole = (user?.role || '').toLowerCase()
+  const isEmployee = userRole === 'empleado' || userRole === 'employee' || !['owner', 'admin'].includes(userRole)
 
   const [product, setProduct] = useState(null)
   const [ingredients, setIngredients] = useState([])

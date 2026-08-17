@@ -75,7 +75,7 @@ function AppRoutes() {
         <Route
           path="products/:id/recipe"
           element={
-            <ProtectedRoute roles={['owner', 'admin']}>
+            <ProtectedRoute>
               <Recipe />
             </ProtectedRoute>
           }
