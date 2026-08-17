@@ -171,12 +171,14 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 		// Top 10 Productos más vendidos del período
 		prodRows, errProdList := h.DB.Query(r.Context(),
-			`SELECT p.name, COALESCE(SUM(si.quantity), 0) as total_qty, COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
+			`SELECT COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado') as prod_name,
+			        COALESCE(SUM(si.quantity), 0) as total_qty, 
+			        COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
 			 FROM sale_items si
 			 JOIN sales s ON si.sale_id = s.id
-			 JOIN products p ON si.product_id = p.id
+			 LEFT JOIN products p ON si.product_id = p.id
 			 WHERE `+timeCondSales+`
-			 GROUP BY p.id, p.name
+			 GROUP BY COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado')
 			 ORDER BY total_qty DESC
 			 LIMIT 10`)
 		if errProdList == nil {

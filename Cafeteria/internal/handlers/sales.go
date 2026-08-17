@@ -34,6 +34,9 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS sold_by_name TEXT DEFAULT ''`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ALTER COLUMN sold_by DROP NOT NULL`)
 
+	_, _ = db.Exec(ctx, `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS product_name TEXT DEFAULT ''`)
+	_, _ = db.Exec(ctx, `UPDATE sale_items si SET product_name = p.name FROM products p WHERE si.product_id = p.id AND (si.product_name IS NULL OR si.product_name = '')`)
+
 	_, _ = db.Exec(ctx, `
 		DO $$ 
 		BEGIN 
@@ -95,7 +98,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		        COALESCE(
 		          (SELECT json_agg(json_build_object(
 		             'product_id', si.product_id,
-		             'product_name', COALESCE(p.name, ''),
+		             'product_name', COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado'),
 		             'quantity', si.quantity,
 		             'unit_price', si.unit_price))
 		           FROM sale_items si
@@ -164,7 +167,7 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT si.product_id, COALESCE(p.name, ''), si.quantity, si.unit_price 
+		`SELECT si.product_id, COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado'), si.quantity, si.unit_price 
 		 FROM sale_items si
 		 LEFT JOIN products p ON si.product_id = p.id
 		 WHERE si.sale_id = $1`, id)
@@ -378,9 +381,9 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// 4. Insertar los items de la venta
 	for _, item := range resolved {
 		_, err = tx.Exec(ctx,
-			`INSERT INTO sale_items (sale_id, product_id, quantity, unit_price)
-			 VALUES ($1, $2, $3, $4)`,
-			saleID, item.ProductID, item.Quantity, item.UnitPrice)
+			`INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice)
 		if err != nil {
 			log.Printf("error creando item de venta: %v", err)
 			http.Error(w, "error interno", http.StatusInternalServerError)
