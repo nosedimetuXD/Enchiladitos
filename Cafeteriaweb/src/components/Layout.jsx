@@ -186,13 +186,13 @@ export default function Layout() {
               >
                 <img
                   src="/icon-192.png"
-                  alt="Toffe Logo"
+                  alt="Toffee Logo"
                   className="w-10 h-10 rounded-2xl object-cover border border-[#9F6839] shadow-xs group-hover:scale-105 transition-transform shrink-0"
                 />
                 {!isCollapsed && (
                   <div className="flex flex-col min-w-0 text-left">
                     <span className="font-bold text-lg text-[#432414] dark:text-[#FEE4D7] tracking-tight leading-tight">
-                      Toffe Coffee
+                      Toffee
                     </span>
                     <span className="text-[9px] font-bold tracking-wider text-[#9F6839] dark:text-[#DABA8C] uppercase leading-tight">
                       "HECHO POR Y PARA ESTUDIANTES"

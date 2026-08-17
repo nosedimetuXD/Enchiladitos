@@ -152,7 +152,7 @@ export default function Products() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
-            Catálogo de Productos & Menú Toffee Coffee
+            Catálogo de Productos & Menú Toffee
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
             Configuración de precios, recetas, fotos e insumos consumidos por venta

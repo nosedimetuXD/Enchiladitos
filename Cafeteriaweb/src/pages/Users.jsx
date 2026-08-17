@@ -209,7 +209,7 @@ export default function Users() {
             Gestión de Usuarios & Personal
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Cuentas, credenciales, rendimiento individual y permisos del equipo Toffee Coffee
+            Cuentas, credenciales, rendimiento individual y permisos del equipo Toffee
           </p>
         </div>
 

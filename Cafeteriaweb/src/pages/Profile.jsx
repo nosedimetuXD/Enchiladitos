@@ -162,7 +162,7 @@ export default function Profile() {
           Mi Perfil & Estadísticas Personales
         </h2>
         <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-          Información de cuenta Toffee Coffee, credenciales y resumen de rendimiento en caja
+          Información de cuenta Toffee, credenciales y resumen de rendimiento en caja
         </p>
       </div>
 

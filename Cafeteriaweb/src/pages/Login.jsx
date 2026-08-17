@@ -42,8 +42,8 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#432414] dark:bg-[#34180D] border-2 border-[#9F6839] text-[#DABA8C] shadow-md mb-4">
             <Coffee className="w-8 h-8 text-[#DABA8C]" />
           </div>
-            <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7] text-xl tracking-tight leading-none block">
-              Toffee Coffee
+            <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7] text-2xl tracking-tight leading-none block">
+              Toffee
             </span>
           <p className="text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-widest mt-1">
             "Hecho por y para estudiantes"
@@ -110,7 +110,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-[10px] font-semibold text-[#9F6839] dark:text-[#DABA8C]/70 mt-6">
-          Toffe Web App &copy; {new Date().getFullYear()} — Todos los derechos reservados
+          Toffee Web App &copy; {new Date().getFullYear()} — Todos los derechos reservados
         </p>
       </div>
     </div>

@@ -10,9 +10,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Toffee Coffee',
+        name: 'Toffee',
         short_name: 'Toffee',
-        description: 'Toffee Coffee — "Hecho por y para estudiantes". Sistema de POS, comandas y gestión.',
+        description: 'Toffee — "Hecho por y para estudiantes". Sistema de POS, comandas y gestión.',
         theme_color: '#46231d',
         background_color: '#46231d',
         display: 'standalone',

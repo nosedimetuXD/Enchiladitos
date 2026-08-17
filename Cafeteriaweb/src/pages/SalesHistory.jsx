@@ -187,7 +187,7 @@ export default function SalesHistory() {
             <div id="printable-receipt" className="p-6 bg-white border border-gray-200 rounded-2xl text-center space-y-3 font-mono text-xs text-gray-800">
               <div className="flex flex-col items-center justify-center border-b border-[#D4B28E]/60 pb-3 text-center">
                 <img src="/icon-192.png" alt="Toffee Logo" className="w-12 h-12 rounded-2xl border border-[#9F6839] mb-1 object-cover" />
-                <h2 className="text-base font-black text-[#432414] uppercase tracking-wider">Toffee Coffee</h2>
+                <h2 className="text-base font-black text-[#432414] uppercase tracking-wider">Toffee</h2>
                 <p className="text-[10px] text-[#9F6839] font-extrabold uppercase tracking-widest">"Hecho por y para estudiantes"</p>
               </div>
 
