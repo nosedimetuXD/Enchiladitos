@@ -9,6 +9,7 @@ import {
   Award,
   Users,
   Calendar,
+  CalendarDays,
   Building2,
   AlertTriangle,
   Trophy,
@@ -16,7 +17,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  Zap,
+  Sun,
+  Globe
 } from 'lucide-react'
 
 const MONTH_NAMES = [
@@ -329,35 +333,38 @@ export default function Stats() {
             <button
               type="button"
               onClick={() => setActiveTab('month_year')}
-              className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === 'month_year'
                   ? 'bg-[#9F6839] text-white shadow-xs'
                   : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
               }`}
             >
-              🗓️ Mes & Año
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Mes & Año</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('custom')}
-              className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === 'custom'
                   ? 'bg-[#9F6839] text-white shadow-xs'
                   : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
               }`}
             >
-              📅 Calendario Rango
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Rango Calendario</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('preset')}
-              className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === 'preset'
                   ? 'bg-[#9F6839] text-white shadow-xs'
                   : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
               }`}
             >
-              ⚡ Rápido
+              <Zap className="w-3.5 h-3.5" />
+              <span>Rápido</span>
             </button>
           </div>
 
@@ -451,48 +458,54 @@ export default function Stats() {
 
           {/* TAB 3: Opciones Rápidas */}
           {activeTab === 'preset' && (
-            <div className="grid grid-cols-2 gap-3 p-2">
+            <div className="grid grid-cols-2 gap-3 p-1">
               <button
                 type="button"
                 onClick={() => handleSelectPreset('month', 'Mes Actual')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                📅 Mes Actual
+                <Calendar className="w-4 h-4 text-[#9F6839]" />
+                <span>Mes Actual</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('prev_month', 'Mes Anterior')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                ⏮️ Mes Anterior
+                <Clock className="w-4 h-4 text-[#9F6839]" />
+                <span>Mes Anterior</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('week', 'Esta Semana')}
-                className="p-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                📊 Esta Semana
+                <BarChart3 className="w-4 h-4 text-[#9F6839]" />
+                <span>Esta Semana</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('today', 'Hoy')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                ☀️ Hoy
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span>Hoy</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('year', 'Este Año')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                🏢 Este Año
+                <Building2 className="w-4 h-4 text-[#9F6839]" />
+                <span>Este Año</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('all', 'Histórico Total')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
               >
-                🌐 Histórico Total
+                <Globe className="w-4 h-4 text-blue-600" />
+                <span>Histórico Total</span>
               </button>
             </div>
           )}

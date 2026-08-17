@@ -35,14 +35,20 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
 	var timeCondition string
+	var timeCondSales string
+	var timeCondComandas string
 
 	if startDate != "" && endDate != "" {
 		timeCondition = fmt.Sprintf("created_at >= '%s 00:00:00' AND created_at <= '%s 23:59:59'", startDate, endDate)
+		timeCondSales = fmt.Sprintf("s.created_at >= '%s 00:00:00' AND s.created_at <= '%s 23:59:59'", startDate, endDate)
+		timeCondComandas = fmt.Sprintf("c.created_at >= '%s 00:00:00' AND c.created_at <= '%s 23:59:59'", startDate, endDate)
 	} else if yearParam != "" && monthParam != "" {
 		y, _ := strconv.Atoi(yearParam)
 		m, _ := strconv.Atoi(monthParam)
 		if y > 2000 && m >= 1 && m <= 12 {
 			timeCondition = fmt.Sprintf("EXTRACT(YEAR FROM created_at) = %d AND EXTRACT(MONTH FROM created_at) = %d", y, m)
+			timeCondSales = fmt.Sprintf("EXTRACT(YEAR FROM s.created_at) = %d AND EXTRACT(MONTH FROM s.created_at) = %d", y, m)
+			timeCondComandas = fmt.Sprintf("EXTRACT(YEAR FROM c.created_at) = %d AND EXTRACT(MONTH FROM c.created_at) = %d", y, m)
 		}
 	}
 
@@ -50,16 +56,28 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		switch period {
 		case "today":
 			timeCondition = "created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
+			timeCondSales = "s.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
+			timeCondComandas = "c.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
 		case "week":
 			timeCondition = "created_at >= (now() - INTERVAL '7 days')"
+			timeCondSales = "s.created_at >= (now() - INTERVAL '7 days')"
+			timeCondComandas = "c.created_at >= (now() - INTERVAL '7 days')"
 		case "month":
 			timeCondition = "created_at >= date_trunc('month', now())"
+			timeCondSales = "s.created_at >= date_trunc('month', now())"
+			timeCondComandas = "c.created_at >= date_trunc('month', now())"
 		case "prev_month":
 			timeCondition = "created_at >= date_trunc('month', now() - INTERVAL '1 month') AND created_at < date_trunc('month', now())"
+			timeCondSales = "s.created_at >= date_trunc('month', now() - INTERVAL '1 month') AND s.created_at < date_trunc('month', now())"
+			timeCondComandas = "c.created_at >= date_trunc('month', now() - INTERVAL '1 month') AND c.created_at < date_trunc('month', now())"
 		case "year":
 			timeCondition = "created_at >= date_trunc('year', now())"
+			timeCondSales = "s.created_at >= date_trunc('year', now())"
+			timeCondComandas = "c.created_at >= date_trunc('year', now())"
 		default: // "all"
 			timeCondition = "1=1"
+			timeCondSales = "1=1"
+			timeCondComandas = "1=1"
 		}
 	}
 
@@ -133,7 +151,7 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 		// Tiempo Promedio de Salida de Comandas en minutos
 		_ = h.DB.QueryRow(r.Context(),
-			"SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(ready_at, updated_at) - created_at))/60), 0) FROM comandas WHERE status IN ('listo', 'entregado') AND "+timeCondition).Scan(&mStats.AvgPrepTimeMinutes)
+			"SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(c.ready_at, c.updated_at) - c.created_at))/60), 0) FROM comandas c WHERE c.status IN ('listo', 'entregado') AND "+timeCondComandas).Scan(&mStats.AvgPrepTimeMinutes)
 
 		// Mejor vendedor del período
 		var topSeller models.TopSellerStat
@@ -141,12 +159,14 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			`SELECT u.username, u.role, COALESCE(SUM(s.total), 0) as total_amount, COUNT(s.id) as sales_count
 			 FROM sales s
 			 JOIN users u ON s.sold_by = u.id
-			 WHERE `+timeCondition+`
+			 WHERE `+timeCondSales+`
 			 GROUP BY u.id, u.username, u.role
 			 ORDER BY total_amount DESC
 			 LIMIT 1`).Scan(&topSeller.Username, &topSeller.Role, &topSeller.TotalAmount, &topSeller.SalesCount)
 		if errSeller == nil {
 			mStats.TopSeller = &topSeller
+		} else {
+			log.Printf("error mejor vendedor query: %v", errSeller)
 		}
 
 		// Top 10 Productos más vendidos del período
@@ -155,7 +175,7 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			 FROM sale_items si
 			 JOIN sales s ON si.sale_id = s.id
 			 JOIN products p ON si.product_id = p.id
-			 WHERE `+timeCondition+`
+			 WHERE `+timeCondSales+`
 			 GROUP BY p.id, p.name
 			 ORDER BY total_qty DESC
 			 LIMIT 10`)
@@ -167,6 +187,8 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			prodRows.Close()
+		} else {
+			log.Printf("error top productos query: %v", errProdList)
 		}
 		if len(mStats.TopProducts) > 0 {
 			mStats.TopProduct = &mStats.TopProducts[0]
