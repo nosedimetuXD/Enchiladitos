@@ -493,10 +493,10 @@ export default function Accounting() {
       </div>
 
       {/* Pestañas (Ingresos / Gastos / Flujo Combinado) */}
-      <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2">
+      <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('sales')}
-          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'sales'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
@@ -507,7 +507,7 @@ export default function Accounting() {
         </button>
         <button
           onClick={() => setActiveTab('expenses')}
-          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'expenses'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
@@ -518,7 +518,7 @@ export default function Accounting() {
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+          className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'all'
               ? 'bg-[#9F6839] text-white shadow-xs'
               : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
@@ -532,153 +532,159 @@ export default function Accounting() {
       {/* Pestaña 1: Ingresos por Ventas */}
       {activeTab === 'sales' && (
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
-              <tr>
-                <th className="py-3.5 px-4">Fecha / Hora</th>
-                <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Método de Pago & Entidad</th>
-                <th className="py-3.5 px-4">Vendido Por</th>
-                <th className="py-3.5 px-4 text-right">Monto Ingresado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {filteredSales.map((s) => {
-                const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
-                const amt = Number(s.total) || 0
-                return (
-                  <tr key={s.id || Math.random()}>
-                    <td className="py-3.5 px-4 font-semibold">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
-                    <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex flex-col gap-0.5">
-                        <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] w-max uppercase tracking-wider ${pBadge.style}`}>
-                          {pBadge.label}
-                        </span>
-                        {s.bank_details && (
-                          <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
-                            {s.bank_details}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[650px] text-left text-xs">
+              <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
+                <tr>
+                  <th className="py-3.5 px-4">Fecha / Hora</th>
+                  <th className="py-3.5 px-4">Cliente</th>
+                  <th className="py-3.5 px-4">Método de Pago & Entidad</th>
+                  <th className="py-3.5 px-4">Vendido Por</th>
+                  <th className="py-3.5 px-4 text-right">Monto Ingresado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+                {filteredSales.map((s) => {
+                  const pBadge = paymentBadges[s.payment_method] || paymentBadges.efectivo
+                  const amt = Number(s.total) || 0
+                  return (
+                    <tr key={s.id || Math.random()}>
+                      <td className="py-3.5 px-4 font-semibold">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
+                      <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] w-max uppercase tracking-wider ${pBadge.style}`}>
+                            {pBadge.label}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">{s.sold_by_username || 'Vendedor'}</td>
-                    <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
-                      +${amt.toLocaleString()}
+                          {s.bank_details && (
+                            <span className="text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-bold">
+                              {s.bank_details}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">{s.sold_by_username || 'Vendedor'}</td>
+                      <td className="py-3.5 px-4 text-right font-extrabold text-emerald-600 text-sm">
+                        +${amt.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredSales.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-8 text-[#9F6839] font-medium">
+                      No hay ingresos registrados en este periodo.
                     </td>
                   </tr>
-                )
-              })}
-              {filteredSales.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center py-8 text-[#9F6839] font-medium">
-                    No hay ingresos registrados en este periodo.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Pestaña 2: Gastos Registrados */}
       {activeTab === 'expenses' && (
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
-              <tr>
-                <th className="py-3.5 px-4">Fecha</th>
-                <th className="py-3.5 px-4">Descripción</th>
-                <th className="py-3.5 px-4">Categoría</th>
-                <th className="py-3.5 px-4">Forma Pago</th>
-                <th className="py-3.5 px-4">Insumo Asociado</th>
-                <th className="py-3.5 px-4 text-right">Monto Erogado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {filteredExpenses.map((exp) => {
-                const catBadge = categoryBadges[exp.category] || categoryBadges.otros
-                const amt = Number(exp.amount) || 0
-                return (
-                  <tr key={exp.id || Math.random()}>
-                    <td className="py-3.5 px-4 font-semibold">{exp.created_at ? new Date(exp.created_at).toLocaleDateString() : '—'}</td>
-                    <td className="py-3.5 px-4 font-bold">{exp.description || 'Gasto'}</td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider ${catBadge.style}`}>
-                        {catBadge.label}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold">
-                      {exp.payment_method === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {exp.ingredient_name ? (
-                        <span className="text-emerald-600 font-bold text-xs">
-                          + {exp.quantity_added} unidades de {exp.ingredient_name}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[650px] text-left text-xs">
+              <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
+                <tr>
+                  <th className="py-3.5 px-4">Fecha</th>
+                  <th className="py-3.5 px-4">Descripción</th>
+                  <th className="py-3.5 px-4">Categoría</th>
+                  <th className="py-3.5 px-4">Forma Pago</th>
+                  <th className="py-3.5 px-4">Insumo Asociado</th>
+                  <th className="py-3.5 px-4 text-right">Monto Erogado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+                {filteredExpenses.map((exp) => {
+                  const catBadge = categoryBadges[exp.category] || categoryBadges.otros
+                  const amt = Number(exp.amount) || 0
+                  return (
+                    <tr key={exp.id || Math.random()}>
+                      <td className="py-3.5 px-4 font-semibold">{exp.created_at ? new Date(exp.created_at).toLocaleDateString() : '—'}</td>
+                      <td className="py-3.5 px-4 font-bold">{exp.description || 'Gasto'}</td>
+                      <td className="py-3.5 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider ${catBadge.style}`}>
+                          {catBadge.label}
                         </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-extrabold text-red-600 text-sm">
-                      -${amt.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold">
+                        {exp.payment_method === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {exp.ingredient_name ? (
+                          <span className="text-emerald-600 font-bold text-xs">
+                            + {exp.quantity_added} unidades de {exp.ingredient_name}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-extrabold text-red-600 text-sm">
+                        -${amt.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredExpenses.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
+                      No hay gastos registrados en este periodo.
                     </td>
                   </tr>
-                )
-              })}
-              {filteredExpenses.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
-                    No hay gastos registrados en este periodo.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Pestaña 3: Flujo de Caja Combinado */}
       {activeTab === 'all' && (
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
-              <tr>
-                <th className="py-3.5 px-4">Fecha / Hora</th>
-                <th className="py-3.5 px-4">Tipo</th>
-                <th className="py-3.5 px-4">Concepto / Cliente</th>
-                <th className="py-3.5 px-4">Detalles</th>
-                <th className="py-3.5 px-4 text-right">Monto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-              {combinedMovements.map((m) => (
-                <tr key={m.id || Math.random()} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : m.type === 'expense' ? 'bg-red-50/30 dark:bg-red-950/20' : 'bg-amber-50/30 dark:bg-amber-950/20'}>
-                  <td className="py-3.5 px-4 font-semibold">{m.date ? new Date(m.date).toLocaleString() : '—'}</td>
-                  <td className="py-3.5 px-4">
-                    {m.type === 'income' ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
-                        <CircleDot className="w-3 h-3 text-emerald-600" /> Ingreso
-                      </span>
-                    ) : m.type === 'expense' ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
-                        <CircleDot className="w-3 h-3 text-red-600" /> Gasto
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3 text-amber-600" /> Pérdida/Merma
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold">{m.concept}</td>
-                  <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">{m.details}</td>
-                  <td className={`py-3.5 px-4 text-right font-extrabold text-sm ${m.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {m.type === 'income' ? `+$${(Number(m.amount) || 0).toLocaleString()}` : `-$${(Number(m.amount) || 0).toLocaleString()}`}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[650px] text-left text-xs">
+              <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
+                <tr>
+                  <th className="py-3.5 px-4">Fecha / Hora</th>
+                  <th className="py-3.5 px-4">Tipo</th>
+                  <th className="py-3.5 px-4">Concepto / Cliente</th>
+                  <th className="py-3.5 px-4">Detalles</th>
+                  <th className="py-3.5 px-4 text-right">Monto</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+                {combinedMovements.map((m) => (
+                  <tr key={m.id || Math.random()} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : m.type === 'expense' ? 'bg-red-50/30 dark:bg-red-950/20' : 'bg-amber-50/30 dark:bg-amber-950/20'}>
+                    <td className="py-3.5 px-4 font-semibold">{m.date ? new Date(m.date).toLocaleString() : '—'}</td>
+                    <td className="py-3.5 px-4">
+                      {m.type === 'income' ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                          <CircleDot className="w-3 h-3 text-emerald-600" /> Ingreso
+                        </span>
+                      ) : m.type === 'expense' ? (
+                        <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                          <CircleDot className="w-3 h-3 text-red-600" /> Gasto
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3 text-amber-600" /> Pérdida/Merma
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold">{m.concept}</td>
+                    <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">{m.details}</td>
+                    <td className={`py-3.5 px-4 text-right font-extrabold text-sm ${m.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {m.type === 'income' ? `+$${(Number(m.amount) || 0).toLocaleString()}` : `-$${(Number(m.amount) || 0).toLocaleString()}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
