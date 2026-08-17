@@ -30,7 +30,7 @@ func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
 		`SELECT id, order_number, sale_id, customer_name, status, notes, created_at, updated_at 
 		 FROM comandas 
-		 WHERE created_at >= date_trunc('day', now()) OR status IN ('pendiente', 'en_preparacion', 'listo')
+		 WHERE created_at >= (now() - INTERVAL '24 hours') OR status IN ('pendiente', 'en_preparacion', 'listo')
 		 ORDER BY CASE status 
 		    WHEN 'pendiente' THEN 1 
 		    WHEN 'en_preparacion' THEN 2 

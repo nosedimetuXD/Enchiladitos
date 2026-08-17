@@ -53,7 +53,7 @@ export default function Comandas() {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        if (data.type === 'comanda_created' || data.type === 'comanda_status_updated') {
+        if (data.type === 'comanda_created' || data.type === 'comanda_status_updated' || data.type === 'comanda_updated') {
           playBellSound()
           loadComandas()
         }
@@ -85,7 +85,7 @@ export default function Comandas() {
   const pending = comandas.filter((c) => c.status === 'pendiente')
   const inPrep = comandas.filter((c) => c.status === 'en_preparacion')
   const ready = comandas.filter((c) => c.status === 'listo')
-  const delivered = comandas.filter((c) => c.status === 'entregado').slice(0, 5)
+  const delivered = comandas.filter((c) => c.status === 'entregado').slice(0, 15)
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando comandas en vivo...</p>
 
@@ -98,14 +98,14 @@ export default function Comandas() {
         className="bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-[#9F6839] transition-all"
       >
         <div>
-          <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
-            <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
+            <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] shrink-0">
               Comanda #{c.order_number || c.id.slice(0, 4)}
             </span>
 
-            <span className="flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#FEE4D7] text-[#9F6839] border border-[#D4B28E]">
-              <Clock className="w-3 h-3" />
-              {elapsedMins} min
+            <span className="inline-flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[#FEE4D7] text-[#9F6839] border border-[#D4B28E] whitespace-nowrap shrink-0">
+              <Clock className="w-3 h-3 shrink-0" />
+              <span>{elapsedMins} min</span>
             </span>
           </div>
 
