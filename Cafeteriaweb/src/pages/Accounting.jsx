@@ -146,7 +146,7 @@ export default function Accounting() {
     if (period === 'week') {
       const oneWeekAgo = new Date()
       oneWeekAgo.setDate(now.getDate() - 7)
-      return saleDate >= oneWeekAgo
+      return expDate >= oneWeekAgo
     }
     if (period === 'month') {
       return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
