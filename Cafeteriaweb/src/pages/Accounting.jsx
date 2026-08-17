@@ -19,13 +19,15 @@ import {
   ArrowUpDown,
   CircleDot,
   Building2,
-  RefreshCw
+  RefreshCw,
+  ShieldAlert
 } from 'lucide-react'
 
 export default function Accounting() {
   const [expenses, setExpenses] = useState([])
   const [sales, setSales] = useState([])
   const [ingredients, setIngredients] = useState([])
+  const [wasteReports, setWasteReports] = useState([])
   const [period, setPeriod] = useState('month')
   const [activeTab, setActiveTab] = useState('sales')
   const [loading, setLoading] = useState(true)
@@ -46,14 +48,16 @@ export default function Accounting() {
     setLoading(true)
     setPageError('')
     try {
-      const [expData, ingData, salesData] = await Promise.all([
+      const [expData, ingData, salesData, wasteData] = await Promise.all([
         api.get('/expenses?period=all').catch(() => []),
         api.get('/ingredients').catch(() => []),
-        api.get('/sales?period=all').catch(() => [])
+        api.get('/sales?period=all').catch(() => []),
+        api.get('/waste').catch(() => [])
       ])
       setExpenses(Array.isArray(expData) ? expData : [])
       setIngredients(Array.isArray(ingData) ? ingData : [])
       setSales(Array.isArray(salesData) ? salesData : [])
+      setWasteReports(Array.isArray(wasteData) ? wasteData : [])
     } catch (err) {
       console.error('Error cargando contabilidad:', err)
       setPageError('No se pudo cargar la información de contabilidad')
@@ -166,6 +170,37 @@ export default function Accounting() {
     })
   }, [safeExpenses, period])
 
+  // Filtro de mermas por periodo
+  const filteredWaste = useMemo(() => {
+    return (Array.isArray(wasteReports) ? wasteReports : []).filter((w) => {
+      if (!w || !w.created_at) return true
+      const wDate = new Date(w.created_at)
+      if (isNaN(wDate.getTime())) return true
+      const now = new Date()
+
+      if (period === 'today') {
+        return wDate.toDateString() === now.toDateString()
+      }
+      if (period === 'week') {
+        const startOfWeek = new Date()
+        startOfWeek.setDate(now.getDate() - 7)
+        startOfWeek.setHours(0, 0, 0, 0)
+        return wDate >= startOfWeek
+      }
+      if (period === 'month') {
+        return wDate.getMonth() === now.getMonth() && wDate.getFullYear() === now.getFullYear()
+      }
+      return true
+    })
+  }, [wasteReports, period])
+
+  const totalWasteLoss = useMemo(() => {
+    return filteredWaste.reduce((sum, w) => {
+      const loss = Number(w.estimated_loss) || (Number(w.quantity_lost) * Number(w.unit_cost || 0))
+      return sum + loss
+    }, 0)
+  }, [filteredWaste])
+
   // Resumen dinámico sincronizado
   const summary = useMemo(() => {
     let totalIncome = 0
@@ -189,13 +224,13 @@ export default function Accounting() {
       sales_count: filteredSales.length,
       total_expenses: totalExpenses,
       expenses_count: filteredExpenses.length,
-      net_balance: totalIncome - totalExpenses,
+      net_balance: totalIncome - totalExpenses - totalWasteLoss,
       income_by_payment_method: {
         efectivo: cashIncome,
         transferencia: transferIncome
       }
     }
-  }, [filteredSales, filteredExpenses])
+  }, [filteredSales, filteredExpenses, totalWasteLoss])
 
   const combinedMovements = useMemo(() => {
     return [
@@ -216,9 +251,18 @@ export default function Accounting() {
         details: e.registerer_name ? `Registrado por ${e.registerer_name}` : 'Gasto operativo',
         paymentMethod: e.payment_method || 'efectivo',
         amount: Number(e.amount) || 0
+      })),
+      ...filteredWaste.map((w) => ({
+        id: w.id || Math.random().toString(),
+        type: 'waste',
+        date: w.created_at || new Date().toISOString(),
+        concept: `Merma / Daño: ${w.ingredient_name || 'Insumo'} (-${w.quantity_lost} ${w.unit || ''})`,
+        details: `Motivo: ${w.reason || 'Daño'} | Reportado por ${w.reporter_name || 'Personal'}`,
+        paymentMethod: 'pérdida de inventario',
+        amount: Number(w.estimated_loss) || (Number(w.quantity_lost) * Number(w.unit_cost || 0))
       }))
     ].sort((a, b) => new Date(b.date) - new Date(a.date))
-  }, [filteredSales, filteredExpenses])
+  }, [filteredSales, filteredExpenses, filteredWaste])
 
   // Ranking Top 5 Bancos / Entidades más usados
   const topBanksRanking = useMemo(() => {
@@ -322,7 +366,7 @@ export default function Accounting() {
       )}
 
       {/* Tarjetas KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
             <span>Ingresos Totales</span>
@@ -351,20 +395,33 @@ export default function Accounting() {
 
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
-            <span>Balance Neto</span>
+            <span>Pérdidas por Mermas</span>
+            <ShieldAlert className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-amber-600">
+            ${(totalWasteLoss || 0).toLocaleString()}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            {filteredWaste.length} reportes de daños
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
+          <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
+            <span>Balance Neto Real</span>
             <DollarSign className="w-4 h-4 text-[#9F6839]" />
           </div>
           <div className={`text-2xl font-extrabold ${(Number(summary.net_balance) || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             ${(Number(summary.net_balance) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
-            Ingresos - Egresos
+            Ingresos - Gastos - Mermas
           </p>
         </div>
 
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 shadow-xs">
           <div className="flex items-center justify-between text-[#9F6839] dark:text-[#DABA8C] text-xs font-bold mb-2">
-            <span>Desglose Métodos Pago</span>
+            <span>Métodos de Pago</span>
             <Wallet className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-xs space-y-1 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
@@ -596,16 +653,20 @@ export default function Accounting() {
             </thead>
             <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
               {combinedMovements.map((m) => (
-                <tr key={m.id || Math.random()} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : 'bg-red-50/30 dark:bg-red-950/20'}>
+                <tr key={m.id || Math.random()} className={m.type === 'income' ? 'bg-emerald-50/30 dark:bg-emerald-950/20' : m.type === 'expense' ? 'bg-red-50/30 dark:bg-red-950/20' : 'bg-amber-50/30 dark:bg-amber-950/20'}>
                   <td className="py-3.5 px-4 font-semibold">{m.date ? new Date(m.date).toLocaleString() : '—'}</td>
                   <td className="py-3.5 px-4">
                     {m.type === 'income' ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
                         <CircleDot className="w-3 h-3 text-emerald-600" /> Ingreso
                       </span>
-                    ) : (
+                    ) : m.type === 'expense' ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
                         <CircleDot className="w-3 h-3 text-red-600" /> Gasto
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                        <ShieldAlert className="w-3 h-3 text-amber-600" /> Pérdida/Merma
                       </span>
                     )}
                   </td>

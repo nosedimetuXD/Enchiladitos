@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { BookOpen, Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { BookOpen, Plus, Trash2, ArrowLeft, Scale } from 'lucide-react'
 
 export default function Recipe() {
   const { id } = useParams()
@@ -23,12 +23,31 @@ export default function Recipe() {
       ])
       setProduct(productData)
       setIngredients(ingredientsData || [])
-      setLines(
-        (recipeData || []).map((r) => ({
+      
+      const loadedLines = (recipeData || []).map((r) => {
+        const foundIng = (ingredientsData || []).find((i) => i.id === r.ingredient_id)
+        const unitLower = foundIng?.unit?.toLowerCase() || ''
+        
+        let initialUserUnit = 'custom'
+        let initialUserQty = r.quantity_used
+
+        if (unitLower.includes('litro') || unitLower === 'l') {
+          initialUserUnit = 'ml'
+          initialUserQty = r.quantity_used * 1000
+        } else if (unitLower.includes('kg') || unitLower.includes('kilo') || unitLower.includes('gramo')) {
+          initialUserUnit = 'g'
+          initialUserQty = r.quantity_used * 1000
+        }
+
+        return {
           ingredient_id: r.ingredient_id,
+          user_quantity: initialUserQty,
+          user_unit: initialUserUnit,
           quantity_used: r.quantity_used
-        }))
-      )
+        }
+      })
+
+      setLines(loadedLines)
     } catch (err) {
       setError('No se pudo cargar la receta')
     } finally {
@@ -41,13 +60,37 @@ export default function Recipe() {
   }, [id])
 
   function addLine() {
-    setLines((prev) => [...prev, { ingredient_id: '', quantity_used: '' }])
+    setLines((prev) => [...prev, { ingredient_id: '', user_quantity: '', user_unit: 'default', quantity_used: '' }])
   }
 
   function updateLine(index, field, value) {
     setLines((prev) => {
       const next = [...prev]
-      next[index] = { ...next[index], [field]: value }
+      const current = { ...next[index], [field]: value }
+
+      const foundIng = ingredients.find((i) => i.id === current.ingredient_id)
+      const ingUnit = foundIng?.unit?.toLowerCase() || ''
+
+      // Auto ajustar unidad seleccionada al cambiar de insumo
+      if (field === 'ingredient_id') {
+        if (ingUnit.includes('litro') || ingUnit === 'l') {
+          current.user_unit = 'ml'
+        } else if (ingUnit.includes('kg') || ingUnit.includes('kilo') || ingUnit.includes('gramo')) {
+          current.user_unit = 'g'
+        } else {
+          current.user_unit = 'default'
+        }
+      }
+
+      // Calcular la cantidad real que se guardará en BD (l / kg)
+      const numUserQty = Number(current.user_quantity) || 0
+      if (current.user_unit === 'ml' || current.user_unit === 'g') {
+        current.quantity_used = numUserQty / 1000
+      } else {
+        current.quantity_used = numUserQty
+      }
+
+      next[index] = current
       return next
     })
   }
@@ -61,7 +104,7 @@ export default function Recipe() {
     setError('')
 
     const items = lines
-      .filter((l) => l.ingredient_id && l.quantity_used)
+      .filter((l) => l.ingredient_id && Number(l.quantity_used) > 0)
       .map((l) => ({
         ingredient_id: l.ingredient_id,
         quantity_used: Number(l.quantity_used)
@@ -80,7 +123,7 @@ export default function Recipe() {
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando receta del producto...</p>
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/products')}
@@ -93,7 +136,7 @@ export default function Recipe() {
             <BookOpen className="w-6 h-6 text-[#9F6839]" /> Receta: {product?.name}
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Configuración de insumos e ingredientes descontados automáticamente en cada venta
+            Configuración de insumos con conversión automática (ml ➔ Litros / g ➔ Kg)
           </p>
         </div>
       </div>
@@ -106,41 +149,83 @@ export default function Recipe() {
 
       <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-4">
         <div className="space-y-3">
-          {lines.map((line, index) => (
-            <div key={index} className="flex items-center gap-3 bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/60 p-3 rounded-2xl">
-              <select
-                value={line.ingredient_id}
-                onChange={(e) => updateLine(index, 'ingredient_id', e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              >
-                <option value="">Selecciona un insumo de inventario...</option>
-                {ingredients.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} ({i.unit})
-                  </option>
-                ))}
-              </select>
+          {lines.map((line, index) => {
+            const foundIng = ingredients.find((i) => i.id === line.ingredient_id)
+            const ingUnit = foundIng?.unit?.toLowerCase() || ''
+            const isLiquid = ingUnit.includes('litro') || ingUnit === 'l'
+            const isWeight = ingUnit.includes('kg') || ingUnit.includes('kilo') || ingUnit.includes('gramo')
 
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Cantidad"
-                value={line.quantity_used}
-                onChange={(e) => updateLine(index, 'quantity_used', e.target.value)}
-                className="w-28 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
+            return (
+              <div key={index} className="bg-[#FEE4D7]/30 dark:bg-[#2E180E] border border-[#D4B28E]/60 p-4 rounded-2xl space-y-2">
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <select
+                    value={line.ingredient_id}
+                    onChange={(e) => updateLine(index, 'ingredient_id', e.target.value)}
+                    className="flex-1 w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                  >
+                    <option value="">Selecciona un insumo de inventario...</option>
+                    {ingredients.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} ({i.unit})
+                      </option>
+                    ))}
+                  </select>
 
-              <button
-                type="button"
-                onClick={() => removeLine(index)}
-                className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                title="Quitar ingrediente"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Cantidad"
+                      value={line.user_quantity}
+                      onChange={(e) => updateLine(index, 'user_quantity', e.target.value)}
+                      className="w-28 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                    />
+
+                    <select
+                      value={line.user_unit}
+                      onChange={(e) => updateLine(index, 'user_unit', e.target.value)}
+                      className="w-32 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+                    >
+                      {isLiquid ? (
+                        <>
+                          <option value="ml">ml (Mililitros)</option>
+                          <option value="l">L (Litros)</option>
+                        </>
+                      ) : isWeight ? (
+                        <>
+                          <option value="g">g (Gramos)</option>
+                          <option value="kg">kg (Kilos)</option>
+                        </>
+                      ) : (
+                        <option value="default">{foundIng?.unit || 'unidades'}</option>
+                      )}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => removeLine(index)}
+                      className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                      title="Quitar ingrediente"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Badge de Conversión en Tiempo Real */}
+                {line.ingredient_id && Number(line.user_quantity) > 0 && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] pt-1">
+                    <Scale className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>
+                      Conversión a inventario: {line.user_quantity} {line.user_unit} ➔{' '}
+                      <strong className="text-emerald-600">{Number(line.quantity_used).toFixed(4)} {foundIng?.unit || ''}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           {lines.length === 0 && (
             <p className="text-xs text-[#9F6839] text-center py-6 font-semibold">

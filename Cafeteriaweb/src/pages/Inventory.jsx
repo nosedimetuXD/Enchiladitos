@@ -1,25 +1,26 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, FileText } from 'lucide-react'
+import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign } from 'lucide-react'
 
 export default function Inventory() {
   const [ingredients, setIngredients] = useState([])
   const [wasteReports, setWasteReports] = useState([])
-  const [activeTab, setActiveTab] = useState('inventory') // 'inventory' | 'waste'
+  const [activeTab, setActiveTab] = useState('inventory')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  // Modal Crear / Editar Insumo (Solo Owner y Admin)
+  // Modal Crear / Editar Insumo
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingIngredient, setEditingIngredient] = useState(null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unit, setUnit] = useState('unidades')
   const [minQuantity, setMinQuantity] = useState('5')
+  const [unitCost, setUnitCost] = useState('0')
 
-  // Modal Reportar Daño / Merma (Acceso General para TODOS)
+  // Modal Reportar Daño / Merma
   const [isWasteModalOpen, setIsWasteModalOpen] = useState(false)
   const [wasteIngredientId, setWasteIngredientId] = useState('')
   const [wasteQuantity, setWasteQuantity] = useState('')
@@ -53,6 +54,7 @@ export default function Inventory() {
     setQuantity('')
     setUnit('unidades')
     setMinQuantity('5')
+    setUnitCost('0')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -62,7 +64,8 @@ export default function Inventory() {
     setName(ing.name)
     setQuantity(String(ing.quantity))
     setUnit(ing.unit)
-    setMinQuantity(String(ing.min_quantity))
+    setMinQuantity(String(ing.min_quantity ?? 5))
+    setUnitCost(String(ing.unit_cost ?? 0))
     setFormError('')
     setIsModalOpen(true)
   }
@@ -81,20 +84,18 @@ export default function Inventory() {
     setFormError('')
 
     try {
+      const payload = {
+        name,
+        quantity: Number(quantity),
+        unit,
+        min_quantity: Number(minQuantity),
+        unit_cost: Number(unitCost) || 0
+      }
+
       if (editingIngredient) {
-        await api.put(`/ingredients/${editingIngredient.id}`, {
-          name,
-          quantity: Number(quantity),
-          unit,
-          min_quantity: Number(minQuantity)
-        })
+        await api.put(`/ingredients/${editingIngredient.id}`, payload)
       } else {
-        await api.post('/ingredients', {
-          name,
-          quantity: Number(quantity),
-          unit,
-          min_quantity: Number(minQuantity)
-        })
+        await api.post('/ingredients', payload)
       }
 
       setIsModalOpen(false)
@@ -153,7 +154,8 @@ export default function Inventory() {
         name: ing.name,
         quantity: newQty,
         unit: ing.unit,
-        min_quantity: ing.min_quantity
+        min_quantity: ing.min_quantity,
+        unit_cost: ing.unit_cost || 0
       })
       await loadData()
     } catch (err) {
@@ -165,6 +167,7 @@ export default function Inventory() {
   const filteredIngredients = ingredients.filter((i) => i.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const selectedWasteIng = ingredients.find((i) => i.id === wasteIngredientId)
+  const estimatedWasteLoss = selectedWasteIng && Number(wasteQuantity) > 0 ? Number(wasteQuantity) * (selectedWasteIng.unit_cost || 0) : 0
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando inventario...</p>
 
@@ -189,7 +192,6 @@ export default function Inventory() {
             </div>
           )}
 
-          {/* Botón Reportar Daño / Merma (Acceso General a Todos) */}
           <button
             onClick={openWasteModal}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
@@ -262,6 +264,7 @@ export default function Inventory() {
                 <tr>
                   <th className="py-3.5 px-4">Insumo / Materia Prima</th>
                   <th className="py-3.5 px-4">Stock Actual</th>
+                  <th className="py-3.5 px-4">Costo / Unidad ($)</th>
                   <th className="py-3.5 px-4">Mínimo Requerido</th>
                   <th className="py-3.5 px-4">Estado</th>
                   <th className="py-3.5 px-4 text-center">Ajuste Rápido</th>
@@ -276,6 +279,9 @@ export default function Inventory() {
                       <td className="py-3.5 px-4 font-bold text-sm">{ing.name}</td>
                       <td className="py-3.5 px-4 font-extrabold text-sm">
                         {ing.quantity} {ing.unit}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-600">
+                        ${(Number(ing.unit_cost) || 0).toLocaleString()} / {ing.unit}
                       </td>
                       <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">
                         {ing.min_quantity} {ing.unit}
@@ -330,7 +336,7 @@ export default function Inventory() {
                 })}
                 {filteredIngredients.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
+                    <td colSpan={7} className="text-center py-8 text-[#9F6839] font-medium">
                       No se encontraron insumos registrados.
                     </td>
                   </tr>
@@ -351,29 +357,36 @@ export default function Inventory() {
                   <th className="py-3.5 px-4">Fecha / Hora</th>
                   <th className="py-3.5 px-4">Insumo Afectado</th>
                   <th className="py-3.5 px-4">Cantidad Descontada</th>
+                  <th className="py-3.5 px-4">Pérdida Financiera Est. ($)</th>
                   <th className="py-3.5 px-4">Motivo del Daño / Pérdida</th>
                   <th className="py-3.5 px-4">Reportado Por</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-                {wasteReports.map((w) => (
-                  <tr key={w.id} className="hover:bg-red-50/20 dark:hover:bg-red-950/10">
-                    <td className="py-3.5 px-4 font-semibold">{new Date(w.created_at).toLocaleString()}</td>
-                    <td className="py-3.5 px-4 font-bold">{w.ingredient_name}</td>
-                    <td className="py-3.5 px-4 font-extrabold text-red-600 text-sm">
-                      -{w.quantity_lost} {w.unit}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-[#432414] dark:text-[#FEE4D7]">
-                      {w.reason}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-[#9F6839]">
-                      {w.reporter_name || 'Personal'}
-                    </td>
-                  </tr>
-                ))}
+                {wasteReports.map((w) => {
+                  const lossAmt = Number(w.estimated_loss) || (Number(w.quantity_lost) * Number(w.unit_cost || 0))
+                  return (
+                    <tr key={w.id} className="hover:bg-red-50/20 dark:hover:bg-red-950/10">
+                      <td className="py-3.5 px-4 font-semibold">{new Date(w.created_at).toLocaleString()}</td>
+                      <td className="py-3.5 px-4 font-bold">{w.ingredient_name}</td>
+                      <td className="py-3.5 px-4 font-extrabold text-red-600 text-sm">
+                        -{w.quantity_lost} {w.unit}
+                      </td>
+                      <td className="py-3.5 px-4 font-extrabold text-red-600 text-sm">
+                        -${lossAmt.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-4 font-medium text-[#432414] dark:text-[#FEE4D7]">
+                        {w.reason}
+                      </td>
+                      <td className="py-3.5 px-4 font-semibold text-[#9F6839]">
+                        {w.reporter_name || 'Personal'}
+                      </td>
+                    </tr>
+                  )
+                })}
                 {wasteReports.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-[#9F6839] font-medium">
+                    <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
                       No hay registros de daños o mermas hasta el momento.
                     </td>
                   </tr>
@@ -405,7 +418,7 @@ export default function Inventory() {
             >
               {ingredients.map((ing) => (
                 <option key={ing.id} value={ing.id}>
-                  {ing.name} (Stock actual: {ing.quantity} {ing.unit})
+                  {ing.name} (Stock: {ing.quantity} {ing.unit} | Costo/u: ${ing.unit_cost || 0})
                 </option>
               ))}
             </select>
@@ -441,8 +454,15 @@ export default function Inventory() {
             />
           </div>
 
-          <div className="p-3 rounded-2xl bg-red-50/60 dark:bg-red-950/30 border border-red-200/60 text-xs text-red-700 dark:text-red-300 font-semibold">
-            ℹ️ Al confirmar, esta cantidad se descontará automáticamente del stock actual del inventario.
+          {estimatedWasteLoss > 0 && (
+            <div className="p-3 rounded-2xl bg-red-50/80 dark:bg-red-950/40 border border-red-200 text-xs text-red-700 dark:text-red-300 font-extrabold flex justify-between items-center">
+              <span>Pérdida Financiera Estimada:</span>
+              <span className="text-sm text-red-600">${estimatedWasteLoss.toLocaleString()}</span>
+            </div>
+          )}
+
+          <div className="p-3 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] text-xs text-[#9F6839] dark:text-[#DABA8C] font-semibold">
+            ℹ️ Al confirmar, se descontará esa cantidad del inventario y se cargará el costo estimado a Contabilidad.
           </div>
 
           <div className="flex gap-3 justify-end pt-3">
@@ -522,20 +542,37 @@ export default function Inventory() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-              Cantidad Mínima para Alerta de Stock Bajo
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={minQuantity}
-              onChange={(e) => setMinQuantity(e.target.value)}
-              placeholder="5.0"
-              required
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Costo / Valor por Unidad ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                placeholder="Ej. 4000"
+                required
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Stock Mínimo para Alerta
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={minQuantity}
+                onChange={(e) => setMinQuantity(e.target.value)}
+                placeholder="5.0"
+                required
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+            </div>
           </div>
 
           <div className="flex gap-3 justify-end pt-3">

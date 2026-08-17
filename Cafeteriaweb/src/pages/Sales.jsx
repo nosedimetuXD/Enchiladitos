@@ -58,7 +58,7 @@ export default function Sales() {
   
   // Desglose de Bancos / Entidades para Transferencia y Pago Mixto
   const [bankPayments, setBankPayments] = useState([
-    { bank: 'Nequi', amount: '' }
+    { bank: 'Bre-B/Llave', amount: '' }
   ])
 
   const [submitting, setSubmitting] = useState(false)

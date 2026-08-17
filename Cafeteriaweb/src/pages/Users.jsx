@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
-import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2 } from 'lucide-react'
+import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2, BarChart3, TrendingUp, DollarSign, ShoppingBag, CheckSquare, ShieldAlert } from 'lucide-react'
 
 export default function Users() {
   const { user: currentUser, updateUser } = useAuth()
   const [users, setUsers] = useState([])
+  const [sales, setSales] = useState([])
+  const [expenses, setExpenses] = useState([])
+  const [tasks, setTasks] = useState([])
+  const [wasteReports, setWasteReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
@@ -29,10 +33,23 @@ export default function Users() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
-  async function loadUsers() {
+  // Modal Stats Personales de Usuario
+  const [selectedUserForStats, setSelectedUserForStats] = useState(null)
+
+  async function loadData() {
     try {
-      const data = await api.get('/users')
-      setUsers(data || [])
+      const [uData, sData, eData, tData, wData] = await Promise.all([
+        api.get('/users').catch(() => []),
+        api.get('/sales?period=all').catch(() => []),
+        api.get('/expenses?period=all').catch(() => []),
+        api.get('/tasks').catch(() => []),
+        api.get('/waste').catch(() => [])
+      ])
+      setUsers(uData || [])
+      setSales(sData || [])
+      setExpenses(eData || [])
+      setTasks(tData || [])
+      setWasteReports(wData || [])
     } catch (err) {
       setPageError('No se pudieron cargar los usuarios')
     } finally {
@@ -41,7 +58,7 @@ export default function Users() {
   }
 
   useEffect(() => {
-    loadUsers()
+    loadData()
   }, [])
 
   function openCreateModal() {
@@ -64,6 +81,10 @@ export default function Users() {
     setIsModalOpen(true)
   }
 
+  function openStatsModal(userItem) {
+    setSelectedUserForStats(userItem)
+  }
+
   function handleFileChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -81,7 +102,6 @@ export default function Users() {
       const finalAvatar = avatarUrl.trim()
 
       if (editingUser) {
-        // Editar usuario existente por el Dueño
         const updated = await api.put(`/users/${editingUser.id}`, {
           username,
           password: password ? password : undefined,
@@ -94,12 +114,10 @@ export default function Users() {
           localStorage.setItem('toffe_user_avatars', JSON.stringify(nextAvatars))
         }
 
-        // Si el dueño se editó a sí mismo, actualizar el localStorage para reflejar el nuevo nombre/rol en pantalla
         if (currentUser && currentUser.id === editingUser.id) {
           updateUser({ username: updated.username, role: updated.role, avatar_url: finalAvatar })
         }
       } else {
-        // Crear nuevo usuario
         const created = await api.post('/users', { username, password, role })
         if (created && created.id && finalAvatar) {
           const nextAvatars = { ...avatars, [created.id]: finalAvatar }
@@ -109,7 +127,7 @@ export default function Users() {
       }
 
       setIsModalOpen(false)
-      await loadUsers()
+      await loadData()
     } catch (err) {
       setFormError(
         err.message.includes('ya')
@@ -137,11 +155,56 @@ export default function Users() {
 
     try {
       await api.delete(`/users/${userItem.id}`)
-      await loadUsers()
+      await loadData()
     } catch (err) {
       alert(err.message || 'No se pudo eliminar el usuario')
     }
   }
+
+  const userStatsCalculated = useMemo(() => {
+    if (!selectedUserForStats) return null
+
+    const uSales = sales.filter((s) => s.sold_by === selectedUserForStats.id || s.sold_by_username?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+    const uExpenses = expenses.filter((e) => e.registered_by === selectedUserForStats.id || e.registerer_name?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+    const uTasksAssigned = tasks.filter((t) => t.assigned_to === selectedUserForStats.id || t.assigned_username?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+    const uTasksCompleted = uTasksAssigned.filter((t) => t.completed)
+    const uWaste = wasteReports.filter((w) => w.reported_by === selectedUserForStats.id || w.reporter_name?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+
+    let totalRevenue = 0
+    const productCounts = {}
+
+    uSales.forEach((s) => {
+      totalRevenue += Number(s.total) || 0
+      if (Array.isArray(s.items)) {
+        s.items.forEach((item) => {
+          const pName = item.product_name || item.name || 'Producto'
+          const qty = Number(item.quantity) || 1
+          productCounts[pName] = (productCounts[pName] || 0) + qty
+        })
+      }
+    })
+
+    const topProductEntry = Object.entries(productCounts).sort((a, b) => b[1] - a[1])[0]
+
+    let totalExpensesSum = 0
+    uExpenses.forEach((e) => {
+      totalExpensesSum += Number(e.amount) || 0
+    })
+
+    return {
+      salesCount: uSales.length,
+      totalRevenue,
+      ticketAverage: uSales.length > 0 ? totalRevenue / uSales.length : 0,
+      topProductName: topProductEntry ? topProductEntry[0] : 'Sin ventas',
+      topProductQty: topProductEntry ? topProductEntry[1] : 0,
+      expensesCount: uExpenses.length,
+      totalExpensesSum,
+      tasksAssignedCount: uTasksAssigned.length,
+      tasksCompletedCount: uTasksCompleted.length,
+      wasteCount: uWaste.length,
+      recentSales: uSales.slice(0, 5)
+    }
+  }, [selectedUserForStats, sales, expenses, tasks, wasteReports])
 
   const roleBadges = {
     owner: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
@@ -164,7 +227,7 @@ export default function Users() {
             Gestión de Usuarios & Personal
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Cuentas, credenciales de acceso y permisos de caja del equipo Toffe
+            Cuentas, credenciales, rendimiento individual y permisos de caja del equipo Toffe
           </p>
         </div>
 
@@ -244,29 +307,129 @@ export default function Users() {
                 </div>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 flex items-center gap-2">
+              <div className="mt-5 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 space-y-2">
                 <button
-                  onClick={() => openEditModal(u)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] hover:bg-[#9F6839] text-[#432414] dark:text-[#FEE4D7] hover:text-white border border-[#D4B28E]/60 dark:border-[#9F6839]/50 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  onClick={() => openStatsModal(u)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-xs transition-all cursor-pointer"
                 >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Editar Usuario & Rol</span>
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Ver Rendimiento & Stats</span>
                 </button>
 
-                {!isPrimary && !isCurrentUser && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleDeleteUser(u)}
-                    className="p-2.5 rounded-2xl bg-red-50 dark:bg-red-950/40 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 dark:border-red-800 text-xs font-bold transition-all cursor-pointer shadow-xs"
-                    title="Eliminar usuario"
+                    onClick={() => openEditModal(u)}
+                    className="flex-1 flex items-center justify-center gap-1 py-2 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] hover:bg-[#D4B28E]/40 text-[#432414] dark:text-[#FEE4D7] border border-[#D4B28E]/60 text-xs font-bold transition-all cursor-pointer"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Edit2 className="w-3.5 h-3.5 text-[#9F6839]" />
+                    <span>Editar</span>
                   </button>
-                )}
+
+                  {!isPrimary && !isCurrentUser && (
+                    <button
+                      onClick={() => handleDeleteUser(u)}
+                      className="p-2 rounded-2xl bg-red-50 dark:bg-red-950/40 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 dark:border-red-800 text-xs font-bold transition-all cursor-pointer"
+                      title="Eliminar usuario"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )
         })}
       </div>
+
+      {/* Modal Rendimiento & Stats Personales de Usuario */}
+      {selectedUserForStats && userStatsCalculated && (
+        <Modal
+          isOpen={Boolean(selectedUserForStats)}
+          onClose={() => setSelectedUserForStats(null)}
+          title={`Stats & Rendimiento de: ${selectedUserForStats.username}`}
+        >
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#9F6839] text-white font-black text-xl flex items-center justify-center">
+                {selectedUserForStats.username.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h4 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  {selectedUserForStats.username}
+                </h4>
+                <span className="text-xs font-bold text-[#9F6839] uppercase tracking-wider">
+                  Rol: {selectedUserForStats.role}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-1">
+                <span className="text-[11px] font-bold text-[#9F6839] uppercase flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Total Vendido
+                </span>
+                <p className="text-xl font-extrabold text-emerald-600">
+                  ${userStatsCalculated.totalRevenue.toLocaleString()}
+                </p>
+                <span className="text-[10px] text-[#9F6839] font-medium">
+                  {userStatsCalculated.salesCount} ventas registradas
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-1">
+                <span className="text-[11px] font-bold text-[#9F6839] uppercase flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-600" /> Promedio Ticket
+                </span>
+                <p className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  ${Math.round(userStatsCalculated.ticketAverage).toLocaleString()}
+                </p>
+                <span className="text-[10px] text-[#9F6839] font-medium">
+                  Por venta realizada
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5 text-[#9F6839]" /> Producto Estrella Vendido
+                </span>
+                <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  {userStatsCalculated.topProductName} ({userStatsCalculated.topProductQty} un.)
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
+                <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
+                  <CheckSquare className="w-3.5 h-3.5 text-[#9F6839]" /> Tareas Completadas
+                </span>
+                <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  {userStatsCalculated.tasksCompletedCount} / {userStatsCalculated.tasksAssignedCount} asignadas
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
+                <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> Reportes de Daños
+                </span>
+                <span className="text-xs font-extrabold text-amber-600">
+                  {userStatsCalculated.wasteCount} mermas reportadas
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedUserForStats(null)}
+                className="px-5 py-2.5 rounded-2xl bg-[#9F6839] text-white font-extrabold text-xs cursor-pointer shadow-md"
+              >
+                Cerrar Stats
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal Crear / Editar Usuario */}
       <Modal

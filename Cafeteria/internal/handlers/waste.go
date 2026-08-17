@@ -31,31 +31,26 @@ func NewWasteHandler(db *pgxpool.Pool, hub *events.Hub) *WasteHandler {
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
 			quantity_lost NUMERIC NOT NULL,
+			unit_cost NUMERIC DEFAULT 0,
+			estimated_loss NUMERIC DEFAULT 0,
 			reason TEXT NOT NULL,
 			reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 		)
 	`)
+	_, _ = db.Exec(ctx, `ALTER TABLE waste_reports ADD COLUMN IF NOT EXISTS unit_cost NUMERIC DEFAULT 0`)
+	_, _ = db.Exec(ctx, `ALTER TABLE waste_reports ADD COLUMN IF NOT EXISTS estimated_loss NUMERIC DEFAULT 0`)
 
 	return &WasteHandler{DB: db, Hub: hub}
 }
 
 // GET /waste — lista todos los reportes de mermas/daños
 func (h *WasteHandler) List(w http.ResponseWriter, r *http.Request) {
-	// Asegurar tabla
-	_, _ = h.DB.Exec(r.Context(), `
-		CREATE TABLE IF NOT EXISTS waste_reports (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-			quantity_lost NUMERIC NOT NULL,
-			reason TEXT NOT NULL,
-			reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-		)
-	`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE waste_reports ADD COLUMN IF NOT EXISTS unit_cost NUMERIC DEFAULT 0`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE waste_reports ADD COLUMN IF NOT EXISTS estimated_loss NUMERIC DEFAULT 0`)
 
 	query := `SELECT w.id, w.ingredient_id, COALESCE(i.name, 'Insumo Eliminado'), COALESCE(i.unit, 'unidades'), 
-	                 w.quantity_lost, w.reason, w.reported_by, COALESCE(u.username, 'Personal'), w.created_at
+	                 w.quantity_lost, COALESCE(w.unit_cost, 0), COALESCE(w.estimated_loss, 0), w.reason, w.reported_by, COALESCE(u.username, 'Personal'), w.created_at
 	          FROM waste_reports w
 	          LEFT JOIN ingredients i ON w.ingredient_id = i.id
 	          LEFT JOIN users u ON w.reported_by = u.id
@@ -73,7 +68,7 @@ func (h *WasteHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item models.WasteReport
 		if err := rows.Scan(&item.ID, &item.IngredientID, &item.IngredientName, &item.Unit,
-			&item.QuantityLost, &item.Reason, &item.ReportedBy, &item.ReporterName, &item.CreatedAt); err != nil {
+			&item.QuantityLost, &item.UnitCost, &item.EstimatedLoss, &item.Reason, &item.ReportedBy, &item.ReporterName, &item.CreatedAt); err != nil {
 			log.Printf("error leyendo mermas: %v", err)
 			http.Error(w, "error leyendo reporte de daños", http.StatusInternalServerError)
 			return
@@ -116,6 +111,11 @@ func (h *WasteHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var unitCost float64
+	_ = h.DB.QueryRow(ctx, `SELECT COALESCE(unit_cost, 0) FROM ingredients WHERE id = $1`, req.IngredientID).Scan(&unitCost)
+
+	estimatedLoss := req.QuantityLost * unitCost
+
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
 		log.Printf("error iniciando transacción de merma: %v", err)
@@ -138,13 +138,13 @@ func (h *WasteHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Insertar el reporte de merma/daño
+	// 2. Insertar el reporte de merma/daño con costo unitario y pérdida estimada
 	var wasteID uuid.UUID
 	var createdAt time.Time
 	err = tx.QueryRow(ctx,
-		`INSERT INTO waste_reports (ingredient_id, quantity_lost, reason, reported_by)
-		 VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-		req.IngredientID, req.QuantityLost, reason, reportedBy,
+		`INSERT INTO waste_reports (ingredient_id, quantity_lost, unit_cost, estimated_loss, reason, reported_by)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
+		req.IngredientID, req.QuantityLost, unitCost, estimatedLoss, reason, reportedBy,
 	).Scan(&wasteID, &createdAt)
 	if err != nil {
 		log.Printf("error creando reporte de merma: %v", err)
@@ -159,16 +159,20 @@ func (h *WasteHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Hub.Publish("inventory_updated", map[string]interface{}{
-		"ingredient_id": req.IngredientID,
-		"quantity_lost": req.QuantityLost,
-		"reason":        reason,
+		"ingredient_id":  req.IngredientID,
+		"quantity_lost":  req.QuantityLost,
+		"unit_cost":      unitCost,
+		"estimated_loss": estimatedLoss,
+		"reason":         reason,
 	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":         wasteID,
-		"created_at": createdAt,
-		"message":    fmt.Sprintf("Se descontaron %.2f unidades del inventario", req.QuantityLost),
+		"id":             wasteID,
+		"unit_cost":      unitCost,
+		"estimated_loss": estimatedLoss,
+		"created_at":     createdAt,
+		"message":        fmt.Sprintf("Se descontaron %.2f unidades del inventario (pérdida est.: $%.2f)", req.QuantityLost, estimatedLoss),
 	})
 }
