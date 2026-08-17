@@ -45,6 +45,7 @@ type MonthlyStats struct {
 	NetProfit       float64          `json:"net_profit"`
 	TopSeller       *TopSellerStat   `json:"top_seller"`
 	TopProduct      *TopProductStat  `json:"top_product"`
+	TopProducts     []TopProductStat `json:"top_products"`
 	TopCustomers    []CustomerStat   `json:"top_customers"`
 }
 

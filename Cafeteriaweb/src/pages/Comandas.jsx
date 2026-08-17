@@ -91,6 +91,22 @@ export default function Comandas() {
     return `${hours} h ${remainingMins} min`
   }
 
+  const formatDuration = (startStr, endStr) => {
+    if (!startStr) return '0 min'
+    const start = new Date(startStr).getTime()
+    const end = endStr ? new Date(endStr).getTime() : Date.now()
+    const totalMins = Math.max(0, Math.floor((end - start) / 60000))
+    if (totalMins < 60) {
+      return `${totalMins} min`
+    }
+    const hours = Math.floor(totalMins / 60)
+    const remainingMins = totalMins % 60
+    if (remainingMins === 0) {
+      return `${hours} h`
+    }
+    return `${hours} h ${remainingMins} min`
+  }
+
   const pending = comandas.filter((c) => c.status === 'pendiente')
   const inPrep = comandas.filter((c) => c.status === 'en_preparacion')
   const ready = comandas.filter((c) => c.status === 'listo')
@@ -99,7 +115,10 @@ export default function Comandas() {
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando comandas en vivo...</p>
 
   const renderCard = (c, colType) => {
-    const timeLabel = formatElapsedTime(c.created_at)
+    const isFinished = c.status === 'listo' || c.status === 'entregado'
+    const prepDuration = isFinished
+      ? formatDuration(c.created_at, c.ready_at || c.updated_at)
+      : formatElapsedTime(c.created_at)
 
     return (
       <div
@@ -119,7 +138,7 @@ export default function Comandas() {
 
             <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FEE4D7] text-[#9F6839] dark:bg-[#381C10] dark:text-[#DABA8C] border border-[#D4B28E] dark:border-[#9F6839]/60 whitespace-nowrap shrink-0">
               <Clock className="w-3 h-3 shrink-0 text-[#9F6839] dark:text-[#DABA8C]" />
-              <span>{timeLabel}</span>
+              <span>{isFinished ? `Prep: ${prepDuration}` : prepDuration}</span>
             </span>
           </div>
 

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
 import { AVAILABLE_UNITS, convertQuantity, formatConvertedHint } from '../utils/unitConverter'
 import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign, ArrowRightLeft } from 'lucide-react'
 
 export default function Inventory() {
+  const { user } = useAuth()
+  const isEmployee = user?.role === 'empleado'
+
   const [ingredients, setIngredients] = useState([])
   const [wasteReports, setWasteReports] = useState([])
   const [activeTab, setActiveTab] = useState('inventory')
@@ -20,6 +24,7 @@ export default function Inventory() {
   const [unit, setUnit] = useState('L')
   const [minQuantity, setMinQuantity] = useState('5')
   const [unitCost, setUnitCost] = useState('0')
+  const [addAsExpense, setAddAsExpense] = useState(false)
 
   // Modal Reportar Daño / Merma
   const [isWasteModalOpen, setIsWasteModalOpen] = useState(false)
@@ -57,6 +62,7 @@ export default function Inventory() {
     setUnit('L')
     setMinQuantity('5')
     setUnitCost('0')
+    setAddAsExpense(false)
     setFormError('')
     setIsModalOpen(true)
   }
@@ -68,6 +74,7 @@ export default function Inventory() {
     setUnit(ing.unit || 'L')
     setMinQuantity(String(ing.min_quantity ?? 5))
     setUnitCost(String(ing.unit_cost ?? 0))
+    setAddAsExpense(false)
     setFormError('')
     setIsModalOpen(true)
   }
@@ -99,7 +106,18 @@ export default function Inventory() {
       if (editingIngredient) {
         await api.put(`/ingredients/${editingIngredient.id}`, payload)
       } else {
-        await api.post('/ingredients', payload)
+        const createdIng = await api.post('/ingredients', payload)
+        if (addAsExpense && (Number(quantity) * Number(unitCost)) > 0) {
+          const totalExpenseAmount = Number(quantity) * Number(unitCost)
+          await api.post('/expenses', {
+            description: `Compra inicial de insumo: ${name} (${quantity} ${unit})`,
+            amount: totalExpenseAmount,
+            category: 'insumos',
+            payment_method: 'efectivo',
+            ingredient_id: createdIng?.id || null,
+            quantity_added: 0
+          })
+        }
       }
 
       setIsModalOpen(false)
@@ -208,13 +226,15 @@ export default function Inventory() {
             <span>Reportar Daño / Merma</span>
           </button>
 
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Insumo</span>
-          </button>
+          {!isEmployee && (
+            <button
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nuevo Insumo</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -290,8 +310,8 @@ export default function Inventory() {
                   <th className="py-3.5 px-4">Costo / Unidad ($)</th>
                   <th className="py-3.5 px-4">Mínimo Requerido</th>
                   <th className="py-3.5 px-4">Estado</th>
-                  <th className="py-3.5 px-4 text-center">Ajuste Rápido</th>
-                  <th className="py-3.5 px-4 text-center">Acciones</th>
+                  {!isEmployee && <th className="py-3.5 px-4 text-center">Ajuste Rápido</th>}
+                  {!isEmployee && <th className="py-3.5 px-4 text-center">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
@@ -320,33 +340,37 @@ export default function Inventory() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="inline-flex items-center gap-1">
+                      {!isEmployee && (
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => quickAdjustStock(ing, -1)}
+                              className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+                              title="Restar 1 unidad"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => quickAdjustStock(ing, 1)}
+                              className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
+                              title="Sumar 1 unidad"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                      {!isEmployee && (
+                        <td className="py-3.5 px-4 text-center">
                           <button
-                            onClick={() => quickAdjustStock(ing, -1)}
-                            className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
-                            title="Restar 1 unidad"
+                            onClick={() => openEditModal(ing)}
+                            className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
+                            title="Editar insumo"
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => quickAdjustStock(ing, 1)}
-                            className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
-                            title="Sumar 1 unidad"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => openEditModal(ing)}
-                          className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
-                          title="Editar insumo"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </td>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -623,6 +647,21 @@ export default function Inventory() {
               />
             </div>
           </div>
+
+          {!editingIngredient && (
+            <div className="p-3 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="addAsExpense"
+                checked={addAsExpense}
+                onChange={(e) => setAddAsExpense(e.target.checked)}
+                className="w-4 h-4 text-[#9F6839] accent-[#9F6839] rounded cursor-pointer"
+              />
+              <label htmlFor="addAsExpense" className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer select-none">
+                Registrar compra inicial como gasto en Contabilidad (${(Number(quantity || 0) * Number(unitCost || 0)).toLocaleString()})
+              </label>
+            </div>
+          )}
 
           <div className="flex gap-3 justify-end pt-3">
             <button

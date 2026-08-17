@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -22,15 +24,18 @@ type ComandaHandler struct {
 }
 
 func NewComandaHandler(db *pgxpool.Pool, hub *events.Hub) *ComandaHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, _ = db.Exec(ctx, `ALTER TABLE comandas ADD COLUMN IF NOT EXISTS ready_at TIMESTAMP WITH TIME ZONE`)
 	return &ComandaHandler{DB: db, Hub: hub}
 }
 
 // GET /comandas
 func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, order_number, sale_id, customer_name, status, notes, created_at, updated_at 
+		`SELECT id, order_number, sale_id, customer_name, status, notes, created_at, updated_at, ready_at 
 		 FROM comandas 
-		 WHERE created_at >= (now() - INTERVAL '24 hours') OR status IN ('pendiente', 'en_preparacion', 'listo')
+		 WHERE created_at >= (now() - INTERVAL '12 hours') OR status IN ('pendiente', 'en_preparacion', 'listo')
 		 ORDER BY CASE status 
 		    WHEN 'pendiente' THEN 1 
 		    WHEN 'en_preparacion' THEN 2 
@@ -48,7 +53,7 @@ func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	var comandas []models.Comanda
 	for rows.Next() {
 		var c models.Comanda
-		if err := rows.Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt); err != nil {
 			log.Printf("error leyendo comanda: %v", err)
 			http.Error(w, "error leyendo comanda", http.StatusInternalServerError)
 			return
@@ -113,13 +118,23 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var c models.Comanda
-	err = h.DB.QueryRow(r.Context(),
-		`UPDATE comandas 
-		 SET status = $1, updated_at = now() 
-		 WHERE id = $2 
-		 RETURNING id, order_number, sale_id, customer_name, status, notes, created_at, updated_at`,
-		statusStr, id,
-	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt)
+	if statusStr == "listo" || statusStr == "entregado" {
+		err = h.DB.QueryRow(r.Context(),
+			`UPDATE comandas 
+			 SET status = $1, updated_at = now(), ready_at = COALESCE(ready_at, now()) 
+			 WHERE id = $2 
+			 RETURNING id, order_number, sale_id, customer_name, status, notes, created_at, updated_at, ready_at`,
+			statusStr, id,
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+	} else {
+		err = h.DB.QueryRow(r.Context(),
+			`UPDATE comandas 
+			 SET status = $1, updated_at = now() 
+			 WHERE id = $2 
+			 RETURNING id, order_number, sale_id, customer_name, status, notes, created_at, updated_at, ready_at`,
+			statusStr, id,
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "comanda no encontrada", http.StatusNotFound)

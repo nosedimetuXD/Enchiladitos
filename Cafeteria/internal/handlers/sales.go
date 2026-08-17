@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -24,14 +26,27 @@ type SaleHandler struct {
 }
 
 func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS bank_details TEXT DEFAULT ''`)
+	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS sold_by_name TEXT DEFAULT ''`)
+
+	_, _ = db.Exec(ctx, `
+		DO $$ 
+		BEGIN 
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sales_sold_by_fkey') THEN
+				ALTER TABLE sales DROP CONSTRAINT sales_sold_by_fkey;
+			END IF;
+			ALTER TABLE sales ADD CONSTRAINT sales_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL;
+		END $$;
+	`)
+
 	return &SaleHandler{DB: db, Hub: hub}
 }
 
 // GET /sales?period=today|week|month|all
 func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
-	// Asegurar columna bank_details en base de datos
-	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE sales ADD COLUMN IF NOT EXISTS bank_details TEXT DEFAULT ''`)
-
 	period := r.URL.Query().Get("period")
 	var timeCondition string
 
@@ -46,7 +61,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		timeCondition = ""
 	}
 
-	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(u.username, ''), COALESCE(s.customer_name, 'Cliente General'), 
+	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Personal'), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
 		        COALESCE(s.bank_details, ''), s.total, s.created_at,
 		        COALESCE(
@@ -314,12 +329,17 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var soldByName string
+	if soldBy != uuid.Nil {
+		_ = tx.QueryRow(ctx, `SELECT COALESCE(username, '') FROM users WHERE id = $1`, soldBy).Scan(&soldByName)
+	}
+
 	// 3. Insertar la venta
 	var saleID uuid.UUID
 	err = tx.QueryRow(ctx,
-		`INSERT INTO sales (sold_by, total, customer_name, payment_method, cash_amount, transfer_amount, bank_details) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		soldBy, total, customerName, paymentMethod, cashAmount, transferAmount, strings.TrimSpace(req.BankDetails),
+		`INSERT INTO sales (sold_by, sold_by_name, total, customer_name, payment_method, cash_amount, transfer_amount, bank_details) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		soldBy, soldByName, total, customerName, paymentMethod, cashAmount, transferAmount, strings.TrimSpace(req.BankDetails),
 	).Scan(&saleID)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)

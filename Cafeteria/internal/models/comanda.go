@@ -32,5 +32,6 @@ type Comanda struct {
 	Notes        string        `json:"notes,omitempty"`
 	CreatedAt    time.Time     `json:"created_at"`
 	UpdatedAt    time.Time     `json:"updated_at"`
+	ReadyAt      *time.Time    `json:"ready_at,omitempty"`
 	Items        []ComandaItem `json:"items,omitempty"`
 }

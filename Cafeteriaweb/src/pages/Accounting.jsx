@@ -22,7 +22,9 @@ import {
   Building2,
   RefreshCw,
   ShieldAlert,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Award,
+  Users
 } from 'lucide-react'
 
 export default function Accounting() {
@@ -316,6 +318,42 @@ export default function Accounting() {
     }))
   }, [filteredSales])
 
+  // Top 10 Clientes que más han comprado
+  const top10Customers = useMemo(() => {
+    const custMap = {}
+    filteredSales.forEach((s) => {
+      const name = (s.customer_name || '').trim()
+      if (name && name.toLowerCase() !== 'cliente general') {
+        if (!custMap[name]) custMap[name] = { name, count: 0, total: 0 }
+        custMap[name].count += 1
+        custMap[name].total += Number(s.total) || 0
+      }
+    })
+    const sorted = Object.values(custMap).sort((a, b) => b.total - a.total).slice(0, 10)
+    const maxTotal = sorted.length > 0 ? sorted[0].total : 1
+    return sorted.map((c) => ({ ...c, percentage: Math.round((c.total / maxTotal) * 100) }))
+  }, [filteredSales])
+
+  // Top 10 Productos Más Vendidos
+  const top10Products = useMemo(() => {
+    const prodMap = {}
+    filteredSales.forEach((s) => {
+      if (Array.isArray(s.items)) {
+        s.items.forEach((item) => {
+          const pName = item.product_name || 'Producto'
+          const qty = Number(item.quantity) || 0
+          const unitPrice = Number(item.unit_price) || 0
+          if (!prodMap[pName]) prodMap[pName] = { name: pName, qty: 0, total: 0 }
+          prodMap[pName].qty += qty
+          prodMap[pName].total += qty * unitPrice
+        })
+      }
+    })
+    const sorted = Object.values(prodMap).sort((a, b) => b.qty - a.qty).slice(0, 10)
+    const maxQty = sorted.length > 0 ? sorted[0].qty : 1
+    return sorted.map((p) => ({ ...p, percentage: Math.round((p.qty / maxQty) * 100) }))
+  }, [filteredSales])
+
   if (loading) {
     return (
       <div className="p-8 text-center space-y-3">
@@ -499,6 +537,73 @@ export default function Accounting() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Grid de Rankings: Top 10 Productos Más Vendidos y Top 10 Clientes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top 10 Productos Más Vendidos */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/40">
+            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-500" />
+              <span>Top 10 Productos Más Vendidos</span>
+            </h3>
+            <span className="text-xs font-bold text-[#9F6839]">Por unidades vendidas</span>
+          </div>
+
+          {top10Products.length === 0 ? (
+            <p className="text-xs text-[#9F6839] font-medium py-3 text-center">No hay productos registrados en las ventas de este periodo.</p>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {top10Products.map((prod, idx) => (
+                <div key={prod.name} className="p-2.5 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/40 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-amber-700' : 'bg-[#9F6839]'}`}>
+                      #{idx + 1}
+                    </span>
+                    <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{prod.name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] block">{prod.qty} ud(s)</span>
+                    <span className="text-[10px] font-bold text-[#432414] dark:text-[#FEE4D7]">${prod.total.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top 10 Clientes */}
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/40">
+            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-600" />
+              <span>Top 10 Clientes del Periodo</span>
+            </h3>
+            <span className="text-xs font-bold text-[#9F6839]">Por total invertido</span>
+          </div>
+
+          {top10Customers.length === 0 ? (
+            <p className="text-xs text-[#9F6839] font-medium py-3 text-center">No hay compras con nombre de cliente registrado en este periodo.</p>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {top10Customers.map((cust, idx) => (
+                <div key={cust.name} className="p-2.5 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/40 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-emerald-600' : idx === 1 ? 'bg-emerald-500' : idx === 2 ? 'bg-teal-600' : 'bg-[#9F6839]'}`}>
+                      #{idx + 1}
+                    </span>
+                    <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{cust.name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-extrabold text-emerald-600 block">${cust.total.toLocaleString()}</span>
+                    <span className="text-[10px] font-bold text-[#9F6839]">{cust.count} compra(s)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Pestañas (Ingresos / Gastos / Flujo Combinado) */}

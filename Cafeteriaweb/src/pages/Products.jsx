@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
 import { compressAndReadFile } from '../utils/imageUtils'
 import { Coffee, Plus, Edit2, Trash2, Search, BookOpen, Image as ImageIcon, Upload } from 'lucide-react'
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80'
 
 export default function Products() {
+  const { user } = useAuth()
+  const isEmployee = user?.role === 'empleado'
+
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
@@ -159,12 +163,14 @@ export default function Products() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Nuevo Producto
-        </button>
+        {!isEmployee && (
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Producto
+          </button>
+        )}
       </div>
 
       {pageError && (
@@ -234,13 +240,16 @@ export default function Products() {
                   <div className="absolute top-2.5 right-2.5">
                     <button
                       type="button"
-                      onClick={(e) => toggleProductActive(prod, e)}
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold cursor-pointer transition-transform hover:scale-105 shadow-xs ${
+                      disabled={isEmployee}
+                      onClick={(e) => !isEmployee && toggleProductActive(prod, e)}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-xs ${
+                        isEmployee ? 'cursor-default' : 'cursor-pointer transition-transform hover:scale-105'
+                      } ${
                         activeState
                           ? 'bg-emerald-600 text-white'
                           : 'bg-red-600 text-white'
                       }`}
-                      title="Haz clic para activar o desactivar este producto"
+                      title={isEmployee ? 'Estado de disponibilidad en POS' : 'Haz clic para activar o desactivar este producto'}
                     >
                       {activeState ? '✓ Activo' : '✕ Inactivo'}
                     </button>
@@ -268,25 +277,31 @@ export default function Products() {
                 <div className="flex items-center gap-1.5">
                   <Link
                     to={`/products/${prod.id}/recipe`}
-                    className="p-2 rounded-xl bg-[#FEE4D7]/60 dark:bg-[#2E180E] text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#9F6839] hover:text-white transition-colors"
-                    title="Ver / Editar Receta"
+                    className="p-2 rounded-xl bg-[#FEE4D7]/60 dark:bg-[#2E180E] text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#9F6839] hover:text-white transition-colors flex items-center gap-1 text-xs font-bold"
+                    title={isEmployee ? "Ver Receta (Modo Lectura)" : "Ver / Editar Receta"}
                   >
                     <BookOpen className="w-4 h-4" />
+                    {isEmployee && <span className="text-[10px]">Ver Receta</span>}
                   </Link>
-                  <button
-                    onClick={() => openEditModal(prod)}
-                    className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
-                    title="Editar producto"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(prod.id, prod.name)}
-                    className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                    title="Eliminar producto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {!isEmployee && (
+                    <button
+                      onClick={() => openEditModal(prod)}
+                      className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
+                      title="Editar producto"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  {!isEmployee && (
+                    <button
+                      onClick={() => handleDelete(prod.id, prod.name)}
+                      className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                      title="Eliminar producto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

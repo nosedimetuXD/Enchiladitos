@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -28,8 +29,12 @@ func NewTaskHandler(db *pgxpool.Pool, hub *events.Hub) *TaskHandler {
 // GET /tasks — cualquier usuario logueado ve todas las tareas
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, title, description, assigned_to, created_by, status, due_date, created_at, updated_at
-		 FROM tasks ORDER BY due_date NULLS LAST, created_at DESC`)
+		`SELECT t.id, t.title, COALESCE(t.description, ''), t.assigned_to, COALESCE(ua.username, ''), 
+		        t.created_by, COALESCE(uc.username, 'Admin'), t.status, t.due_date, t.created_at, t.updated_at
+		 FROM tasks t
+		 LEFT JOIN users ua ON t.assigned_to = ua.id
+		 LEFT JOIN users uc ON t.created_by = uc.id
+		 ORDER BY t.due_date NULLS LAST, t.created_at DESC`)
 	if err != nil {
 		log.Printf("error consultando tareas: %v", err)
 		http.Error(w, "error consultando tareas", http.StatusInternalServerError)
@@ -40,7 +45,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	var tasks []models.Task
 	for rows.Next() {
 		var t models.Task
-		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.AssignedTo, &t.CreatedBy, &t.Status, &t.DueDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.AssignedTo, &t.AssignedToName, &t.CreatedBy, &t.CreatedByName, &t.Status, &t.DueDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			log.Printf("error leyendo tareas: %v", err)
 			http.Error(w, "error leyendo tareas", http.StatusInternalServerError)
 			return
@@ -143,8 +148,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(t)
 }
 
-// PATCH /tasks/{id}/status — cualquier usuario logueado puede cambiar el estado
-// (para que el empleado marque su propia tarea como en progreso/completada)
+// PATCH /tasks/{id}/status — cambio de estado con validación de asignado
 type updateStatusRequest struct {
 	Status models.TaskStatus `json:"status"`
 }
@@ -175,8 +179,38 @@ func (h *TaskHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+	var currentTask models.Task
+	err = h.DB.QueryRow(ctx, `SELECT id, assigned_to, created_by, status FROM tasks WHERE id = $1`, id).Scan(&currentTask.ID, &currentTask.AssignedTo, &currentTask.CreatedBy, &currentTask.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "tarea no encontrada", http.StatusNotFound)
+		return
+	}
+
+	userVal := ctx.Value(custommw.ContextUserID)
+	roleVal := ctx.Value(custommw.ContextRole)
+
+	var currentUserID uuid.UUID
+	if userVal != nil {
+		if val, ok := userVal.(uuid.UUID); ok {
+			currentUserID = val
+		} else if valStr, ok := userVal.(string); ok {
+			currentUserID, _ = uuid.Parse(valStr)
+		}
+	}
+
+	userRole := ""
+	if roleVal != nil {
+		userRole = fmt.Sprintf("%v", roleVal)
+	}
+
+	if currentTask.AssignedTo != nil && *currentTask.AssignedTo != currentUserID && userRole != "owner" && userRole != "admin" && currentTask.CreatedBy != currentUserID {
+		http.Error(w, "Solo el usuario asignado o un administrador pueden modificar el estado de esta tarea", http.StatusForbidden)
+		return
+	}
+
 	var t models.Task
-	err = h.DB.QueryRow(r.Context(),
+	err = h.DB.QueryRow(ctx,
 		`UPDATE tasks SET status = $1 WHERE id = $2
 		 RETURNING id, title, description, assigned_to, created_by, status, due_date, created_at, updated_at`,
 		req.Status, id,

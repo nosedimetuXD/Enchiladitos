@@ -201,12 +201,12 @@ export default function Tasks() {
                     <p className="text-xs text-[#9F6839] dark:text-[#DABA8C] mt-1">{t.description}</p>
                   )}
 
-                  <div className="flex items-center gap-3 mt-2.5 text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-semibold">
+                  <div className="flex flex-wrap items-center gap-3 mt-2.5 text-[10px] text-[#9F6839] dark:text-[#DABA8C] font-semibold">
                     <span className="flex items-center gap-1">
                       <User className="w-3 h-3 text-[#9F6839]" />
-                      Asignada a: <strong className="text-[#432414] dark:text-[#FEE4D7]">{t.assigned_to_username || 'Todo el Equipo'}</strong>
+                      Asignada a: <strong className="text-[#432414] dark:text-[#FEE4D7]">{t.assigned_to_name || t.assigned_to_username || 'Todo el Equipo'}</strong>
                     </span>
-                    <span>• Creada por: {t.creator_username || 'Sistema'}</span>
+                    <span>• Asignada por: <strong className="text-[#432414] dark:text-[#FEE4D7]">{t.created_by_name || t.creator_username || 'Administrador'}</strong></span>
                   </div>
                 </div>
               </div>
