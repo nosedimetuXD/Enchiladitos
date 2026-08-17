@@ -14,7 +14,12 @@ import {
   TrendingUp,
   Award,
   FileText,
-  Edit2
+  Edit2,
+  Calendar,
+  DollarSign,
+  Key,
+  Clock,
+  Sparkles
 } from 'lucide-react'
 
 export default function Profile() {
@@ -48,9 +53,9 @@ export default function Profile() {
   useEffect(() => {
     async function fetchUserSales() {
       try {
-        const sales = await api.get('/sales')
+        const sales = await api.get('/sales?period=all')
         const mySales = (sales || []).filter(
-          (s) => (user?.id && s.sold_by_user_id === user.id) || s.sold_by_username === user?.username
+          (s) => (user?.id && s.sold_by === user.id) || s.sold_by_username?.toLowerCase() === user?.username?.toLowerCase()
         )
         setUserSales(mySales)
       } catch (e) {
@@ -65,10 +70,9 @@ export default function Profile() {
   // Cálculo de Estadísticas Personales
   const stats = useMemo(() => {
     const totalCount = userSales.length
-    const totalRevenue = userSales.reduce((sum, s) => sum + (s.total || 0), 0)
+    const totalRevenue = userSales.reduce((sum, s) => sum + (Number(s.total) || 0), 0)
     const avgSale = totalCount > 0 ? totalRevenue / totalCount : 0
 
-    // Conteo de productos vendidos por este usuario
     const productCounts = {}
     userSales.forEach((s) => {
       let items = s.items
@@ -99,8 +103,6 @@ export default function Profile() {
       maxQty
     }
   }, [userSales])
-
-  const previewAvatarUrl = processImageUrl(avatarInput)
 
   function openEditModal() {
     setUsername(user?.username || '')
@@ -158,7 +160,8 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header General */}
       <div>
         <h2 className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7] tracking-tight">
           Mi Perfil & Estadísticas Personales
@@ -175,22 +178,32 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Información del Perfil (Izquierda / 5 cols) */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-6">
-          <div className="space-y-6">
-            <div className="flex flex-col items-center text-center pb-6 border-b border-[#D4B28E]/40">
+      {/* Grid Principal Armónico */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Tarjeta Perfil de Usuario (Izquierda / 5 cols) */}
+        <div className="lg:col-span-5 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl overflow-hidden shadow-xs">
+          {/* Banner de Fondo de Marca Toffe */}
+          <div className="relative h-28 bg-[#432414] p-4">
+            <div
+              className="absolute inset-0 opacity-30 bg-cover bg-center pointer-events-none"
+              style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }}
+            />
+          </div>
+
+          <div className="px-6 pb-6 pt-0 relative space-y-5">
+            {/* Avatar Superpuesto */}
+            <div className="-mt-14 flex flex-col items-center text-center">
               {currentAvatarUrl ? (
                 <img
                   src={currentAvatarUrl}
                   alt={user?.username}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-[#9F6839] shadow-md mb-3"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-[#201009] shadow-md bg-white mb-2"
                   onError={(e) => {
                     e.target.style.display = 'none'
                   }}
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-[#9F6839] text-[#FEE4D7] font-extrabold text-3xl flex items-center justify-center border-4 border-[#D4B28E] shadow-md mb-3">
+                <div className="w-24 h-24 rounded-full bg-[#9F6839] text-[#FEE4D7] font-black text-3xl flex items-center justify-center border-4 border-white dark:border-[#201009] shadow-md mb-2">
                   {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
                 </div>
               )}
@@ -198,46 +211,55 @@ export default function Profile() {
               <h3 className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7] leading-tight">
                 {user?.username}
               </h3>
-              <div className="mt-2">
-                <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-[#9F6839]" />
+              <div className="mt-1.5">
+                <span className="text-[10px] font-extrabold px-3 py-1 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] uppercase tracking-wider inline-flex items-center gap-1">
+                  <Shield className="w-3 h-3 text-[#9F6839]" />
                   ROL: {roleLabels[user?.role] || user?.role}
                 </span>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs text-[#9F6839] dark:text-[#DABA8C]">
-              <div className="flex justify-between py-1 border-b border-[#D4B28E]/30">
-                <span className="font-semibold">Nombre de Usuario:</span>
-                <strong className="text-[#432414] dark:text-[#FEE4D7]">{user?.username}</strong>
+            {/* Detalles de Cuenta Organizados */}
+            <div className="space-y-2.5 text-xs text-[#9F6839] dark:text-[#DABA8C] pt-2 border-t border-[#D4B28E]/40">
+              <div className="flex items-center justify-between py-1 border-b border-[#D4B28E]/20">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#9F6839]" /> Usuario:
+                </span>
+                <strong className="text-[#432414] dark:text-[#FEE4D7] font-bold">{user?.username}</strong>
               </div>
-              <div className="flex justify-between py-1 border-b border-[#D4B28E]/30">
-                <span className="font-semibold">Permisos de Acceso:</span>
-                <strong className="text-[#432414] dark:text-[#FEE4D7]">
+              <div className="flex items-center justify-between py-1 border-b border-[#D4B28E]/20">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-[#9F6839]" /> Permisos:
+                </span>
+                <strong className="text-[#432414] dark:text-[#FEE4D7] font-bold">
                   {user?.role === 'owner' ? 'Acceso Total (Dueño)' : user?.role === 'admin' ? 'Administración' : 'Ventas & Comandas'}
                 </strong>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="font-semibold">Estado de Cuenta:</span>
+              <div className="flex items-center justify-between py-1">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Estado:
+                </span>
                 <strong className="text-emerald-600 font-extrabold">✓ Activa & Autenticada</strong>
               </div>
             </div>
-          </div>
 
-          <button
-            onClick={openEditModal}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all"
-          >
-            <Edit2 className="w-4 h-4" />
-            <span>Editar Mi Perfil</span>
-          </button>
+            {/* Botón de Acción */}
+            <button
+              onClick={openEditModal}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all border border-white/20"
+            >
+              <Edit2 className="w-4 h-4" />
+              <span>Editar Mi Perfil</span>
+            </button>
+          </div>
         </div>
 
-        {/* Panel de Estadísticas Personales del Usuario (Derecha / 7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Panel de Estadísticas Personales & Últimas Ventas (Derecha / 7 cols) */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* Tarjeta de Métricas */}
           <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-4">
-            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2 pb-2 border-b border-[#D4B28E]/40">
-              <TrendingUp className="w-4 h-4 text-[#9F6839]" /> Mis Estadísticas Personales
+            <h3 className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2 pb-2 border-b border-[#D4B28E]/40">
+              <TrendingUp className="w-4 h-4 text-[#9F6839]" /> Mis Estadísticas Personales en Caja
             </h3>
 
             {loadingStats ? (
@@ -248,7 +270,7 @@ export default function Profile() {
                   <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
                     Ventas Realizadas
                   </span>
-                  <p className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  <p className="text-2xl font-black text-[#432414] dark:text-[#FEE4D7]">
                     {stats.totalCount}
                   </p>
                 </div>
@@ -257,14 +279,14 @@ export default function Profile() {
                   <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
                     Ingresos Generados
                   </span>
-                  <p className="text-xl font-extrabold text-emerald-600">
+                  <p className="text-2xl font-black text-emerald-600">
                     ${stats.totalRevenue.toLocaleString()}
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
                   <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
-                    Venta Promedio
+                    Venta Promedio Ticket
                   </span>
                   <p className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
                     ${Math.round(stats.avgSale).toLocaleString()}
@@ -273,7 +295,7 @@ export default function Profile() {
 
                 <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
                   <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block flex items-center gap-1">
-                    <Award className="w-3 h-3 text-[#9F6839]" /> Más Vendido
+                    <Award className="w-3 h-3 text-[#9F6839]" /> Más Vendido por Ti
                   </span>
                   <p className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] truncate" title={stats.topProduct}>
                     {stats.topProduct}
@@ -290,29 +312,43 @@ export default function Profile() {
 
           {/* Historial Reciente de Mis Ventas */}
           <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-3">
-            <h4 className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#9F6839]" /> Mis Últimas Ventas
-            </h4>
+            <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/40">
+              <h4 className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-[#9F6839]" /> Mis Últimas Ventas Registradas
+              </h4>
+              <span className="text-[11px] font-bold text-[#9F6839]">
+                {userSales.length} ventas totales
+              </span>
+            </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
               {userSales.length === 0 ? (
-                <p className="text-xs text-[#9F6839] py-4 text-center font-medium">Aún no registras ventas en caja</p>
+                <p className="text-xs text-[#9F6839] py-6 text-center font-medium">
+                  Aún no has registrado ventas en el punto de venta.
+                </p>
               ) : (
-                userSales.slice(0, 6).map((s) => (
+                userSales.slice(0, 8).map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/50 text-xs"
+                    className="flex items-center justify-between p-3 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/50 text-xs hover:border-[#9F6839] transition-colors"
                   >
-                    <div>
-                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block text-xs">
                         {s.customer_name || 'Cliente General'}
                       </span>
-                      <span className="text-[10px] text-[#9F6839] font-semibold">
-                        {new Date(s.created_at).toLocaleString()}
-                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-[#9F6839] font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#9F6839]" />
+                          {new Date(s.created_at).toLocaleString()}
+                        </span>
+                        <span>•</span>
+                        <span className="uppercase text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-[#9F6839]/10 text-[#9F6839]">
+                          {s.payment_method || 'Efectivo'}
+                        </span>
+                      </div>
                     </div>
-                    <span className="font-extrabold text-emerald-600 text-sm">
-                      ${s.total.toLocaleString()}
+                    <span className="font-black text-emerald-600 text-sm">
+                      ${Number(s.total).toLocaleString()}
                     </span>
                   </div>
                 ))
