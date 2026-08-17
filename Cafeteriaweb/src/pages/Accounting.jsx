@@ -502,16 +502,24 @@ export default function Accounting() {
             <span>Métodos de Pago</span>
             <Wallet className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-xs space-y-2 mt-1 text-[#432414] dark:text-[#FEE4D7] font-bold">
-            <div className="flex items-center gap-2">
-              <Banknote className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Efectivo:</span>
-              <strong className="text-sm font-extrabold">${(Number(summary.income_by_payment_method.efectivo) || 0).toLocaleString()}</strong>
+          <div className="space-y-2 mt-1 text-[#432414] dark:text-[#FEE4D7]">
+            <div className="flex items-center justify-between gap-1">
+              <span className="flex items-center gap-1.5 font-bold text-xs min-w-0 truncate">
+                <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="truncate">Efectivo</span>
+              </span>
+              <strong className="text-xs font-extrabold text-emerald-600 shrink-0">
+                ${(Number(summary.income_by_payment_method.efectivo) || 0).toLocaleString()}
+              </strong>
             </div>
-            <div className="flex items-center gap-2">
-              <Smartphone className="w-5 h-5 text-blue-600 shrink-0" />
-              <span>Transferencia:</span>
-              <strong className="text-sm font-extrabold">${(Number(summary.income_by_payment_method.transferencia) || 0).toLocaleString()}</strong>
+            <div className="flex items-center justify-between gap-1">
+              <span className="flex items-center gap-1.5 font-bold text-xs min-w-0 truncate">
+                <Smartphone className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="truncate">Transfer.</span>
+              </span>
+              <strong className="text-xs font-extrabold text-blue-600 shrink-0">
+                ${(Number(summary.income_by_payment_method.transferencia) || 0).toLocaleString()}
+              </strong>
             </div>
           </div>
         </div>
