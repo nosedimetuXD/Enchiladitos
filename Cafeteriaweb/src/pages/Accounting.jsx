@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { AVAILABLE_UNITS, convertQuantity, formatConvertedHint } from '../utils/unitConverter'
 import {
   DollarSign,
   Plus,
@@ -20,7 +21,8 @@ import {
   CircleDot,
   Building2,
   RefreshCw,
-  ShieldAlert
+  ShieldAlert,
+  ArrowRightLeft
 } from 'lucide-react'
 
 export default function Accounting() {
@@ -41,6 +43,7 @@ export default function Accounting() {
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [ingredientId, setIngredientId] = useState('')
   const [quantityAdded, setQuantityAdded] = useState('')
+  const [addedUnit, setAddedUnit] = useState('ml')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -77,9 +80,15 @@ export default function Accounting() {
     setPaymentMethod('efectivo')
     setIngredientId('')
     setQuantityAdded('')
+    setAddedUnit('ml')
     setFormError('')
     setIsModalOpen(true)
   }
+
+  const selectedAddedIng = ingredients.find((i) => i.id === ingredientId)
+  const convertedAddedQuantity = selectedAddedIng && Number(quantityAdded) > 0
+    ? convertQuantity(quantityAdded, addedUnit, selectedAddedIng.unit)
+    : Number(quantityAdded) || 0
 
   async function handleCreateExpense(e) {
     e.preventDefault()
@@ -93,7 +102,7 @@ export default function Accounting() {
         category,
         payment_method: paymentMethod,
         ingredient_id: category === 'insumos' && ingredientId ? ingredientId : null,
-        quantity_added: category === 'insumos' && quantityAdded ? Number(quantityAdded) : 0
+        quantity_added: category === 'insumos' && ingredientId ? convertedAddedQuantity : 0
       })
 
       setIsModalOpen(false)
@@ -760,36 +769,65 @@ export default function Accounting() {
           </div>
 
           {category === 'insumos' && (
-            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E]">
-              <span className="block text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-3">
+              <span className="block text-xs font-bold text-[#9F6839] dark:text-[#DABA8C]">
                 Reabastecer Inventario (Opcional)
               </span>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <select
                   value={ingredientId}
-                  onChange={(e) => setIngredientId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                  onChange={(e) => {
+                    const id = e.target.value
+                    setIngredientId(id)
+                    const ing = ingredients.find((i) => i.id === id)
+                    if (ing) {
+                      setAddedUnit(ing.unit === 'L' ? 'ml' : ing.unit)
+                    }
+                  }}
+                  className="sm:col-span-1 w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
                 >
                   <option value="">No sumar a inventario</option>
                   {ingredients.map((ing) => (
                     <option key={ing.id} value={ing.id}>
-                      {ing.name} ({ing.quantity} {ing.unit})
+                      {ing.name} (Stock: {ing.quantity} {ing.unit})
                     </option>
                   ))}
                 </select>
+
                 {ingredientId && (
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={quantityAdded}
-                    onChange={(e) => setQuantityAdded(e.target.value)}
-                    placeholder="Cantidad a sumar"
-                    required
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
-                  />
+                  <>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={quantityAdded}
+                      onChange={(e) => setQuantityAdded(e.target.value)}
+                      placeholder="Cantidad a sumar"
+                      required
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
+                    />
+
+                    <select
+                      value={addedUnit}
+                      onChange={(e) => setAddedUnit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold"
+                    >
+                      {AVAILABLE_UNITS.map((u) => (
+                        <option key={u.value} value={u.value}>{u.label}</option>
+                      ))}
+                    </select>
+                  </>
                 )}
               </div>
+
+              {selectedAddedIng && formatConvertedHint(quantityAdded, addedUnit, selectedAddedIng.unit) && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-emerald-600" />
+                  <span>
+                    Conversión automática: <strong>{formatConvertedHint(quantityAdded, addedUnit, selectedAddedIng.unit)}</strong> (se sumará al stock base en {selectedAddedIng.unit}).
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

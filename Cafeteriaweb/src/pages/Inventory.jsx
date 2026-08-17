@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
-import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign } from 'lucide-react'
+import { AVAILABLE_UNITS, convertQuantity, formatConvertedHint } from '../utils/unitConverter'
+import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign, ArrowRightLeft } from 'lucide-react'
 
 export default function Inventory() {
   const [ingredients, setIngredients] = useState([])
@@ -16,7 +17,7 @@ export default function Inventory() {
   const [editingIngredient, setEditingIngredient] = useState(null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [unit, setUnit] = useState('unidades')
+  const [unit, setUnit] = useState('L')
   const [minQuantity, setMinQuantity] = useState('5')
   const [unitCost, setUnitCost] = useState('0')
 
@@ -24,6 +25,7 @@ export default function Inventory() {
   const [isWasteModalOpen, setIsWasteModalOpen] = useState(false)
   const [wasteIngredientId, setWasteIngredientId] = useState('')
   const [wasteQuantity, setWasteQuantity] = useState('')
+  const [wasteUnit, setWasteUnit] = useState('ml')
   const [wasteReason, setWasteReason] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
@@ -52,7 +54,7 @@ export default function Inventory() {
     setEditingIngredient(null)
     setName('')
     setQuantity('')
-    setUnit('unidades')
+    setUnit('L')
     setMinQuantity('5')
     setUnitCost('0')
     setFormError('')
@@ -63,7 +65,7 @@ export default function Inventory() {
     setEditingIngredient(ing)
     setName(ing.name)
     setQuantity(String(ing.quantity))
-    setUnit(ing.unit)
+    setUnit(ing.unit || 'L')
     setMinQuantity(String(ing.min_quantity ?? 5))
     setUnitCost(String(ing.unit_cost ?? 0))
     setFormError('')
@@ -71,8 +73,10 @@ export default function Inventory() {
   }
 
   function openWasteModal() {
-    setWasteIngredientId(ingredients.length > 0 ? ingredients[0].id : '')
+    const firstIng = ingredients.length > 0 ? ingredients[0] : null
+    setWasteIngredientId(firstIng ? firstIng.id : '')
     setWasteQuantity('')
+    setWasteUnit(firstIng && firstIng.unit === 'L' ? 'ml' : firstIng ? firstIng.unit : 'ml')
     setWasteReason('')
     setFormError('')
     setIsWasteModalOpen(true)
@@ -107,6 +111,15 @@ export default function Inventory() {
     }
   }
 
+  const selectedWasteIng = ingredients.find((i) => i.id === wasteIngredientId)
+  const convertedWasteQuantity = selectedWasteIng && Number(wasteQuantity) > 0
+    ? convertQuantity(wasteQuantity, wasteUnit, selectedWasteIng.unit)
+    : Number(wasteQuantity) || 0
+
+  const estimatedWasteLoss = selectedWasteIng && convertedWasteQuantity > 0
+    ? convertedWasteQuantity * (selectedWasteIng.unit_cost || 0)
+    : 0
+
   async function handleSubmitWaste(e) {
     e.preventDefault()
     setSubmitting(true)
@@ -118,8 +131,8 @@ export default function Inventory() {
       return
     }
 
-    const qty = Number(wasteQuantity)
-    if (!qty || qty <= 0) {
+    const rawQty = Number(wasteQuantity)
+    if (!rawQty || rawQty <= 0) {
       setFormError('La cantidad perdida debe ser mayor a 0')
       setSubmitting(false)
       return
@@ -132,10 +145,15 @@ export default function Inventory() {
     }
 
     try {
+      const targetUnit = selectedWasteIng ? selectedWasteIng.unit : wasteUnit
+      const reasonDetail = wasteUnit.toLowerCase() !== targetUnit.toLowerCase()
+        ? `${wasteReason.trim()} (${wasteQuantity} ${wasteUnit})`
+        : wasteReason.trim()
+
       await api.post('/waste', {
         ingredient_id: wasteIngredientId,
-        quantity_lost: qty,
-        reason: wasteReason.trim()
+        quantity_lost: convertedWasteQuantity,
+        reason: reasonDetail
       })
 
       setIsWasteModalOpen(false)
@@ -166,9 +184,6 @@ export default function Inventory() {
   const lowStockCount = ingredients.filter((i) => i.quantity <= i.min_quantity).length
   const filteredIngredients = ingredients.filter((i) => i.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
-  const selectedWasteIng = ingredients.find((i) => i.id === wasteIngredientId)
-  const estimatedWasteLoss = selectedWasteIng && Number(wasteQuantity) > 0 ? Number(wasteQuantity) * (selectedWasteIng.unit_cost || 0) : 0
-
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando inventario...</p>
 
   return (
@@ -180,30 +195,25 @@ export default function Inventory() {
             Control de Inventario & Reporte de Mermas
           </h2>
           <p className="text-xs font-semibold text-[#9F6839] dark:text-[#DABA8C] mt-0.5">
-            Gestión de materias primas, insumos y registro de pérdidas o daños
+            Existencias, alertas de stock mínimo, costos por unidad y registro unificado de daños
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {lowStockCount > 0 && (
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 text-xs font-bold shadow-xs">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span>{lowStockCount} insumos en stock crítico</span>
-            </div>
-          )}
-
+        <div className="flex items-center gap-2">
           <button
             onClick={openWasteModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
           >
-            <ShieldAlert className="w-4 h-4" /> Reportar Daño / Merma
+            <ShieldAlert className="w-4 h-4" />
+            <span>Reportar Daño / Merma</span>
           </button>
 
           <button
             onClick={openCreateModal}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Nuevo Insumo
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Insumo</span>
           </button>
         </div>
       </div>
@@ -214,45 +224,58 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Pestañas (Inventario / Historial de Mermas) */}
-      <div className="flex items-center justify-between border-b border-[#D4B28E]/40 pb-2">
-        <div className="flex items-center gap-2">
+      {/* Alerta de Stock Bajo */}
+      {lowStockCount > 0 && (
+        <div className="p-4 rounded-3xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center gap-3 shadow-xs">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600" />
+          <div>
+            <span className="font-extrabold text-sm block">¡Alerta de Inventario Bajo!</span>
+            <span>
+              Tienes {lowStockCount} insumo(s) por debajo de su stock mínimo configurado. Considera realizar reabastecimiento en Contabilidad.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Buscador */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839]" />
+          <input
+            type="text"
+            placeholder="Buscar insumo por nombre (ej. Café, Leche, Vaso)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-2xl pl-10 pr-3 py-2.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
+          />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2 w-full sm:w-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'inventory'
                 ? 'bg-[#9F6839] text-white shadow-xs'
                 : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
             }`}
           >
-            <Package className="w-3.5 h-3.5" />
-            <span>Inventario de Insumos</span>
+            <Package className="w-3.5 h-3.5 text-[#9F6839] group-hover:text-white" />
+            <span>Existencias ({ingredients.length})</span>
           </button>
+
           <button
             onClick={() => setActiveTab('waste')}
-            className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'waste'
                 ? 'bg-[#9F6839] text-white shadow-xs'
                 : 'bg-white dark:bg-[#201009] border border-[#D4B28E] text-[#432414] dark:text-[#FEE4D7]'
             }`}
           >
-            <History className="w-3.5 h-3.5" />
-            <span>Historial de Daños & Pérdidas ({wasteReports.length})</span>
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+            <span>Reportes de Mermas ({wasteReports.length})</span>
           </button>
         </div>
-
-        {activeTab === 'inventory' && (
-          <div className="relative max-w-xs">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839]" />
-            <input
-              type="text"
-              placeholder="Buscar insumo..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-2xl pl-10 pr-3 py-1.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
-            />
-          </div>
-        )}
       </div>
 
       {/* Pestaña 1: Tabla de Insumos */}
@@ -268,61 +291,54 @@ export default function Inventory() {
                   <th className="py-3.5 px-4">Mínimo Requerido</th>
                   <th className="py-3.5 px-4">Estado</th>
                   <th className="py-3.5 px-4 text-center">Ajuste Rápido</th>
-                  <th className="py-3.5 px-4 text-right">Acción</th>
+                  <th className="py-3.5 px-4 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
                 {filteredIngredients.map((ing) => {
                   const isLow = ing.quantity <= ing.min_quantity
                   return (
-                    <tr key={ing.id} className={isLow ? 'bg-red-50/40 dark:bg-red-950/20' : ''}>
-                      <td className="py-3.5 px-4 font-bold text-sm">{ing.name}</td>
+                    <tr key={ing.id} className={isLow ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                      <td className="py-3.5 px-4 font-bold">{ing.name}</td>
                       <td className="py-3.5 px-4 font-extrabold text-sm">
-                        {ing.quantity} {ing.unit}
+                        {ing.quantity} <span className="text-xs font-semibold text-[#9F6839]">{ing.unit}</span>
                       </td>
                       <td className="py-3.5 px-4 font-bold text-emerald-600">
-                        ${(Number(ing.unit_cost) || 0).toLocaleString()} / {ing.unit}
+                        ${(ing.unit_cost || 0).toLocaleString()} <span className="text-[10px] text-[#9F6839] font-normal">/{ing.unit}</span>
                       </td>
-                      <td className="py-3.5 px-4 text-[#9F6839] dark:text-[#DABA8C]">
+                      <td className="py-3.5 px-4 font-semibold text-[#9F6839]">
                         {ing.min_quantity} {ing.unit}
                       </td>
                       <td className="py-3.5 px-4">
                         {isLow ? (
-                          <span className="px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 font-extrabold text-[10px] uppercase tracking-wider">
-                            Stock Bajo
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider border border-amber-300">
+                            ⚠️ Stock Bajo
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider">
-                            Normal
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-300">
+                            ✓ Suficiente
                           </span>
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <div className="inline-flex items-center gap-1 bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] p-1 rounded-2xl">
+                        <div className="inline-flex items-center gap-1">
                           <button
                             onClick={() => quickAdjustStock(ing, -1)}
-                            className="p-1 rounded-xl bg-white dark:bg-[#150904] text-[#432414] dark:text-[#FEE4D7] border border-[#D4B28E] cursor-pointer"
-                            title="-1 unidad"
+                            className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+                            title="Restar 1 unidad"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => quickAdjustStock(ing, 1)}
-                            className="p-1 rounded-xl bg-white dark:bg-[#150904] text-[#432414] dark:text-[#FEE4D7] border border-[#D4B28E] cursor-pointer"
-                            title="+1 unidad"
+                            className="p-1 rounded-lg bg-[#FEE4D7] dark:bg-[#2E180E] text-[#9F6839] hover:bg-emerald-600 hover:text-white transition-colors cursor-pointer"
+                            title="Sumar 1 unidad"
                           >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => quickAdjustStock(ing, 5)}
-                            className="px-2 py-1 rounded-xl bg-[#9F6839] text-white text-[10px] font-extrabold cursor-pointer"
-                            title="+5 unidades"
-                          >
-                            +5
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-center">
                         <button
                           onClick={() => openEditModal(ing)}
                           className="p-2 rounded-xl text-[#9F6839] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] transition-colors cursor-pointer"
@@ -337,7 +353,7 @@ export default function Inventory() {
                 {filteredIngredients.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center py-8 text-[#9F6839] font-medium">
-                      No se encontraron insumos registrados.
+                      No hay insumos registrados.
                     </td>
                   </tr>
                 )}
@@ -347,7 +363,7 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Pestaña 2: Historial de Daños & Mermas */}
+      {/* Pestaña 2: Tabla de Mermas / Pérdidas */}
       {activeTab === 'waste' && (
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
@@ -356,38 +372,37 @@ export default function Inventory() {
                 <tr>
                   <th className="py-3.5 px-4">Fecha / Hora</th>
                   <th className="py-3.5 px-4">Insumo Afectado</th>
-                  <th className="py-3.5 px-4">Cantidad Descontada</th>
-                  <th className="py-3.5 px-4">Pérdida Financiera Est. ($)</th>
-                  <th className="py-3.5 px-4">Motivo del Daño / Pérdida</th>
+                  <th className="py-3.5 px-4">Cantidad Perdida</th>
+                  <th className="py-3.5 px-4">Costo / u ($)</th>
+                  <th className="py-3.5 px-4 text-right">Pérdida Financiera Estimada</th>
+                  <th className="py-3.5 px-4">Motivo / Razón</th>
                   <th className="py-3.5 px-4">Reportado Por</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
-                {wasteReports.map((w) => {
-                  const lossAmt = Number(w.estimated_loss) || (Number(w.quantity_lost) * Number(w.unit_cost || 0))
-                  return (
-                    <tr key={w.id} className="hover:bg-red-50/20 dark:hover:bg-red-950/10">
-                      <td className="py-3.5 px-4 font-semibold">{new Date(w.created_at).toLocaleString()}</td>
-                      <td className="py-3.5 px-4 font-bold">{w.ingredient_name}</td>
-                      <td className="py-3.5 px-4 font-extrabold text-red-600 text-sm">
-                        -{w.quantity_lost} {w.unit}
-                      </td>
-                      <td className="py-3.5 px-4 font-extrabold text-red-600 text-sm">
-                        -${lossAmt.toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-[#432414] dark:text-[#FEE4D7]">
-                        {w.reason}
-                      </td>
-                      <td className="py-3.5 px-4 font-semibold text-[#9F6839]">
-                        {w.reporter_name || 'Personal'}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {wasteReports.map((w) => (
+                  <tr key={w.id}>
+                    <td className="py-3.5 px-4 font-semibold">
+                      {w.created_at ? new Date(w.created_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold">{w.ingredient_name || 'Insumo'}</td>
+                    <td className="py-3.5 px-4 font-extrabold text-amber-600">
+                      -{w.quantity_lost} {w.unit}
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-[#9F6839]">
+                      ${(w.unit_cost || 0).toLocaleString()} /{w.unit}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-black text-red-600 text-sm">
+                      -${(w.estimated_loss || 0).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 italic text-[#9F6839] dark:text-[#DABA8C]">{w.reason}</td>
+                    <td className="py-3.5 px-4 font-bold">{w.reporter_name || 'Personal'}</td>
+                  </tr>
+                ))}
                 {wasteReports.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[#9F6839] font-medium">
-                      No hay registros de daños o mermas hasta el momento.
+                    <td colSpan={7} className="text-center py-8 text-[#9F6839] font-medium">
+                      No hay mermas reportadas.
                     </td>
                   </tr>
                 )}
@@ -412,33 +427,67 @@ export default function Inventory() {
             </label>
             <select
               value={wasteIngredientId}
-              onChange={(e) => setWasteIngredientId(e.target.value)}
+              onChange={(e) => {
+                const id = e.target.value
+                setWasteIngredientId(id)
+                const ing = ingredients.find((i) => i.id === id)
+                if (ing) {
+                  setWasteUnit(ing.unit === 'L' ? 'ml' : ing.unit)
+                }
+              }}
               required
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             >
               {ingredients.map((ing) => (
                 <option key={ing.id} value={ing.id}>
-                  {ing.name} (Stock: {ing.quantity} {ing.unit} | Costo/u: ${ing.unit_cost || 0})
+                  {ing.name} (Stock Base: {ing.quantity} {ing.unit} | Costo/u: ${ing.unit_cost || 0})
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-              Cantidad Perdida / Dañada {selectedWasteIng ? `(${selectedWasteIng.unit})` : ''}
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={wasteQuantity}
-              onChange={(e) => setWasteQuantity(e.target.value)}
-              placeholder="Ej. 2 vasos, 1.5 litros de leche, 500g grano..."
-              required
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-            />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Cantidad Perdida / Dañada
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={wasteQuantity}
+                onChange={(e) => setWasteQuantity(e.target.value)}
+                placeholder="Ej. 300, 0.5..."
+                required
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Unidad
+              </label>
+              <select
+                value={wasteUnit}
+                onChange={(e) => setWasteUnit(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
+              >
+                {AVAILABLE_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {/* Badge de Conversión Automática de Unidades */}
+          {selectedWasteIng && formatConvertedHint(wasteQuantity, wasteUnit, selectedWasteIng.unit) && (
+            <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 text-xs text-amber-800 dark:text-amber-300 font-bold flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-amber-600" />
+              <span>
+                Conversión automática: <strong>{formatConvertedHint(wasteQuantity, wasteUnit, selectedWasteIng.unit)}</strong> (se descontará del stock base en {selectedWasteIng.unit}).
+              </span>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
@@ -462,7 +511,7 @@ export default function Inventory() {
           )}
 
           <div className="p-3 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] text-xs text-[#9F6839] dark:text-[#DABA8C] font-semibold">
-            ℹ️ Al confirmar, se descontará esa cantidad del inventario y se cargará el costo estimado a Contabilidad.
+            ℹ️ Al confirmar, se descontará automáticamente la cantidad equivalente del inventario y se cargará el costo estimado a Contabilidad.
           </div>
 
           <div className="flex gap-3 justify-end pt-3">
@@ -505,7 +554,7 @@ export default function Inventory() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Café en Grano Tostado 1kg / Leche Entera"
+              placeholder="Ej. Leche Entera / Café en Grano / Vasos 12oz"
               required
               className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
@@ -527,18 +576,20 @@ export default function Inventory() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               />
             </div>
+
             <div>
               <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                Unidad de Medida
+                Unidad Base de Medida
               </label>
-              <input
-                type="text"
+              <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                placeholder="kg, litros, unidades..."
-                required
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
+              >
+                {AVAILABLE_UNITS.map((u) => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
