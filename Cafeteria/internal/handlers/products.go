@@ -142,7 +142,23 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
+	// 1. Eliminar cualquier restricción foránea previa que intente hacer SET NULL
+	_, _ = h.DB.Exec(r.Context(), `
+		DO $$ 
+		BEGIN 
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sale_items_product_id_fkey') THEN
+				ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
+			END IF;
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'comanda_items_product_id_fkey') THEN
+				ALTER TABLE comanda_items DROP CONSTRAINT comanda_items_product_id_fkey;
+			END IF;
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'product_ingredients_product_id_fkey') THEN
+				ALTER TABLE product_ingredients DROP CONSTRAINT product_ingredients_product_id_fkey;
+			END IF;
+		END $$;
+	`)
+
+	// 2. Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
 	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_ingredients WHERE product_id = $1`, id)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, API_URL } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import {
   UtensilsCrossed,
   Clock,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react'
 
 export default function Comandas() {
+  const { user } = useAuth()
   const [comandas, setComandas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
