@@ -148,10 +148,15 @@ export default function Comandas() {
             Cliente: <span className="font-bold">{c.customer_name || 'Cliente General'}</span>
           </div>
 
-          {c.prepared_by_username && (
-            <div className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] font-extrabold flex items-center gap-1 mt-1">
-              <User className="w-3 h-3 text-[#9F6839]" />
+          {c.prepared_by_username ? (
+            <div className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] font-extrabold flex items-center gap-1 mt-1 bg-[#FEE4D7]/50 dark:bg-[#34180D] px-2 py-0.5 rounded-lg border border-[#D4B28E]/60 w-max">
+              <User className="w-3.5 h-3.5 text-[#9F6839]" />
               <span>Preparado por: {c.prepared_by_username}</span>
+            </div>
+          ) : (
+            <div className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 mt-1">
+              <User className="w-3 h-3" />
+              <span>Preparado por: Por asignar</span>
             </div>
           )}
 

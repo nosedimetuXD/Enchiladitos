@@ -27,6 +27,24 @@ func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
 	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`)
 	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Bebidas'`)
 
+	_, _ = db.Exec(ctx, `ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL`)
+	_, _ = db.Exec(ctx, `ALTER TABLE comanda_items ALTER COLUMN product_id DROP NOT NULL`)
+
+	_, _ = db.Exec(ctx, `
+		DO $$ 
+		BEGIN 
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sale_items_product_id_fkey') THEN
+				ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
+			END IF;
+			ALTER TABLE sale_items ADD CONSTRAINT sale_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'comanda_items_product_id_fkey') THEN
+				ALTER TABLE comanda_items DROP CONSTRAINT comanda_items_product_id_fkey;
+			END IF;
+			ALTER TABLE comanda_items ADD CONSTRAINT comanda_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
+		END $$;
+	`)
+
 	return &ProductHandler{DB: db}
 }
 
@@ -122,6 +140,12 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "id inválido", http.StatusBadRequest)
 		return
 	}
+
+	// Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
+	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = NULL WHERE product_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = NULL WHERE product_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `DELETE FROM recipes WHERE product_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_recipes WHERE product_id = $1`, id)
 
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM products WHERE id = $1`, id)
 	if err != nil {

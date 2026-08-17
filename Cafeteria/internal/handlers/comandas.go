@@ -155,9 +155,9 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 			     prepared_by = COALESCE(prepared_by, $3),
 			     prepared_by_username = COALESCE(NULLIF(prepared_by_username, ''), $4)
 			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at`,
+			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 			statusStr, id, preparedBy, preparedByName,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 	} else {
 		updateErr = h.DB.QueryRow(r.Context(),
 			`UPDATE comandas 
@@ -165,9 +165,9 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 			     updated_at = now(), 
 			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END)
 			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at`,
+			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 			statusStr, id,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 	}
 
 	// Ultimate fallback si falla cualquier cosa
@@ -178,9 +178,9 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("ejecutando fallback minimo para comanda %s por error: %v", id, updateErr)
 		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at`,
+			`UPDATE comandas SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 			statusStr, id,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt)
+		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 
 		if updateErr != nil {
 			log.Printf("error crítico actualizando comanda %s: %v", id, updateErr)
