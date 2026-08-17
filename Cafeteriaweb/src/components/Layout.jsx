@@ -168,9 +168,14 @@ export default function Layout() {
         <div className="flex-1 overflow-y-auto">
           {/* Header & Logo */}
           <div className="relative overflow-hidden p-4 border-b border-[#D4B28E]/50 dark:border-[#9F6839]/30 bg-[#FEE4D7]/40 dark:bg-[#2A150C]">
-            <div className="absolute inset-0 opacity-15 pointer-events-none">
-              <ToffeeMarblePattern />
-            </div>
+            <div
+              className="absolute inset-0 opacity-25 dark:opacity-20 pointer-events-none bg-cover bg-center"
+              style={{ backgroundImage: "url('/toffe-pattern-light.png')" }}
+            />
+            <div
+              className="absolute inset-0 opacity-20 pointer-events-none bg-cover bg-center hidden dark:block"
+              style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }}
+            />
 
             <div className={`relative flex items-center ${isCollapsed ? 'justify-center w-full' : 'justify-between'} z-10`}>
               <button

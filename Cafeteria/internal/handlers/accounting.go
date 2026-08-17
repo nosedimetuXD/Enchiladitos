@@ -32,11 +32,11 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	switch period {
 	case "today":
-		timeCondition = "created_at >= date_trunc('day', now())"
+		timeCondition = "created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
 	case "week":
-		timeCondition = "created_at >= date_trunc('week', now())"
+		timeCondition = "created_at >= (now() - INTERVAL '7 days')"
 	case "month":
-		timeCondition = "created_at >= date_trunc('month', now())"
+		timeCondition = "created_at >= (now() - INTERVAL '30 days')"
 	default: // "all"
 		timeCondition = "1=1"
 	}
@@ -172,11 +172,11 @@ func (h *AccountingHandler) ListExpenses(w http.ResponseWriter, r *http.Request)
 
 	switch period {
 	case "today":
-		timeCondition = "WHERE e.created_at >= date_trunc('day', now())"
+		timeCondition = "WHERE e.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
 	case "week":
-		timeCondition = "WHERE e.created_at >= date_trunc('week', now())"
+		timeCondition = "WHERE e.created_at >= (now() - INTERVAL '7 days')"
 	case "month":
-		timeCondition = "WHERE e.created_at >= date_trunc('month', now())"
+		timeCondition = "WHERE e.created_at >= (now() - INTERVAL '30 days')"
 	default:
 		timeCondition = ""
 	}

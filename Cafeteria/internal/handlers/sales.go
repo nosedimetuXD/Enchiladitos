@@ -37,11 +37,11 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	switch period {
 	case "today":
-		timeCondition = "WHERE s.created_at >= date_trunc('day', now())"
+		timeCondition = "WHERE s.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
 	case "week":
-		timeCondition = "WHERE s.created_at >= date_trunc('week', now())"
+		timeCondition = "WHERE s.created_at >= (now() - INTERVAL '7 days')"
 	case "month":
-		timeCondition = "WHERE s.created_at >= date_trunc('month', now())"
+		timeCondition = "WHERE s.created_at >= (now() - INTERVAL '30 days')"
 	default:
 		timeCondition = ""
 	}

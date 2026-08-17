@@ -23,7 +23,6 @@ import {
 } from 'lucide-react'
 
 export default function Accounting() {
-  const [summary, setSummary] = useState(null)
   const [expenses, setExpenses] = useState([])
   const [sales, setSales] = useState([])
   const [ingredients, setIngredients] = useState([])
@@ -47,13 +46,11 @@ export default function Accounting() {
     setLoading(true)
     setPageError('')
     try {
-      const [sumData, expData, ingData, salesData] = await Promise.all([
-        api.get(`/accounting/summary?period=${period}`).catch(() => null),
-        api.get(`/expenses?period=${period}`).catch(() => []),
+      const [expData, ingData, salesData] = await Promise.all([
+        api.get('/expenses?period=all').catch(() => []),
         api.get('/ingredients').catch(() => []),
-        api.get(`/sales?period=${period}`).catch(() => [])
+        api.get('/sales?period=all').catch(() => [])
       ])
-      setSummary(sumData || null)
       setExpenses(Array.isArray(expData) ? expData : [])
       setIngredients(Array.isArray(ingData) ? ingData : [])
       setSales(Array.isArray(salesData) ? salesData : [])
@@ -67,7 +64,7 @@ export default function Accounting() {
 
   useEffect(() => {
     loadData()
-  }, [period])
+  }, [])
 
   function openCreateModal() {
     setDescription('')
@@ -121,6 +118,7 @@ export default function Accounting() {
   const safeSales = Array.isArray(sales) ? sales : []
   const safeExpenses = Array.isArray(expenses) ? expenses : []
 
+  // Filtro de ventas por zona horaria local de navegador
   const filteredSales = useMemo(() => {
     return safeSales.filter((s) => {
       if (!s || !s.created_at) return true
@@ -132,9 +130,10 @@ export default function Accounting() {
         return saleDate.toDateString() === now.toDateString()
       }
       if (period === 'week') {
-        const oneWeekAgo = new Date()
-        oneWeekAgo.setDate(now.getDate() - 7)
-        return saleDate >= oneWeekAgo
+        const startOfWeek = new Date()
+        startOfWeek.setDate(now.getDate() - 7)
+        startOfWeek.setHours(0, 0, 0, 0)
+        return saleDate >= startOfWeek
       }
       if (period === 'month') {
         return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear()
@@ -143,6 +142,7 @@ export default function Accounting() {
     })
   }, [safeSales, period])
 
+  // Filtro de egresos por zona horaria local de navegador
   const filteredExpenses = useMemo(() => {
     return safeExpenses.filter((e) => {
       if (!e || !e.created_at) return true
@@ -154,9 +154,10 @@ export default function Accounting() {
         return expDate.toDateString() === now.toDateString()
       }
       if (period === 'week') {
-        const oneWeekAgo = new Date()
-        oneWeekAgo.setDate(now.getDate() - 7)
-        return expDate >= oneWeekAgo
+        const startOfWeek = new Date()
+        startOfWeek.setDate(now.getDate() - 7)
+        startOfWeek.setHours(0, 0, 0, 0)
+        return expDate >= startOfWeek
       }
       if (period === 'month') {
         return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()
@@ -164,6 +165,37 @@ export default function Accounting() {
       return true
     })
   }, [safeExpenses, period])
+
+  // Resumen dinámico sincronizado
+  const summary = useMemo(() => {
+    let totalIncome = 0
+    let cashIncome = 0
+    let transferIncome = 0
+
+    filteredSales.forEach((s) => {
+      const tot = Number(s.total) || 0
+      totalIncome += tot
+      cashIncome += Number(s.cash_amount) || 0
+      transferIncome += Number(s.transfer_amount) || 0
+    })
+
+    let totalExpenses = 0
+    filteredExpenses.forEach((e) => {
+      totalExpenses += Number(e.amount) || 0
+    })
+
+    return {
+      total_income: totalIncome,
+      sales_count: filteredSales.length,
+      total_expenses: totalExpenses,
+      expenses_count: filteredExpenses.length,
+      net_balance: totalIncome - totalExpenses,
+      income_by_payment_method: {
+        efectivo: cashIncome,
+        transferencia: transferIncome
+      }
+    }
+  }, [filteredSales, filteredExpenses])
 
   const combinedMovements = useMemo(() => {
     return [
@@ -242,9 +274,9 @@ export default function Accounting() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner con Fondo de Marca Toffe */}
+      {/* Header Banner con Fondo de Marca Oficial Toffe */}
       <div className="relative rounded-3xl overflow-hidden p-6 border border-[#D4B28E] dark:border-[#9F6839]/40 shadow-sm bg-[#432414] text-[#FEE4D7]">
-        <div className="absolute inset-0 opacity-15 bg-cover bg-center pointer-events-none" style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }} />
+        <div className="absolute inset-0 opacity-20 dark:opacity-25 bg-cover bg-center pointer-events-none" style={{ backgroundImage: "url('/toffe-pattern-dark.png')" }} />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
@@ -297,10 +329,10 @@ export default function Accounting() {
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-600">
-            ${(Number(summary?.total_income) || 0).toLocaleString()}
+            ${(Number(summary.total_income) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
-            Ventas realizadas: {summary?.sales_count || 0}
+            Ventas realizadas: {summary.sales_count || 0}
           </p>
         </div>
 
@@ -310,10 +342,10 @@ export default function Accounting() {
             <TrendingDown className="w-4 h-4 text-red-600" />
           </div>
           <div className="text-2xl font-extrabold text-red-600">
-            ${(Number(summary?.total_expenses) || 0).toLocaleString()}
+            ${(Number(summary.total_expenses) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
-            Egresos cargados: {summary?.expenses_count || 0}
+            Egresos cargados: {summary.expenses_count || 0}
           </p>
         </div>
 
@@ -322,8 +354,8 @@ export default function Accounting() {
             <span>Balance Neto</span>
             <DollarSign className="w-4 h-4 text-[#9F6839]" />
           </div>
-          <div className={`text-2xl font-extrabold ${(Number(summary?.net_balance) || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            ${(Number(summary?.net_balance) || 0).toLocaleString()}
+          <div className={`text-2xl font-extrabold ${(Number(summary.net_balance) || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            ${(Number(summary.net_balance) || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
             Ingresos - Egresos
@@ -339,12 +371,12 @@ export default function Accounting() {
             <div className="flex items-center gap-1.5">
               <Banknote className="w-3.5 h-3.5 text-emerald-600" />
               <span>Efectivo:</span>
-              <strong>${(Number(summary?.income_by_payment_method?.efectivo) || 0).toLocaleString()}</strong>
+              <strong>${(Number(summary.income_by_payment_method.efectivo) || 0).toLocaleString()}</strong>
             </div>
             <div className="flex items-center gap-1.5">
               <Smartphone className="w-3.5 h-3.5 text-blue-600" />
               <span>Transferencia:</span>
-              <strong>${(Number(summary?.income_by_payment_method?.transferencia) || 0).toLocaleString()}</strong>
+              <strong>${(Number(summary.income_by_payment_method.transferencia) || 0).toLocaleString()}</strong>
             </div>
           </div>
         </div>
