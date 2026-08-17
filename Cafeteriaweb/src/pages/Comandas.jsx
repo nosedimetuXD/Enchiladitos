@@ -68,7 +68,13 @@ export default function Comandas() {
 
   async function handleStatusChange(id, newStatus) {
     try {
-      await api.patch(`/comandas/${id}/status`, { status: newStatus })
+      const userObj = JSON.parse(localStorage.getItem('user') || '{}')
+      const preparerName = userObj.username || userObj.name || ''
+
+      await api.patch(`/comandas/${id}/status`, {
+        status: newStatus,
+        prepared_by_username: preparerName
+      })
       if (newStatus === 'listo') {
         playBellSound()
       }

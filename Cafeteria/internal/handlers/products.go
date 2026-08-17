@@ -143,10 +143,8 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
-	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL`)
-	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE comanda_items ALTER COLUMN product_id DROP NOT NULL`)
-	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = NULL WHERE product_id = $1`, id)
-	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = NULL WHERE product_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
+	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_ingredients WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM recipes WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_recipes WHERE product_id = $1`, id)

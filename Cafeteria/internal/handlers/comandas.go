@@ -92,7 +92,8 @@ func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // PATCH /comandas/{id}/status
 type updateComandaStatusRequest struct {
-	Status string `json:"status"`
+	Status             string `json:"status"`
+	PreparedByUsername string `json:"prepared_by_username"`
 }
 
 func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
@@ -142,11 +143,14 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 			preparedBy = &validID
 		}
 	}
+	if preparedByName == "" {
+		preparedByName = strings.TrimSpace(req.PreparedByUsername)
+	}
 
 	var c models.Comanda
 	var updateErr error
 
-	if preparedBy != nil {
+	if preparedBy != nil || preparedByName != "" {
 		updateErr = h.DB.QueryRow(r.Context(),
 			`UPDATE comandas 
 			 SET status = $1, 
