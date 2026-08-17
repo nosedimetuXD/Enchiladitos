@@ -43,11 +43,26 @@ export default function Accounting() {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('insumos')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
+  const [expenseCashAmount, setExpenseCashAmount] = useState('')
+  const [expenseBankLines, setExpenseBankLines] = useState([{ bank: 'Bre-B/Llave', amount: '' }])
   const [ingredientId, setIngredientId] = useState('')
   const [quantityAdded, setQuantityAdded] = useState('')
   const [addedUnit, setAddedUnit] = useState('ml')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+
+  function addExpenseBankLine() {
+    setExpenseBankLines((prev) => [...prev, { bank: 'Bre-B/Llave', amount: '' }])
+  }
+
+  function removeExpenseBankLine(index) {
+    if (expenseBankLines.length <= 1) return
+    setExpenseBankLines((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateExpenseBankLine(index, field, value) {
+    setExpenseBankLines((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
+  }
 
   async function loadData() {
     setLoading(true)
@@ -80,6 +95,8 @@ export default function Accounting() {
     setAmount('')
     setCategory('insumos')
     setPaymentMethod('efectivo')
+    setExpenseCashAmount('')
+    setExpenseBankLines([{ bank: 'Bre-B/Llave', amount: '' }])
     setIngredientId('')
     setQuantityAdded('')
     setAddedUnit('ml')
@@ -99,14 +116,17 @@ export default function Accounting() {
 
     try {
       let finalPaymentMethod = paymentMethod
+
+      const bankParts = expenseBankLines
+        .filter((l) => l.bank.trim() !== '')
+        .map((l) => (l.amount ? `${l.bank.trim()} ($${Number(l.amount).toLocaleString()})` : l.bank.trim()))
+
       if (paymentMethod === 'transferencia') {
-        finalPaymentMethod = `transferencia: ${expenseBankDetails || 'General'}`
+        finalPaymentMethod = bankParts.length > 0 ? `transferencia: ${bankParts.join(' + ')}` : 'transferencia'
       } else if (paymentMethod === 'mixto') {
-        const cash = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
-        const trans = expenseTransferAmount ? `$${Number(expenseTransferAmount).toLocaleString()} ${expenseBankDetails || 'Banco'}` : 'Transferencia'
-        finalPaymentMethod = `mixto (${cash} + ${trans})`
-      } else if (paymentMethod === 'multibanco') {
-        finalPaymentMethod = `multibanco (${expenseMultiBanks || 'Bancos Varios'})`
+        const cashPart = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
+        const bankStr = bankParts.length > 0 ? bankParts.join(' + ') : 'Transferencia'
+        finalPaymentMethod = `mixto (${cashPart} + ${bankStr})`
       }
 
       await api.post('/expenses', {
@@ -795,99 +815,85 @@ export default function Accounting() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
               >
                 <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia / Banco</option>
+                <option value="transferencia">Transferencia / Banco (1 o más bancos)</option>
                 <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
-                <option value="multibanco">Múltiples Bancos / Transferencias</option>
               </select>
             </div>
           </div>
 
-          {paymentMethod === 'transferencia' && (
-            <div>
-              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                Detalles / Banco (ej. Bre-B/Llave, Nequi, Bancolombia)
-              </label>
-              <input
-                type="text"
-                list="expenseBankList"
-                value={expenseBankDetails}
-                onChange={(e) => setExpenseBankDetails(e.target.value)}
-                placeholder="Bre-B/Llave, Nequi, Bancolombia..."
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
-              />
-              <datalist id="expenseBankList">
-                <option value="Bre-B/Llave" />
-                <option value="Nequi" />
-                <option value="Bancolombia" />
-                <option value="Daviplata" />
-                <option value="Mercado Pago" />
-              </datalist>
-            </div>
-          )}
+          <datalist id="expenseBankSuggestions">
+            <option value="Bre-B/Llave" />
+            <option value="Nequi" />
+            <option value="Bancolombia" />
+            <option value="Daviplata" />
+            <option value="Mercado Pago" />
+            <option value="Nu" />
+          </datalist>
 
           {paymentMethod === 'mixto' && (
-            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-3">
-              <span className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C]">
-                Desglose de Pago Mixto
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
-                    Monto en Efectivo ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={expenseCashAmount}
-                    onChange={(e) => setExpenseCashAmount(e.target.value)}
-                    placeholder="Ej. 10000"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
-                    Monto Transferencia ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={expenseTransferAmount}
-                    onChange={(e) => setExpenseTransferAmount(e.target.value)}
-                    placeholder="Ej. 15000"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
-                  Banco / Entidad
-                </label>
-                <input
-                  type="text"
-                  list="expenseBankList"
-                  value={expenseBankDetails}
-                  onChange={(e) => setExpenseBankDetails(e.target.value)}
-                  placeholder="Nequi, Bancolombia, Bre-B/Llave..."
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold"
-                />
-              </div>
+            <div className="p-3 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2E180E] border border-[#D4B28E]">
+              <label className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase mb-1">
+                Monto abonado en Efectivo ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={expenseCashAmount}
+                onChange={(e) => setExpenseCashAmount(e.target.value)}
+                placeholder="Ej. 10000"
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
             </div>
           )}
 
-          {paymentMethod === 'multibanco' && (
-            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-2">
-              <label className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase">
-                Detalle de Múltiples Bancos / Transferencias
-              </label>
-              <input
-                type="text"
-                value={expenseMultiBanks}
-                onChange={(e) => setExpenseMultiBanks(e.target.value)}
-                placeholder="Ej. Nequi: $10,000 + Bancolombia: $15,000"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold"
-              />
+          {(paymentMethod === 'transferencia' || paymentMethod === 'mixto') && (
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-[#9F6839]" />
+                  Desglose de Transferencias / Bancos
+                </span>
+                <button
+                  type="button"
+                  onClick={addExpenseBankLine}
+                  className="text-xs font-bold text-[#9F6839] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Agregar otro banco
+                </button>
+              </div>
+
+              {expenseBankLines.map((line, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    list="expenseBankSuggestions"
+                    value={line.bank}
+                    onChange={(e) => updateExpenseBankLine(idx, 'bank', e.target.value)}
+                    placeholder="Banco / Entidad (ej. Nequi, Bre-B/Llave)"
+                    className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={line.amount}
+                    onChange={(e) => updateExpenseBankLine(idx, 'amount', e.target.value)}
+                    placeholder={expenseBankLines.length > 1 ? "Monto ($)" : "Monto opcional ($)"}
+                    className="w-32 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                  {expenseBankLines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeExpenseBankLine(idx)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer"
+                      title="Eliminar línea de banco"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 

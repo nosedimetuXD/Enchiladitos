@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import Modal from '../components/Modal'
 import { useAuth } from '../context/AuthContext'
 import { AVAILABLE_UNITS, convertQuantity, formatConvertedHint } from '../utils/unitConverter'
-import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign, ArrowRightLeft, Trash2, CreditCard, Banknote, Smartphone } from 'lucide-react'
+import { Package, Plus, Minus, AlertTriangle, Search, Edit2, ShieldAlert, History, DollarSign, ArrowRightLeft, Trash2, CreditCard, Banknote, Smartphone, Building2 } from 'lucide-react'
 
 export default function Inventory() {
   const { user } = useAuth()
@@ -27,7 +27,21 @@ export default function Inventory() {
   const [unitCost, setUnitCost] = useState('0')
   const [addAsExpense, setAddAsExpense] = useState(false)
   const [expensePaymentMethod, setExpensePaymentMethod] = useState('efectivo')
-  const [expenseBankDetails, setExpenseBankDetails] = useState('Bre-B/Llave')
+  const [expenseCashAmount, setExpenseCashAmount] = useState('')
+  const [expenseBankLines, setExpenseBankLines] = useState([{ bank: 'Bre-B/Llave', amount: '' }])
+
+  function addExpenseBankLine() {
+    setExpenseBankLines((prev) => [...prev, { bank: 'Bre-B/Llave', amount: '' }])
+  }
+
+  function removeExpenseBankLine(index) {
+    if (expenseBankLines.length <= 1) return
+    setExpenseBankLines((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateExpenseBankLine(index, field, value) {
+    setExpenseBankLines((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
+  }
 
   // Modal Reportar Daño / Merma
   const [isWasteModalOpen, setIsWasteModalOpen] = useState(false)
@@ -75,7 +89,8 @@ export default function Inventory() {
     setUnitCost('0')
     setAddAsExpense(false)
     setExpensePaymentMethod('efectivo')
-    setExpenseBankDetails('Bre-B/Llave')
+    setExpenseCashAmount('')
+    setExpenseBankLines([{ bank: 'Bre-B/Llave', amount: '' }])
     setFormError('')
     setIsModalOpen(true)
   }
@@ -126,14 +141,17 @@ export default function Inventory() {
           const totalExpenseAmount = Number(quantity) * Number(unitCost)
 
           let finalPaymentMethod = expensePaymentMethod
+
+          const bankParts = expenseBankLines
+            .filter((l) => l.bank.trim() !== '')
+            .map((l) => (l.amount ? `${l.bank.trim()} ($${Number(l.amount).toLocaleString()})` : l.bank.trim()))
+
           if (expensePaymentMethod === 'transferencia') {
-            finalPaymentMethod = `transferencia: ${expenseBankDetails || 'General'}`
+            finalPaymentMethod = bankParts.length > 0 ? `transferencia: ${bankParts.join(' + ')}` : 'transferencia'
           } else if (expensePaymentMethod === 'mixto') {
-            const cash = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
-            const trans = expenseTransferAmount ? `$${Number(expenseTransferAmount).toLocaleString()} ${expenseBankDetails || 'Banco'}` : 'Transferencia'
-            finalPaymentMethod = `mixto (${cash} + ${trans})`
-          } else if (expensePaymentMethod === 'multibanco') {
-            finalPaymentMethod = `multibanco (${expenseMultiBanks || 'Bancos Varios'})`
+            const cashPart = expenseCashAmount ? `$${Number(expenseCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
+            const bankStr = bankParts.length > 0 ? bankParts.join(' + ') : 'Transferencia'
+            finalPaymentMethod = `mixto (${cashPart} + ${bankStr})`
           }
 
           await api.post('/expenses', {
@@ -541,79 +559,83 @@ export default function Inventory() {
                       className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
                     >
                       <option value="efectivo">Efectivo</option>
-                      <option value="transferencia">Transferencia / Banco</option>
+                      <option value="transferencia">Transferencia / Banco (1 o más bancos)</option>
                       <option value="mixto">Pago Mixto (Efectivo + Transferencia)</option>
-                      <option value="multibanco">Múltiples Bancos / Transferencias</option>
                     </select>
                   </div>
 
-                  {expensePaymentMethod === 'transferencia' && (
-                    <div>
-                      <label className="block text-[11px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
-                        Detalles / Banco (ej. Bre-B/Llave, Nequi, Bancolombia)
-                      </label>
-                      <input
-                        type="text"
-                        list="bankSuggestions"
-                        value={expenseBankDetails}
-                        onChange={(e) => setExpenseBankDetails(e.target.value)}
-                        placeholder="Bre-B/Llave, Nequi, Bancolombia..."
-                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
-                      />
-                      <datalist id="bankSuggestions">
-                        <option value="Bre-B/Llave" />
-                        <option value="Nequi" />
-                        <option value="Bancolombia" />
-                        <option value="Daviplata" />
-                        <option value="Mercado Pago" />
-                      </datalist>
-                    </div>
-                  )}
+                  <datalist id="bankSuggestions">
+                    <option value="Bre-B/Llave" />
+                    <option value="Nequi" />
+                    <option value="Bancolombia" />
+                    <option value="Daviplata" />
+                    <option value="Mercado Pago" />
+                    <option value="Nu" />
+                  </datalist>
 
                   {expensePaymentMethod === 'mixto' && (
-                    <div className="p-3 rounded-xl bg-white/60 dark:bg-[#150904] border border-[#D4B28E] space-y-2">
-                      <span className="block text-[11px] font-extrabold text-[#9F6839]">Desglose de Pago Mixto</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={expenseCashAmount}
-                          onChange={(e) => setExpenseCashAmount(e.target.value)}
-                          placeholder="Monto en Efectivo ($)"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={expenseTransferAmount}
-                          onChange={(e) => setExpenseTransferAmount(e.target.value)}
-                          placeholder="Monto Transferencia ($)"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-[10px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase mb-1">
+                        Monto abonado en Efectivo ($)
+                      </label>
                       <input
-                        type="text"
-                        list="bankSuggestions"
-                        value={expenseBankDetails}
-                        onChange={(e) => setExpenseBankDetails(e.target.value)}
-                        placeholder="Banco / Entidad (ej. Nequi, Bancolombia)"
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={expenseCashAmount}
+                        onChange={(e) => setExpenseCashAmount(e.target.value)}
+                        placeholder="Ej. 10000"
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
                       />
                     </div>
                   )}
 
-                  {expensePaymentMethod === 'multibanco' && (
+                  {(expensePaymentMethod === 'transferencia' || expensePaymentMethod === 'mixto') && (
                     <div className="p-3 rounded-xl bg-white/60 dark:bg-[#150904] border border-[#D4B28E] space-y-2">
-                      <label className="block text-[11px] font-extrabold text-[#9F6839]">Múltiples Bancos / Transferencias</label>
-                      <input
-                        type="text"
-                        value={expenseMultiBanks}
-                        onChange={(e) => setExpenseMultiBanks(e.target.value)}
-                        placeholder="Ej. Nequi: $10,000 + Bancolombia: $15,000"
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs"
-                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-[#9F6839] flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5" /> Desglose de Bancos
+                        </span>
+                        <button
+                          type="button"
+                          onClick={addExpenseBankLine}
+                          className="text-[11px] font-bold text-[#9F6839] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" /> Agregar otro banco
+                        </button>
+                      </div>
+
+                      {expenseBankLines.map((line, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            list="bankSuggestions"
+                            value={line.bank}
+                            onChange={(e) => updateExpenseBankLine(idx, 'bank', e.target.value)}
+                            placeholder="Banco (ej. Nequi, Bre-B/Llave)"
+                            className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs font-semibold"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={line.amount}
+                            onChange={(e) => updateExpenseBankLine(idx, 'amount', e.target.value)}
+                            placeholder={expenseBankLines.length > 1 ? "Monto ($)" : "Monto opcional"}
+                            className="w-28 px-2.5 py-1.5 rounded-lg border border-[#D4B28E] text-xs font-semibold"
+                          />
+                          {expenseBankLines.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeExpenseBankLine(idx)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Eliminar línea"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
