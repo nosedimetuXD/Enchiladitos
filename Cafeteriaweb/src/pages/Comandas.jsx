@@ -98,12 +98,17 @@ export default function Comandas() {
         className="bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-4 flex flex-col justify-between gap-3 shadow-xs hover:border-[#9F6839] transition-all"
       >
         <div>
-          <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30 min-w-0">
-            <span className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate min-w-0">
-              Comanda #{c.order_number || c.id.slice(0, 4)}
-            </span>
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#D4B28E]/60 dark:border-[#9F6839]/30">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider leading-tight">
+                Comanda
+              </span>
+              <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] leading-tight">
+                #{c.order_number || c.id.slice(0, 4)}
+              </span>
+            </div>
 
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FEE4D7] text-[#9F6839] dark:bg-[#381C10] dark:text-[#DABA8C] border border-[#D4B28E] dark:border-[#9F6839]/60 whitespace-nowrap shrink-0 ml-auto">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FEE4D7] text-[#9F6839] dark:bg-[#381C10] dark:text-[#DABA8C] border border-[#D4B28E] dark:border-[#9F6839]/60 whitespace-nowrap shrink-0">
               <Clock className="w-3 h-3 shrink-0 text-[#9F6839] dark:text-[#DABA8C]" />
               <span>{elapsedMins} min</span>
             </span>
