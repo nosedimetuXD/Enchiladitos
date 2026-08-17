@@ -519,17 +519,29 @@ export default function Inventory() {
           )}
           <div>
             <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">Nombre del Insumo</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D4B28E]" />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Leche Entera 1L" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] placeholder-[#9F6839]/60 dark:placeholder-[#DABA8C]/60" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-             <input type="number" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Cantidad" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D4B28E]" />
-             <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D4B28E]">
-                {AVAILABLE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-             </select>
+             <div>
+               <label className="block text-[11px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">Cantidad Inicial</label>
+               <input type="number" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Cantidad" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] placeholder-[#9F6839]/60 dark:placeholder-[#DABA8C]/60" />
+             </div>
+             <div>
+               <label className="block text-[11px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">Unidad Medida</label>
+               <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]">
+                  {AVAILABLE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+               </select>
+             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-             <input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="Costo por unidad" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D4B28E]" />
-             <input type="number" step="0.01" value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} placeholder="Stock Mínimo" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white border border-[#D4B28E]" />
+             <div>
+               <label className="block text-[11px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">Costo Unitario ($)</label>
+               <input type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="Costo por unidad" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] placeholder-[#9F6839]/60 dark:placeholder-[#DABA8C]/60" />
+             </div>
+             <div>
+               <label className="block text-[11px] font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">Stock Mínimo Alerta</label>
+               <input type="number" step="0.01" value={minQuantity} onChange={(e) => setMinQuantity(e.target.value)} placeholder="Stock Mínimo" required className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7] placeholder-[#9F6839]/60 dark:placeholder-[#DABA8C]/60" />
+             </div>
           </div>
 
           {!editingIngredient && (
@@ -644,8 +656,8 @@ export default function Inventory() {
           )}
 
           <div className="flex gap-3 justify-end pt-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 rounded-2xl bg-white border border-[#D4B28E] text-xs font-bold">Cancelar</button>
-            <button type="submit" disabled={submitting} className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] hover:bg-[#FEE4D7]/40 dark:hover:bg-[#2E180E] transition-colors cursor-pointer">Cancelar</button>
+            <button type="submit" disabled={submitting} className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50">
               {submitting ? 'Guardando...' : editingIngredient ? 'Actualizar' : 'Crear Insumo'}
             </button>
           </div>

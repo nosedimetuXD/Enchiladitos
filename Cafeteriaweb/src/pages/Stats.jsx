@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, Award, Flame, Users, Calendar, Building2, AlertTriangle, Trophy } from 'lucide-react'
+import { BarChart3, TrendingUp, TrendingDown, DollarSign, Award, Flame, Users, Calendar, Building2, AlertTriangle, Trophy, Clock } from 'lucide-react'
 
 export default function Stats() {
   const [summary, setSummary] = useState(null)
+  const [period, setPeriod] = useState('month')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  async function loadStats() {
+  async function loadStats(p = period) {
     try {
-      const data = await api.get('/accounting/summary?period=month')
+      const data = await api.get(`/accounting/summary?period=${p}`)
       setSummary(data)
     } catch (err) {
       setPageError('No se pudieron cargar las estadísticas ejecutivas')
@@ -35,15 +36,29 @@ export default function Stats() {
           <div>
             <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
               <BarChart3 className="w-6 h-6 text-[#DABA8C]" />
-              <span>Estadísticas Ejecutivas & Reporte Mensual</span>
+              <span>Estadísticas Ejecutivas & Reportes</span>
             </h2>
             <p className="text-xs font-semibold text-[#DABA8C] mt-1">
               Dashboard exclusivo del dueño con ranking de ventas, productos estrella y clientes top
             </p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-white shadow-xs">
             <Calendar className="w-4 h-4 text-[#DABA8C]" />
-            <span>Mes Actual</span>
+            <select
+              value={period}
+              onChange={(e) => {
+                const newPeriod = e.target.value
+                setPeriod(newPeriod)
+                loadStats(newPeriod)
+              }}
+              className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="month" className="text-black">Mes Actual</option>
+              <option value="prev_month" className="text-black">Mes Anterior</option>
+              <option value="week" className="text-black">Esta Semana</option>
+              <option value="today" className="text-black">Hoy</option>
+              <option value="all" className="text-black">Histórico Total</option>
+            </select>
           </div>
         </div>
       </div>
@@ -56,10 +71,10 @@ export default function Stats() {
       )}
 
       {/* Tarjetas KPI Financieras Exec */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
           <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
-            <span>Ventas del Mes</span>
+            <span>Ventas Totales</span>
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-600">
@@ -72,14 +87,14 @@ export default function Stats() {
 
         <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
           <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
-            <span>Gastos del Mes</span>
+            <span>Gastos Totales</span>
             <TrendingDown className="w-4 h-4 text-red-600" />
           </div>
           <div className="text-2xl font-extrabold text-red-600">
             ${(mStats?.monthly_expenses || 0).toLocaleString()}
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
-            Egresos operativos del mes
+            Egresos del período
           </p>
         </div>
 
@@ -93,6 +108,19 @@ export default function Stats() {
           </div>
           <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
             Utilidad disponible
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
+            <span>Tiempo Prom. Comandas</span>
+            <Clock className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+            {mStats?.avg_prep_time_minutes > 0 ? `${Math.round(mStats.avg_prep_time_minutes)} min` : '—'}
+          </div>
+          <p className="text-[11px] text-[#9F6839] dark:text-[#DABA8C] mt-1 font-semibold">
+            Demora salida de comandas
           </p>
         </div>
 

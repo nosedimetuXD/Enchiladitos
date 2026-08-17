@@ -36,7 +36,11 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	case "week":
 		timeCondition = "created_at >= (now() - INTERVAL '7 days')"
 	case "month":
-		timeCondition = "created_at >= (now() - INTERVAL '30 days')"
+		timeCondition = "created_at >= date_trunc('month', now())"
+	case "prev_month":
+		timeCondition = "created_at >= date_trunc('month', now() - INTERVAL '1 month') AND created_at < date_trunc('month', now())"
+	case "year":
+		timeCondition = "created_at >= date_trunc('year', now())"
 	default: // "all"
 		timeCondition = "1=1"
 	}
@@ -83,7 +87,7 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	summary.NetBalance = summary.TotalIncome - summary.TotalExpenses
 
-	// 4. Estadísticas Mensuales Exclusivas para el Dueño (Owner)
+	// 4. Estadísticas Ejecutivas (exclusivas para dueño)
 	roleVal := r.Context().Value(custommw.ContextRole)
 	var userRole models.UserRole
 	if r, ok := roleVal.(models.UserRole); ok {
@@ -95,41 +99,45 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	if userRole == models.RoleOwner {
 		mStats := &models.MonthlyStats{
 			TopCustomers: []models.CustomerStat{},
+			TopProducts:  []models.TopProductStat{},
+			TopBanks:     []models.TopBankStat{},
 		}
 
-		// Ventas mensuales
+		// Ventas del período
 		_ = h.DB.QueryRow(r.Context(),
-			`SELECT COALESCE(SUM(total), 0) FROM sales WHERE created_at >= date_trunc('month', now())`).Scan(&mStats.MonthlyIncome)
+			"SELECT COALESCE(SUM(total), 0) FROM sales WHERE "+timeCondition).Scan(&mStats.MonthlyIncome)
 
-		// Gastos mensuales
+		// Gastos del período
 		_ = h.DB.QueryRow(r.Context(),
-			`SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE created_at >= date_trunc('month', now())`).Scan(&mStats.MonthlyExpenses)
+			"SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE "+timeCondition).Scan(&mStats.MonthlyExpenses)
 
 		mStats.NetProfit = mStats.MonthlyIncome - mStats.MonthlyExpenses
 
-		// Mejor vendedor del mes (cualquier rol)
+		// Tiempo Promedio de Salida de Comandas en minutos
+		_ = h.DB.QueryRow(r.Context(),
+			"SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(ready_at, updated_at) - created_at))/60), 0) FROM comandas WHERE status IN ('listo', 'entregado') AND "+timeCondition).Scan(&mStats.AvgPrepTimeMinutes)
+
+		// Mejor vendedor del período
 		var topSeller models.TopSellerStat
 		errSeller := h.DB.QueryRow(r.Context(),
 			`SELECT u.username, u.role, COALESCE(SUM(s.total), 0) as total_amount, COUNT(s.id) as sales_count
 			 FROM sales s
 			 JOIN users u ON s.sold_by = u.id
-			 WHERE s.created_at >= date_trunc('month', now())
+			 WHERE `+timeCondition+`
 			 GROUP BY u.id, u.username, u.role
 			 ORDER BY total_amount DESC
 			 LIMIT 1`).Scan(&topSeller.Username, &topSeller.Role, &topSeller.TotalAmount, &topSeller.SalesCount)
 		if errSeller == nil {
 			mStats.TopSeller = &topSeller
-		} else {
-			log.Printf("error mejor vendedor: %v", errSeller)
 		}
 
-		// Top 10 Productos más vendidos del mes
+		// Top 10 Productos más vendidos del período
 		prodRows, errProdList := h.DB.Query(r.Context(),
 			`SELECT p.name, COALESCE(SUM(si.quantity), 0) as total_qty, COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
 			 FROM sale_items si
 			 JOIN sales s ON si.sale_id = s.id
 			 JOIN products p ON si.product_id = p.id
-			 WHERE s.created_at >= date_trunc('month', now())
+			 WHERE `+timeCondition+`
 			 GROUP BY p.id, p.name
 			 ORDER BY total_qty DESC
 			 LIMIT 10`)
@@ -146,11 +154,11 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			mStats.TopProduct = &mStats.TopProducts[0]
 		}
 
-		// Top 10 Clientes que más compraron en el mes
+		// Top 10 Clientes del período
 		custRows, errCust := h.DB.Query(r.Context(),
 			`SELECT customer_name, COALESCE(SUM(total), 0) as total_spent, COUNT(id) as orders_count
 			 FROM sales
-			 WHERE created_at >= date_trunc('month', now()) AND TRIM(customer_name) != '' AND LOWER(customer_name) != 'cliente general'
+			 WHERE `+timeCondition+` AND TRIM(customer_name) != '' AND LOWER(customer_name) != 'cliente general'
 			 GROUP BY customer_name
 			 ORDER BY total_spent DESC
 			 LIMIT 10`)
@@ -164,14 +172,14 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			custRows.Close()
 		}
 
-		// Top 5 Bancos / Entidades más usados
+		// Top 5 Bancos del período
 		bankRows, errBank := h.DB.Query(r.Context(),
 			`SELECT 
 				COALESCE(NULLIF(TRIM(bank_details), ''), 'Transferencia General') as bank_name,
 				COUNT(id) as count,
 				COALESCE(SUM(CASE WHEN transfer_amount > 0 THEN transfer_amount ELSE total END), 0) as total_amount
 			 FROM sales
-			 WHERE created_at >= date_trunc('month', now()) 
+			 WHERE `+timeCondition+` 
 			   AND (payment_method IN ('transferencia', 'mixto', 'multibanco') OR transfer_amount > 0)
 			 GROUP BY bank_name
 			 ORDER BY count DESC, total_amount DESC

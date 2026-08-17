@@ -173,6 +173,21 @@ export default function Users() {
       totalExpensesSum += Number(e.amount) || 0
     })
 
+    let totalPrepMin = 0
+    let prepCount = 0
+    comandas.forEach((c) => {
+      if ((c.status === 'listo' || c.status === 'entregado') && c.created_at) {
+        const end = new Date(c.ready_at || c.updated_at || c.created_at)
+        const start = new Date(c.created_at)
+        const min = (end - start) / (1000 * 60)
+        if (min >= 0 && min < 1440) {
+          totalPrepMin += min
+          prepCount += 1
+        }
+      }
+    })
+    const avgUserPrepMin = prepCount > 0 ? Math.round(totalPrepMin / prepCount) : 0
+
     return {
       salesCount: uSales.length,
       totalRevenue,
@@ -184,9 +199,10 @@ export default function Users() {
       tasksAssignedCount: uTasksAssigned.length,
       tasksCompletedCount: uTasksCompleted.length,
       wasteCount: uWaste.length,
+      avgUserPrepMin,
       recentSales: uSales.slice(0, 5)
     }
-  }, [selectedUserForStats, sales, expenses, tasks, wasteReports])
+  }, [selectedUserForStats, sales, expenses, tasks, wasteReports, comandas])
 
   const roleBadges = {
     owner: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
@@ -396,6 +412,15 @@ export default function Users() {
                 </span>
                 <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
                   {userStatsCalculated.tasksCompletedCount} / {userStatsCalculated.tasksAssignedCount} asignadas
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
+                <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" /> Demora Promedio Comandas
+                </span>
+                <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  {userStatsCalculated.avgUserPrepMin > 0 ? `${userStatsCalculated.avgUserPrepMin} min` : '—'}
                 </span>
               </div>
 

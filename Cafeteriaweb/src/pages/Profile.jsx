@@ -37,23 +37,28 @@ export default function Profile() {
 
   // Métricas personales del usuario
   const [userSales, setUserSales] = useState([])
+  const [userComandas, setUserComandas] = useState([])
   const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
-    async function fetchUserSales() {
+    async function fetchUserData() {
       try {
-        const sales = await api.get('/sales?period=all')
+        const [sales, comandas] = await Promise.all([
+          api.get('/sales?period=all').catch(() => []),
+          api.get('/comandas').catch(() => [])
+        ])
         const mySales = (sales || []).filter(
           (s) => (user?.id && s.sold_by === user.id) || s.sold_by_username?.toLowerCase() === user?.username?.toLowerCase()
         )
         setUserSales(mySales)
+        setUserComandas(comandas || [])
       } catch (e) {
-        console.error('Error cargando ventas del usuario', e)
+        console.error('Error cargando datos del usuario', e)
       } finally {
         setLoadingStats(false)
       }
     }
-    fetchUserSales()
+    fetchUserData()
   }, [user])
 
   useEffect(() => {
@@ -91,14 +96,30 @@ export default function Profile() {
       }
     })
 
+    let totalPrepMin = 0
+    let prepCount = 0
+    userComandas.forEach((c) => {
+      if ((c.status === 'listo' || c.status === 'entregado') && c.created_at) {
+        const end = new Date(c.ready_at || c.updated_at || c.created_at)
+        const start = new Date(c.created_at)
+        const min = (end - start) / (1000 * 60)
+        if (min >= 0 && min < 1440) {
+          totalPrepMin += min
+          prepCount += 1
+        }
+      }
+    })
+    const avgPrepTimeMin = prepCount > 0 ? Math.round(totalPrepMin / prepCount) : 0
+
     return {
       totalCount,
       totalRevenue,
       avgSale,
       topProduct,
-      maxQty
+      maxQty,
+      avgPrepTimeMin
     }
-  }, [userSales])
+  }, [userSales, userComandas])
 
   function openEditModal() {
     setUsername(user?.username || '')
@@ -300,6 +321,18 @@ export default function Profile() {
                       ({stats.maxQty} unidades)
                     </span>
                   )}
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
+                  <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-600" /> Demora Comandas
+                  </span>
+                  <p className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                    {stats.avgPrepTimeMin > 0 ? `${stats.avgPrepTimeMin} min` : '—'}
+                  </p>
+                  <span className="text-[10px] text-[#9F6839] font-semibold block">
+                    Promedio preparación
+                  </span>
                 </div>
               </div>
             )}

@@ -46,14 +46,15 @@ type TopBankStat struct {
 }
 
 type MonthlyStats struct {
-	MonthlyIncome   float64          `json:"monthly_income"`
-	MonthlyExpenses float64          `json:"monthly_expenses"`
-	NetProfit       float64          `json:"net_profit"`
-	TopSeller       *TopSellerStat   `json:"top_seller"`
-	TopProduct      *TopProductStat  `json:"top_product"`
-	TopProducts     []TopProductStat `json:"top_products"`
-	TopCustomers    []CustomerStat   `json:"top_customers"`
-	TopBanks        []TopBankStat    `json:"top_banks"`
+	MonthlyIncome      float64          `json:"monthly_income"`
+	MonthlyExpenses    float64          `json:"monthly_expenses"`
+	NetProfit          float64          `json:"net_profit"`
+	AvgPrepTimeMinutes float64          `json:"avg_prep_time_minutes"`
+	TopSeller          *TopSellerStat   `json:"top_seller"`
+	TopProduct         *TopProductStat  `json:"top_product"`
+	TopProducts        []TopProductStat `json:"top_products"`
+	TopCustomers       []CustomerStat   `json:"top_customers"`
+	TopBanks           []TopBankStat    `json:"top_banks"`
 }
 
 type AccountingSummary struct {

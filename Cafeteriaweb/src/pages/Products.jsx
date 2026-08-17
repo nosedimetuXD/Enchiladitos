@@ -341,7 +341,7 @@ export default function Products() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej. Capuccino 12oz"
               required
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
             />
           </div>
 
