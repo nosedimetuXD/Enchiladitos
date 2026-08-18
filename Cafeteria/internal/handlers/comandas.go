@@ -152,16 +152,16 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	updateErr = h.DB.QueryRow(r.Context(),
 		`UPDATE comandas 
-		 SET status = $1, 
+		 SET status = $1::text, 
 		     updated_at = now(), 
-		     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
+		     ready_at = COALESCE(ready_at, CASE WHEN $1::text IN ('listo', 'entregado') THEN now() ELSE NULL END),
 		     prepared_by = COALESCE($3::uuid, prepared_by),
 		     prepared_by_username = CASE 
 		                              WHEN $4::text <> '' AND $4::text <> 'Por asignar' THEN $4::text 
 		                              WHEN COALESCE(prepared_by_username, '') <> '' AND prepared_by_username <> 'Por asignar' THEN prepared_by_username 
 		                              ELSE 'Por asignar' 
 		                            END
-		 WHERE id = $2 
+		 WHERE id = $2::uuid 
 		 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 		statusStr, id, preparedBy, preparedByName,
 	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
