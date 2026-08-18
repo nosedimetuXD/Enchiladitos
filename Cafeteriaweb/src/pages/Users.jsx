@@ -139,10 +139,12 @@ export default function Users() {
     }
 
     try {
+      setUsers((prev) => prev.filter((u) => u.id !== userItem.id))
       await api.delete(`/users/${userItem.id}`)
       await loadData()
     } catch (err) {
       alert(err.message || 'No se pudo eliminar el usuario')
+      await loadData()
     }
   }
 
