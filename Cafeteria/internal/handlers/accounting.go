@@ -155,9 +155,9 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			TopBanks:     []models.TopBankStat{},
 		}
 
-		// Ventas del período
+		// Ventas del período (excluyendo canceladas)
 		_ = h.DB.QueryRow(r.Context(),
-			"SELECT COALESCE(SUM(total), 0) FROM sales WHERE "+timeCondition).Scan(&mStats.MonthlyIncome)
+			"SELECT COALESCE(SUM(s.total), 0) FROM sales s LEFT JOIN comandas c ON c.sale_id = s.id WHERE (c.status IS NULL OR c.status != 'cancelado') AND "+timeCondSales).Scan(&mStats.MonthlyIncome)
 
 		// Gastos del período
 		_ = h.DB.QueryRow(r.Context(),
@@ -169,13 +169,14 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		_ = h.DB.QueryRow(r.Context(),
 			"SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(c.ready_at, c.updated_at) - c.created_at))/60), 0) FROM comandas c WHERE c.status IN ('listo', 'entregado') AND "+timeCondComandas).Scan(&mStats.AvgPrepTimeMinutes)
 
-		// Mejor vendedor del período
+		// Mejor vendedor del período (excluyendo ventas canceladas)
 		var topSeller models.TopSellerStat
 		errSeller := h.DB.QueryRow(r.Context(),
 			`SELECT u.username, u.role, COALESCE(SUM(s.total), 0) as total_amount, COUNT(s.id) as sales_count
 			 FROM sales s
 			 JOIN users u ON s.sold_by = u.id
-			 WHERE `+timeCondSales+`
+			 LEFT JOIN comandas c ON c.sale_id = s.id
+			 WHERE (c.status IS NULL OR c.status != 'cancelado') AND `+timeCondSales+`
 			 GROUP BY u.id, u.username, u.role
 			 ORDER BY total_amount DESC
 			 LIMIT 1`).Scan(&topSeller.Username, &topSeller.Role, &topSeller.TotalAmount, &topSeller.SalesCount)
@@ -185,15 +186,16 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			log.Printf("error mejor vendedor query: %v", errSeller)
 		}
 
-		// Top 10 Productos más vendidos del período
+		// Top 10 Productos más vendidos del período (excluyendo ventas canceladas)
 		prodRows, errProdList := h.DB.Query(r.Context(),
 			`SELECT COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado') as prod_name,
 			        COALESCE(SUM(si.quantity), 0) as total_qty, 
 			        COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
 			 FROM sale_items si
 			 JOIN sales s ON si.sale_id = s.id
+			 LEFT JOIN comandas c ON c.sale_id = s.id
 			 LEFT JOIN products p ON si.product_id = p.id
-			 WHERE `+timeCondSales+`
+			 WHERE (c.status IS NULL OR c.status != 'cancelado') AND `+timeCondSales+`
 			 GROUP BY COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado')
 			 ORDER BY total_qty DESC
 			 LIMIT 10`)
@@ -212,12 +214,13 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			mStats.TopProduct = &mStats.TopProducts[0]
 		}
 
-		// Top 10 Clientes del período
+		// Top 10 Clientes del período (excluyendo ventas canceladas)
 		custRows, errCust := h.DB.Query(r.Context(),
-			`SELECT customer_name, COALESCE(SUM(total), 0) as total_spent, COUNT(id) as orders_count
-			 FROM sales
-			 WHERE `+timeCondition+` AND TRIM(customer_name) != '' AND LOWER(customer_name) != 'cliente general'
-			 GROUP BY customer_name
+			`SELECT s.customer_name, COALESCE(SUM(s.total), 0) as total_spent, COUNT(s.id) as orders_count
+			 FROM sales s
+			 LEFT JOIN comandas c ON c.sale_id = s.id
+			 WHERE (c.status IS NULL OR c.status != 'cancelado') AND `+timeCondSales+` AND TRIM(s.customer_name) != '' AND LOWER(s.customer_name) != 'cliente general'
+			 GROUP BY s.customer_name
 			 ORDER BY total_spent DESC
 			 LIMIT 10`)
 		if errCust == nil {
@@ -230,15 +233,16 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 			custRows.Close()
 		}
 
-		// Top 5 Bancos del período
+		// Top 5 Bancos del período (excluyendo ventas canceladas)
 		bankRows, errBank := h.DB.Query(r.Context(),
 			`SELECT 
-				COALESCE(NULLIF(TRIM(bank_details), ''), 'Transferencia General') as bank_name,
-				COUNT(id) as count,
-				COALESCE(SUM(CASE WHEN transfer_amount > 0 THEN transfer_amount ELSE total END), 0) as total_amount
-			 FROM sales
-			 WHERE `+timeCondition+` 
-			   AND (payment_method IN ('transferencia', 'mixto', 'multibanco') OR transfer_amount > 0)
+				COALESCE(NULLIF(TRIM(s.bank_details), ''), 'Transferencia General') as bank_name,
+				COUNT(s.id) as count,
+				COALESCE(SUM(CASE WHEN s.transfer_amount > 0 THEN s.transfer_amount ELSE s.total END), 0) as total_amount
+			 FROM sales s
+			 LEFT JOIN comandas c ON c.sale_id = s.id
+			 WHERE (c.status IS NULL OR c.status != 'cancelado') AND `+timeCondSales+` 
+			   AND (s.payment_method IN ('transferencia', 'mixto', 'multibanco') OR s.transfer_amount > 0)
 			 GROUP BY bank_name
 			 ORDER BY count DESC, total_amount DESC
 			 LIMIT 5`)
