@@ -47,9 +47,18 @@ func NewComandaHandler(db *pgxpool.Pool, hub *events.Hub) *ComandaHandler {
 // GET /comandas
 func (h *ComandaHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT c.id, c.order_number, COALESCE(c.sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(c.customer_name, ''), c.status, COALESCE(c.notes, ''), c.created_at, c.updated_at, c.ready_at, c.prepared_by, COALESCE(NULLIF(c.prepared_by_username, ''), u.username, '') 
+		`SELECT c.id, c.order_number, COALESCE(c.sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(c.customer_name, ''), c.status, COALESCE(c.notes, ''), c.created_at, c.updated_at, c.ready_at, c.prepared_by, 
+		        COALESCE(
+		          NULLIF(NULLIF(c.prepared_by_username, ''), 'Por asignar'), 
+		          u.username, 
+		          NULLIF(s.sold_by_name, ''), 
+		          su.username, 
+		          CASE WHEN c.status != 'pendiente' THEN 'Personal' ELSE 'Por asignar' END
+		        ) AS prepared_by_username
 		 FROM comandas c
 		 LEFT JOIN users u ON c.prepared_by = u.id
+		 LEFT JOIN sales s ON c.sale_id = s.id
+		 LEFT JOIN users su ON s.sold_by = su.id
 		 WHERE c.created_at >= (now() - INTERVAL '12 hours') OR c.status IN ('pendiente', 'en_preparacion', 'listo')
 		 ORDER BY CASE c.status 
 		    WHEN 'pendiente' THEN 1 
@@ -205,6 +214,21 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if (preparedByName == "" || preparedByName == "Por asignar") && statusStr != "pendiente" {
+		var saleSeller string
+		_ = h.DB.QueryRow(r.Context(),
+			`SELECT COALESCE(NULLIF(s.sold_by_name, ''), u.username, '') 
+			 FROM comandas c 
+			 JOIN sales s ON c.sale_id = s.id 
+			 LEFT JOIN users u ON s.sold_by = u.id 
+			 WHERE c.id = $1`, id).Scan(&saleSeller)
+		if saleSeller != "" {
+			preparedByName = saleSeller
+		} else {
+			preparedByName = "Personal"
+		}
+	}
+
 	var c models.Comanda
 	var updateErr error
 
@@ -216,8 +240,8 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		     prepared_by = COALESCE($3, prepared_by),
 		     prepared_by_username = CASE 
 		       WHEN $4 <> '' AND $4 <> 'Por asignar' THEN $4 
-		       WHEN COALESCE(prepared_by_username, '') <> '' AND prepared_by_username <> 'Por asignar' THEN prepared_by_username
-		       ELSE 'Por asignar'
+		       WHEN COALESCE(NULLIF(prepared_by_username, ''), 'Por asignar') <> 'Por asignar' THEN prepared_by_username
+		       ELSE $4
 		     END
 		 WHERE id = $2 
 		 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,

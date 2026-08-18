@@ -30,6 +30,15 @@ func NewUserHandler(db *pgxpool.Pool) *UserHandler {
 	defer cancel()
 
 	_, _ = db.Exec(ctx, `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''`)
+	_, _ = db.Exec(ctx, `
+		DO $$ 
+		BEGIN 
+			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'comandas_prepared_by_fkey') THEN
+				ALTER TABLE comandas DROP CONSTRAINT comandas_prepared_by_fkey;
+			END IF;
+			ALTER TABLE comandas ADD CONSTRAINT comandas_prepared_by_fkey FOREIGN KEY (prepared_by) REFERENCES users(id) ON DELETE SET NULL;
+		END $$;
+	`)
 
 	return &UserHandler{DB: db}
 }
@@ -351,6 +360,9 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
+	if _, err := tx.Exec(ctx, `UPDATE comandas SET prepared_by = NULL WHERE prepared_by = $1`, id); err != nil {
+		log.Printf("aviso actualizando comandas prepared_by: %v", err)
+	}
 	if _, err := tx.Exec(ctx, `UPDATE sales SET sold_by = NULL WHERE sold_by = $1`, id); err != nil {
 		log.Printf("aviso actualizando sales: %v", err)
 		_, _ = tx.Exec(ctx, `UPDATE sales SET sold_by = $2 WHERE sold_by = $1`, id, primaryOwnerID)
