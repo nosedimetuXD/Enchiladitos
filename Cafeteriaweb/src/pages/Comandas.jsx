@@ -72,7 +72,7 @@ export default function Comandas() {
   async function handleStatusChange(id, newStatus) {
     try {
       const userObj = JSON.parse(localStorage.getItem('user') || '{}')
-      const preparerName = userObj.username || userObj.name || ''
+      const preparerName = user?.username || user?.name || userObj?.username || userObj?.name || ''
 
       await api.patch(`/comandas/${id}/status`, {
         status: newStatus,

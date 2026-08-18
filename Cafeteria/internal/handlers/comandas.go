@@ -181,7 +181,7 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	var preparedBy *uuid.UUID
 	var preparedByName string
 
-	if strings.TrimSpace(req.PreparedByUsername) != "" {
+	if strings.TrimSpace(req.PreparedByUsername) != "" && strings.TrimSpace(req.PreparedByUsername) != "Por asignar" {
 		preparedByName = strings.TrimSpace(req.PreparedByUsername)
 	}
 
@@ -191,7 +191,7 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		errU := h.DB.QueryRow(r.Context(), "SELECT id, username FROM users WHERE id = $1", *userID).Scan(&validID, &dbUsername)
 		if errU == nil {
 			preparedBy = &validID
-			if preparedByName == "" {
+			if preparedByName == "" || preparedByName == "Por asignar" {
 				preparedByName = dbUsername
 			}
 		}
@@ -200,29 +200,21 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	var c models.Comanda
 	var updateErr error
 
-	if preparedBy != nil || preparedByName != "" {
-		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas 
-			 SET status = $1, 
-			     updated_at = now(), 
-			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
-			     prepared_by = COALESCE($3, prepared_by),
-			     prepared_by_username = CASE WHEN $4 <> '' THEN $4 ELSE prepared_by_username END
-			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
-			statusStr, id, preparedBy, preparedByName,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
-	} else {
-		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas 
-			 SET status = $1, 
-			     updated_at = now(), 
-			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END)
-			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
-			statusStr, id,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
-	}
+	updateErr = h.DB.QueryRow(r.Context(),
+		`UPDATE comandas 
+		 SET status = $1, 
+		     updated_at = now(), 
+		     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
+		     prepared_by = COALESCE($3, prepared_by),
+		     prepared_by_username = CASE 
+		       WHEN $4 <> '' AND $4 <> 'Por asignar' THEN $4 
+		       WHEN COALESCE(prepared_by_username, '') <> '' AND prepared_by_username <> 'Por asignar' THEN prepared_by_username
+		       ELSE 'Por asignar'
+		     END
+		 WHERE id = $2 
+		 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
+		statusStr, id, preparedBy, preparedByName,
+	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 
 	// Ultimate fallback si falla cualquier cosa
 	if updateErr != nil {

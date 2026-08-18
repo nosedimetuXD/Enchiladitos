@@ -102,9 +102,9 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		ExpensesByCategory:   make(map[string]float64),
 	}
 
-	// 1. Ingresos totales de ventas
+	// 1. Ingresos totales de ventas (excluyendo canceladas)
 	var cashIncome, transferIncome float64
-	salesQuery := "SELECT COALESCE(SUM(total), 0), COUNT(id), COALESCE(SUM(cash_amount), 0), COALESCE(SUM(transfer_amount), 0) FROM sales WHERE " + timeCondition
+	salesQuery := "SELECT COALESCE(SUM(s.total), 0), COUNT(s.id), COALESCE(SUM(s.cash_amount), 0), COALESCE(SUM(s.transfer_amount), 0) FROM sales s LEFT JOIN comandas c ON c.sale_id = s.id WHERE (c.status IS NULL OR c.status != 'cancelado') AND " + timeCondSales
 	err := h.DB.QueryRow(r.Context(), salesQuery).Scan(&summary.TotalIncome, &summary.SalesCount, &cashIncome, &transferIncome)
 	if err != nil {
 		log.Printf("error calculando ingresos: %v", err)

@@ -239,10 +239,11 @@ export default function Accounting() {
   const safeSales = Array.isArray(sales) ? sales : []
   const safeExpenses = Array.isArray(expenses) ? expenses : []
 
-  // Filtro de ventas por zona horaria local de navegador
+  // Filtro de ventas por zona horaria local de navegador (excluyendo canceladas)
   const filteredSales = useMemo(() => {
     return safeSales.filter((s) => {
-      if (!s || !s.created_at) return true
+      if (!s || !s.created_at) return false
+      if (s.status === 'cancelado' || s.status === 'cancelada') return false
       const saleDate = new Date(s.created_at)
       if (isNaN(saleDate.getTime())) return true
       const now = new Date()

@@ -12,6 +12,7 @@ export default function Users() {
   const [expenses, setExpenses] = useState([])
   const [tasks, setTasks] = useState([])
   const [wasteReports, setWasteReports] = useState([])
+  const [comandas, setComandas] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
@@ -30,18 +31,20 @@ export default function Users() {
 
   async function loadData() {
     try {
-      const [uData, sData, eData, tData, wData] = await Promise.all([
+      const [uData, sData, eData, tData, wData, cData] = await Promise.all([
         api.get('/users').catch(() => []),
         api.get('/sales?period=all').catch(() => []),
         api.get('/expenses?period=all').catch(() => []),
         api.get('/tasks').catch(() => []),
-        api.get('/waste').catch(() => [])
+        api.get('/waste').catch(() => []),
+        api.get('/comandas').catch(() => [])
       ])
       setUsers(uData || [])
       setSales(sData || [])
       setExpenses(eData || [])
       setTasks(tData || [])
       setWasteReports(wData || [])
+      setComandas(cData || [])
     } catch (err) {
       setPageError('No se pudieron cargar los usuarios')
     } finally {
@@ -175,7 +178,8 @@ export default function Users() {
 
     let totalPrepMin = 0
     let prepCount = 0
-    comandas.forEach((c) => {
+    const safeComandas = Array.isArray(comandas) ? comandas : []
+    safeComandas.forEach((c) => {
       const isMyPrep = (selectedUserForStats?.id && c.prepared_by === selectedUserForStats.id) ||
                        (c.prepared_by_username && c.prepared_by_username.toLowerCase() === selectedUserForStats?.username?.toLowerCase())
 
