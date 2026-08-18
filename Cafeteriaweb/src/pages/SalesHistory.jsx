@@ -211,7 +211,6 @@ export default function SalesHistory() {
               <tr>
                 <th className="py-3.5 px-4">Fecha / Hora</th>
                 <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Resumen del Pedido</th>
                 <th className="py-3.5 px-4">Método de Pago & Entidad</th>
                 <th className="py-3.5 px-4">Atendido Por</th>
                 <th className="py-3.5 px-4 text-right">Total</th>
@@ -223,7 +222,6 @@ export default function SalesHistory() {
                 const sDate = new Date(s.created_at)
                 const dateFormatted = sDate.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
                 const timeFormatted = sDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
-                const itemsSummary = (s.items || []).map((i) => `${i.quantity}x ${i.product_name || 'Producto'}`).join(', ') || 'Sin productos'
 
                 return (
                   <tr key={s.id} className="hover:bg-[#FEE4D7]/30 transition-colors">
@@ -237,11 +235,6 @@ export default function SalesHistory() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
-                    <td className="py-3.5 px-4">
-                      <div className="max-w-[220px] font-semibold text-[#432414] dark:text-[#FEE4D7] text-xs truncate" title={itemsSummary}>
-                        {itemsSummary}
-                      </div>
-                    </td>
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5">
                         <span className="px-2.5 py-0.5 rounded-full bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] border border-[#D4B28E] font-extrabold text-[10px] uppercase tracking-wider w-max">
