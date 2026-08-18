@@ -9,7 +9,8 @@ import {
   Play,
   Check,
   User,
-  XCircle
+  XCircle,
+  RefreshCw
 } from 'lucide-react'
 
 export default function Comandas() {
@@ -17,6 +18,7 @@ export default function Comandas() {
   const [comandas, setComandas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [processingId, setProcessingId] = useState(null)
 
   async function loadComandas() {
     try {
@@ -70,10 +72,26 @@ export default function Comandas() {
   }, [])
 
   async function handleStatusChange(id, newStatus) {
-    try {
-      const userObj = JSON.parse(localStorage.getItem('user') || '{}')
-      const preparerName = user?.username || user?.name || userObj?.username || userObj?.name || ''
+    if (processingId === id) return
+    setProcessingId(id)
 
+    const userObj = JSON.parse(localStorage.getItem('user') || '{}')
+    const preparerName = user?.username || user?.name || userObj?.username || userObj?.name || 'Personal'
+
+    // Actualización optimista inmediata en local
+    setComandas((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c
+        const currentPrep = c.prepared_by_username && c.prepared_by_username !== 'Por asignar' ? c.prepared_by_username : preparerName
+        return {
+          ...c,
+          status: newStatus,
+          prepared_by_username: currentPrep
+        }
+      })
+    )
+
+    try {
       await api.patch(`/comandas/${id}/status`, {
         status: newStatus,
         prepared_by_username: preparerName
@@ -85,6 +103,9 @@ export default function Comandas() {
     } catch (err) {
       console.error('Error al cambiar estado de comanda:', err)
       alert(err.message || 'Error al actualizar el estado de la comanda')
+      await loadComandas()
+    } finally {
+      setProcessingId(null)
     }
   }
 
@@ -130,6 +151,8 @@ export default function Comandas() {
     const prepDuration = isFinished
       ? formatDuration(c.created_at, c.ready_at || c.updated_at)
       : formatElapsedTime(c.created_at)
+
+    const isCurrentProcessing = processingId === c.id
 
     return (
       <div
@@ -199,43 +222,43 @@ export default function Comandas() {
           {colType === 'pending' && (
             <div className="flex flex-col gap-2">
               <button
+                disabled={isCurrentProcessing}
                 onClick={() => handleStatusChange(c.id, 'en_preparacion')}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Iniciar Preparación</span>
+                {isCurrentProcessing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span>{isCurrentProcessing ? 'Procesando...' : 'Iniciar Preparación'}</span>
               </button>
               <button
-                onClick={() => {
-                  if (window.confirm('¿Estás seguro de cancelar esta venta?')) {
-                    handleStatusChange(c.id, 'cancelado')
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-red-300 dark:border-red-800/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                disabled={isCurrentProcessing}
+                onClick={() => handleStatusChange(c.id, 'cancelado')}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-red-300 dark:border-red-800/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                <XCircle className="w-3.5 h-3.5" />
-                <span>Cancelar Venta</span>
+                {isCurrentProcessing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                <span>{isCurrentProcessing ? 'Cancelando...' : 'Cancelar Venta'}</span>
               </button>
             </div>
           )}
 
           {colType === 'in_prep' && (
             <button
+              disabled={isCurrentProcessing}
               onClick={() => handleStatusChange(c.id, 'listo')}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>Listo para Servir</span>
+              {isCurrentProcessing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              <span>{isCurrentProcessing ? 'Procesando...' : 'Listo para Servir'}</span>
             </button>
           )}
 
           {colType === 'ready' && (
             <button
+              disabled={isCurrentProcessing}
               onClick={() => handleStatusChange(c.id, 'entregado')}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#432414] hover:bg-[#201009] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#432414] hover:bg-[#201009] disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Marcar Entregado</span>
+              {isCurrentProcessing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              <span>{isCurrentProcessing ? 'Procesando...' : 'Marcar Entregado'}</span>
             </button>
           )}
 

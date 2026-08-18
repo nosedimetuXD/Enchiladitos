@@ -33,6 +33,14 @@ func NewComandaHandler(db *pgxpool.Pool, hub *events.Hub) *ComandaHandler {
 	_, _ = db.Exec(ctx, `ALTER TABLE comandas ADD COLUMN IF NOT EXISTS ready_at TIMESTAMP WITH TIME ZONE`)
 	_, _ = db.Exec(ctx, `ALTER TABLE comandas ADD COLUMN IF NOT EXISTS prepared_by UUID REFERENCES users(id)`)
 	_, _ = db.Exec(ctx, `ALTER TABLE comandas ADD COLUMN IF NOT EXISTS prepared_by_username VARCHAR(100)`)
+	_, _ = db.Exec(ctx, `
+		UPDATE comandas c
+		SET prepared_by = COALESCE(c.prepared_by, s.sold_by),
+		    prepared_by_username = COALESCE(NULLIF(c.prepared_by_username, ''), NULLIF(c.prepared_by_username, 'Por asignar'), NULLIF(s.sold_by_name, ''), u.username, 'Personal')
+		FROM sales s
+		LEFT JOIN users u ON s.sold_by = u.id
+		WHERE c.sale_id = s.id AND (c.prepared_by_username IS NULL OR c.prepared_by_username = '' OR c.prepared_by_username = 'Por asignar')
+	`)
 	return &ComandaHandler{DB: db, Hub: hub}
 }
 
