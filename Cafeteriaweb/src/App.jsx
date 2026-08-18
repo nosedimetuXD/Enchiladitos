@@ -48,7 +48,7 @@ function AppRoutes() {
         <Route
           path="accounting"
           element={
-            <ProtectedRoute roles={['owner', 'admin']}>
+            <ProtectedRoute roles={['owner']}>
               <Accounting />
             </ProtectedRoute>
           }

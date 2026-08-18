@@ -659,58 +659,6 @@ export default function Accounting() {
         </div>
       </div>
 
-      {/* Ranking Top 5 Bancos / Entidades Más Usados */}
-      <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-[#9F6839]" />
-            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-              Ranking Top 5 Bancos / Entidades Más Usados
-            </h3>
-          </div>
-          <span className="text-xs font-bold text-[#9F6839]">
-            Basado en transferencias recibidas
-          </span>
-        </div>
-
-        {topBanksRanking.length === 0 ? (
-          <p className="text-xs text-[#9F6839] font-medium py-3 text-center">
-            No hay transferencias ni pagos digitales registrados en este periodo.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {topBanksRanking.map((bank, index) => (
-              <div
-                key={bank.name}
-                className="p-3.5 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/50 space-y-2 relative"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5 truncate">
-                    <span className="w-5 h-5 rounded-full bg-[#9F6839] text-white text-[10px] flex items-center justify-center font-black shrink-0">
-                      #{index + 1}
-                    </span>
-                    <span className="truncate">{bank.name}</span>
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] text-[#9F6839] font-bold">
-                    <span>{bank.count} {bank.count === 1 ? 'pago' : 'pagos'}</span>
-                    <span className="text-[#432414] dark:text-[#FEE4D7] font-extrabold">${(Number(bank.total) || 0).toLocaleString()}</span>
-                  </div>
-
-                  <div className="w-full h-1.5 bg-[#D4B28E]/30 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#9F6839] rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(10, bank.percentage)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Pestañas (Ingresos / Gastos / Flujo Combinado) */}
       <div className="flex items-center gap-2 border-b border-[#D4B28E]/40 pb-2 overflow-x-auto">

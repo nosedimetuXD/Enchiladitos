@@ -146,10 +146,10 @@ func main() {
 		r.Post("/sales", saleHandler.Create)
 	})
 
-	// Contabilidad y Gastos: solo Owner y Admin
+	// Contabilidad y Gastos: solo el Dueño (Owner)
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
-		r.Use(custommw.RequireRole(models.RoleOwner, models.RoleAdmin))
+		r.Use(custommw.RequireRole(models.RoleOwner))
 		r.Get("/accounting/summary", accountingHandler.GetSummary)
 		r.Get("/expenses", accountingHandler.ListExpenses)
 		r.Post("/expenses", accountingHandler.CreateExpense)

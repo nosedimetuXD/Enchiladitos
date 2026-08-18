@@ -2,7 +2,7 @@
 
 > *"Hecho por y para estudiantes"*
 
-**Toffe Coffee** es una plataforma web integral de Punto de Venta (POS), gestión operativa de inventario, comandas en tiempo real, control de mermas/daños, contabilidad financiera avanzada y estadísticas ejecutivas diseñada para la administración eficiente de cafeterías universitarias y comerciales.
+**Toffe Coffee** es una plataforma web integral de Punto de Venta (POS), gestión operativa de inventario, comandas en tiempo real (KDS), control de mermas/daños, contabilidad financiera avanzada y estadísticas ejecutivas diseñada para la administración eficiente de cafeterías universitarias y comerciales.
 
 ---
 
@@ -10,62 +10,61 @@
 
 ### 🛒 1. Punto de Venta (POS) & Cobro Multi-Entidad
 - Catálogo interactivo de productos con filtrado por categoría y búsqueda en tiempo real.
-- Carrito de compras responsivo con cálculo de subtotal y total.
+- Carrito de compras responsivo con cálculo de subtotal y total a pagar.
 - **Formas de Pago Avanzadas**:
   - `Efectivo`: Cálculo automático de cambio a entregar.
   - `Transferencia`: Registro y selección rápida de bancos/entidades (*Nequi*, *Daviplata*, *Bancolombia*, *Nu*, *Bre-B / Llave*, etc.) con opción de **dividir el pago entre múltiples bancos**.
-  - `Pago Mixto`: Combinación de efectivo + abonos digitales desglosados por banco con validación estricta de totales y montos no nulos.
-- Validación de duplicados de banco y prevención de entradas de monto `$0`.
-- Autocompletado de clientes habituales y comprobante de venta impreso/digital.
+  - `Pago Mixto`: Combinación de efectivo + abonos digitales desglosados por banco con validación estricta de totales.
+- Autocompletado de clientes habituales y ticket de recibo impreso/digital.
 
-### ⚠️ 2. Sistema de Reporte de Daños y Pérdidas de Insumos (Mermas)
-- **Acceso General**: Todos los roles de usuario (*Dueño*, *Administrador*, *Empleado*) pueden reportar daños o pérdidas de insumos.
-- **Descuento Automático**: Al registrar una merma (ej. vasos quebrados, leche vencida, derrames), la cantidad reportada se descuenta automáticamente del stock de inventario.
-- **Historial Completo**: Registro auditable con fecha/hora, insumo afectado, cantidad perdida, unidad, motivo detallado y nombre del usuario declarante.
-
-### 💰 3. Contabilidad Financial & Ranking Top 5 Bancos
-- Reporte unificado de ingresos por ventas, egresos operativos y balance neto por periodos (`Hoy`, `Esta Semana`, `Este Mes`, `Histórico Total`).
-- **Ranking Top 5 Bancos / Entidades Más Usados**: Panel visual interactivo que muestra las 5 entidades digitales más utilizadas por los clientes, con número de transacciones, volumen total en dinero ($) y barra de frecuencia relativa.
-- Registro de gastos por categorías (Insumos, Servicios, Mantenimiento, Nómina, Otros) con reabastecimiento directo de inventario.
-
-### 🛎️ 4. Comandas Diarias en Tiempo Real (Barra & Cocina)
+### 🛎️ 2. Comandas en Tiempo Real (KDS Cocina & Barista)
 - Generación automática de tickets de comanda al confirmar cada venta en el POS.
-- **Filtro Diario Automático**: El tablero limpia la vista al inicio de cada jornada mostrando solo pedidos del día.
-- Estados de comanda: `Pendientes` ➔ `En Preparación` ➔ `Entregados`.
-- Sincronización instantánea vía Server-Sent Events (SSE).
+- **Asignación de Preparador**: Las comandas pendientes inician en estado `Por asignar`. Al hacer clic en **"Iniciar Preparación"**, se asigna incondicionalmente el usuario activo que asume la comanda.
+- **Botonera de Cancelación Directa**: Permite ejecutar `Cancelar Venta` en comandas pendientes. Al cancelar:
+  - Cambia el estado de la comanda a `cancelado`.
+  - **Devuelve automáticamente los insumos** descontados al inventario de ingredientes.
+  - Excluye la venta de los totales facturados e ingresos contables.
+- Sincronización instantánea entre pantallas mediante Server-Sent Events (SSE).
 
-### 🏆 5. Panel de Estadísticas Ejecutivas del Mes (Exclusivo Dueño)
-- Accesible únicamente para el rol **Dueño (`owner`)**.
-- **Métricas Clave**: Ventas Totales del Mes, Gastos Totales del Mes y Ganancia Neta.
-- 🥇 **Mejor Vendedor del Mes**: Usuario que generó el mayor volumen de ventas.
-- 🔥 **Producto Más Vendido del Mes**: Producto estrella con mayor número de unidades e ingresos.
-- 🏆 **Top 5 Clientes**: Ranking de clientes frecuentes por volumen de compra.
+### 📜 3. Historial de Ventas con Estado & Cancelación Auditable
+- Registro cronológico de todas las ventas cobradas.
+- **Columna de Estado**: Muestra insignias claras de `COMPLETADA` o `CANCELADA`.
+- **Cancelación de Ventas**: Permite cancelar cualquier venta completada sin eliminar el registro del sistema. La venta permanece marcada como `CANCELADA` para fines de auditoría, descontando su monto del total facturado y retornando los ingredientes al inventario.
 
-### 👤 6. Perfil de Usuario & Gestión de Personal
-- **Mi Perfil**: Cada usuario puede personalizar su nombre de usuario, contraseña y foto de perfil (avatar desde archivo local o enlace Google Drive).
-- **Gestión de Personal (Dueño)**: Creación, edición de rol y eliminación de usuarios mediante transacciones atómicas que preservan intacto todo el historial contable y operativo.
+### 💼 4. Contabilidad & Registrar Ingreso Manual (Exclusivo Dueño)
+- Accesible de forma estricta para el rol **Dueño (`owner`)**.
+- **Registrar Ingreso Manual**: Incorpora la misma lógica avanzada de formas de pago (**Efectivo**, **Transferencia** con desglose de entidades/bancos y **Pago Mixto**).
+- **Registrar Gasto**: Permite clasificar egresos por categoría (Insumos, Servicios, Mantenimiento, Nómina, Otros) con reabastecimiento directo de insumos.
+- Botones de acción alineados limpiamente en una sola línea horizontal.
+- Flujo de caja combinado con ventas (+), ingresos manuales (+), gastos (-) y mermas (-).
 
-### 🎨 7. Diseño Minimalista & Navegación Categorizada
-- Iconografía limpia y minimalista basada en vectores **Lucide React** (sin emojis cliché).
-- **Barra Lateral Categorizada**: Organizada en 4 módulos (*Operación & Ventas*, *Catálogo & Inventario*, *Finanzas & Control*, *Sistema & Cuenta*) con opción de colapsado compacto.
+### ⚠️ 5. Control de Mermas y Pérdidas de Insumos
+- **Acceso General**: Todos los roles (*Dueño*, *Administrador*, *Empleado*) pueden reportar pérdidas o daños de materia prima.
+- **Descuento Inmediato**: Resta automáticamente del stock de inventario la cantidad reportada y la registra como pérdida operativa.
+
+### 🏆 6. Estadísticas Ejecutivas del Mes (Exclusivo Dueño)
+- **Métricas Clave**: Ingresos Totales del Mes, Gastos Totales y Ganancia Neta Real.
+- 🥇 **Mejor Vendedor del Mes**: Usuario con mayor volumen de facturación.
+- 🔥 **Top 10 Productos Más Vendidos**: Ranking por unidades vendidas.
+- 🏆 **Top 10 Clientes Frecuentes**: Ranking por monto acumulado de compra.
 
 ---
 
-## 🛡️ Roles y Permisos
+## 🛡️ Matriz de Roles y Permisos
 
-| Rol | POS & Ventas | Reportar Daños / Mermas | Ver Inventario | Gestionar Productos & Recetas | Contabilidad & Gastos | Estadísticas Ejecutivas | Gestión de Usuarios |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| ☕ **Empleado** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| 🛡️ **Administrador** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| 👑 **Dueño** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Rol | POS & Ventas | Comandas & Cocina | Reportar Mermas | Inventario & Productos | Historial Ventas | Contabilidad & Gastos | Estadísticas Ejecutivo | Usuarios |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| ☕ **Empleado** | ✅ | ✅ | ✅ | 👁️ Lectura | ✅ | ❌ | ❌ | ❌ |
+| 🛡️ **Administrador** | ✅ | ✅ | ✅ | ✅ Edición | ✅ | ❌ | ❌ | ❌ |
+| 👑 **Dueño** | ✅ | ✅ | ✅ | ✅ Edición | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
 ## 🛠️ Arquitectura Tecnológica
 
 - **Backend**: Go 1.26, Router `Chi`, Driver PostgreSQL `pgx/v5`, Autenticación JWT, Server-Sent Events (SSE).
-- **Frontend**: React 19, Vite, React Router v7, Vanilla CSS (Espresso Roasted Design), PWA.
-- **Base de Datos**: PostgreSQL 14+ (Supabase / PostgreSQL Local).
+- **Frontend**: React 19, Vite, React Router v7, Tailwind CSS / Custom Styling (Espresso Roasted Design), PWA.
+- **Base de Datos**: PostgreSQL 14+ (Supabase / Local).
 
 ---
 
@@ -94,7 +93,7 @@
    cd Cafeteria
    go run ./cmd/server
    ```
-   *El servidor iniciará en `http://localhost:8080`.*
+   *El servidor escuchará en `http://localhost:8080`.*
 
 ### 2. Frontend en React (`Cafeteriaweb/`)
 

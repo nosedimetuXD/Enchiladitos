@@ -89,14 +89,12 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var timeCondition string
 	if rawCond != "" {
-		timeCondition = "WHERE (c.status IS NULL OR c.status != 'cancelado') AND (" + rawCond + ")"
-	} else {
-		timeCondition = "WHERE (c.status IS NULL OR c.status != 'cancelado')"
+		timeCondition = "WHERE " + rawCond
 	}
 
 	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Personal'), COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        COALESCE(s.bank_details, ''), s.total, s.created_at,
+		        COALESCE(s.bank_details, ''), s.total, COALESCE(c.status, 'completada') AS status, s.created_at,
 		        COALESCE(
 		          (SELECT json_agg(json_build_object(
 		             'product_id', si.product_id,
@@ -125,7 +123,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		var s models.Sale
 		var itemsJSON []byte
 		if err := rows.Scan(&s.ID, &s.SoldBy, &s.SoldByUsername, &s.CustomerName,
-			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails, &s.Total, &s.CreatedAt, &itemsJSON); err != nil {
+			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails, &s.Total, &s.Status, &s.CreatedAt, &itemsJSON); err != nil {
 			log.Printf("error leyendo ventas: %v", err)
 			http.Error(w, "error leyendo ventas", http.StatusInternalServerError)
 			return

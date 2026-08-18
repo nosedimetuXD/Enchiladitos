@@ -102,7 +102,7 @@ export default function Layout() {
     {
       title: 'FINANZAS & CONTROL',
       items: [
-        { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isAdmin },
+        { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isOwner },
         { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
         { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true }
       ]
