@@ -24,11 +24,13 @@ import {
   ShieldAlert,
   ArrowRightLeft,
   Award,
-  Users
+  Users,
+  Trash2
 } from 'lucide-react'
 
 export default function Accounting() {
   const [expenses, setExpenses] = useState([])
+  const [incomes, setIncomes] = useState([])
   const [sales, setSales] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [wasteReports, setWasteReports] = useState([])
@@ -51,6 +53,17 @@ export default function Accounting() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
+  // Modal Registrar Ingreso
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false)
+  const [incomeDescription, setIncomeDescription] = useState('')
+  const [incomeAmount, setIncomeAmount] = useState('')
+  const [incomeCategory, setIncomeCategory] = useState('otros')
+  const [incomePaymentMethod, setIncomePaymentMethod] = useState('efectivo')
+  const [incomeCashAmount, setIncomeCashAmount] = useState('')
+  const [incomeBankLines, setIncomeBankLines] = useState([{ bank: 'Bre-B/Llave', amount: '' }])
+  const [incomeSubmitting, setIncomeSubmitting] = useState(false)
+  const [incomeFormError, setIncomeFormError] = useState('')
+
   function addExpenseBankLine() {
     setExpenseBankLines((prev) => [...prev, { bank: 'Bre-B/Llave', amount: '' }])
   }
@@ -64,20 +77,35 @@ export default function Accounting() {
     setExpenseBankLines((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
   }
 
+  function addIncomeBankLine() {
+    setIncomeBankLines((prev) => [...prev, { bank: 'Bre-B/Llave', amount: '' }])
+  }
+
+  function removeIncomeBankLine(index) {
+    if (incomeBankLines.length <= 1) return
+    setIncomeBankLines((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function updateIncomeBankLine(index, field, value) {
+    setIncomeBankLines((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
+  }
+
   async function loadData() {
     setLoading(true)
     setPageError('')
     try {
-      const [expData, ingData, salesData, wasteData] = await Promise.all([
+      const [expData, ingData, salesData, wasteData, incData] = await Promise.all([
         api.get('/expenses?period=all').catch(() => []),
         api.get('/ingredients').catch(() => []),
         api.get('/sales?period=all').catch(() => []),
-        api.get('/waste').catch(() => [])
+        api.get('/waste').catch(() => []),
+        api.get('/incomes?period=all').catch(() => [])
       ])
       setExpenses(Array.isArray(expData) ? expData : [])
       setIngredients(Array.isArray(ingData) ? ingData : [])
       setSales(Array.isArray(salesData) ? salesData : [])
       setWasteReports(Array.isArray(wasteData) ? wasteData : [])
+      setIncomes(Array.isArray(incData) ? incData : [])
     } catch (err) {
       console.error('Error cargando contabilidad:', err)
       setPageError('No se pudo cargar la información de contabilidad')
@@ -102,6 +130,53 @@ export default function Accounting() {
     setAddedUnit('ml')
     setFormError('')
     setIsModalOpen(true)
+  }
+
+  function openCreateIncomeModal() {
+    setIncomeDescription('')
+    setIncomeAmount('')
+    setIncomeCategory('otros')
+    setIncomePaymentMethod('efectivo')
+    setIncomeCashAmount('')
+    setIncomeBankLines([{ bank: 'Bre-B/Llave', amount: '' }])
+    setIncomeFormError('')
+    setIsIncomeModalOpen(true)
+  }
+
+  async function handleCreateIncome(e) {
+    e.preventDefault()
+    setIncomeSubmitting(true)
+    setIncomeFormError('')
+
+    try {
+      let finalPaymentMethod = incomePaymentMethod
+
+      const bankParts = incomeBankLines
+        .filter((l) => l.bank.trim() !== '')
+        .map((l) => (l.amount ? `${l.bank.trim()} ($${Number(l.amount).toLocaleString()})` : l.bank.trim()))
+
+      if (incomePaymentMethod === 'transferencia') {
+        finalPaymentMethod = bankParts.length > 0 ? `transferencia: ${bankParts.join(' + ')}` : 'transferencia'
+      } else if (incomePaymentMethod === 'mixto') {
+        const cashPart = incomeCashAmount ? `$${Number(incomeCashAmount).toLocaleString()} Efectivo` : 'Efectivo'
+        const bankStr = bankParts.length > 0 ? bankParts.join(' + ') : 'Transferencia'
+        finalPaymentMethod = `mixto (${cashPart} + ${bankStr})`
+      }
+
+      await api.post('/incomes', {
+        description: incomeDescription,
+        amount: Number(incomeAmount) || 0,
+        category: incomeCategory,
+        payment_method: finalPaymentMethod
+      })
+
+      setIsIncomeModalOpen(false)
+      await loadData()
+    } catch (err) {
+      setIncomeFormError(err.message || 'No se pudo registrar el ingreso')
+    } finally {
+      setIncomeSubmitting(false)
+    }
   }
 
   const selectedAddedIng = ingredients.find((i) => i.id === ingredientId)
@@ -243,6 +318,32 @@ export default function Accounting() {
     }, 0)
   }, [filteredWaste])
 
+  const safeIncomes = Array.isArray(incomes) ? incomes : []
+
+  // Filtro de ingresos manuales por zona horaria local de navegador
+  const filteredIncomes = useMemo(() => {
+    return safeIncomes.filter((inc) => {
+      if (!inc || !inc.created_at) return true
+      const incDate = new Date(inc.created_at)
+      if (isNaN(incDate.getTime())) return true
+      const now = new Date()
+
+      if (period === 'today') {
+        return incDate.toDateString() === now.toDateString()
+      }
+      if (period === 'week') {
+        const startOfWeek = new Date()
+        startOfWeek.setDate(now.getDate() - 7)
+        startOfWeek.setHours(0, 0, 0, 0)
+        return incDate >= startOfWeek
+      }
+      if (period === 'month') {
+        return incDate.getMonth() === now.getMonth() && incDate.getFullYear() === now.getFullYear()
+      }
+      return true
+    })
+  }, [safeIncomes, period])
+
   // Resumen dinámico sincronizado
   const summary = useMemo(() => {
     let totalIncome = 0
@@ -256,6 +357,19 @@ export default function Accounting() {
       transferIncome += Number(s.transfer_amount) || 0
     })
 
+    filteredIncomes.forEach((inc) => {
+      const tot = Number(inc.amount) || 0
+      totalIncome += tot
+      if (inc.payment_method?.includes('transferencia')) {
+        transferIncome += tot
+      } else if (inc.payment_method?.includes('mixto')) {
+        transferIncome += tot / 2
+        cashIncome += tot / 2
+      } else {
+        cashIncome += tot
+      }
+    })
+
     let totalExpenses = 0
     filteredExpenses.forEach((e) => {
       totalExpenses += Number(e.amount) || 0
@@ -263,7 +377,7 @@ export default function Accounting() {
 
     return {
       total_income: totalIncome,
-      sales_count: filteredSales.length,
+      sales_count: filteredSales.length + filteredIncomes.length,
       total_expenses: totalExpenses,
       expenses_count: filteredExpenses.length,
       net_balance: totalIncome - totalExpenses - totalWasteLoss,
@@ -272,7 +386,7 @@ export default function Accounting() {
         transferencia: transferIncome
       }
     }
-  }, [filteredSales, filteredExpenses, totalWasteLoss])
+  }, [filteredSales, filteredIncomes, filteredExpenses, totalWasteLoss])
 
   const combinedMovements = useMemo(() => {
     return [
@@ -284,6 +398,15 @@ export default function Accounting() {
         details: `${s.sold_by_username ? `Vendido por ${s.sold_by_username}` : 'Venta POS'}${s.bank_details ? ` (${s.bank_details})` : ''}`,
         paymentMethod: s.payment_method || 'efectivo',
         amount: Number(s.total) || 0
+      })),
+      ...filteredIncomes.map((inc) => ({
+        id: inc.id || Math.random().toString(),
+        type: 'income',
+        date: inc.created_at || new Date().toISOString(),
+        concept: `Ingreso Manual - ${inc.description || 'Otros Ingresos'}`,
+        details: inc.registerer_name ? `Registrado por ${inc.registerer_name}` : 'Ingreso adicional',
+        paymentMethod: inc.payment_method || 'efectivo',
+        amount: Number(inc.amount) || 0
       })),
       ...filteredExpenses.map((e) => ({
         id: e.id || Math.random().toString(),
@@ -409,8 +532,8 @@ export default function Accounting() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shrink-0">
               <Calendar className="w-3.5 h-3.5 text-[#DABA8C]" />
               <select
                 value={period}
@@ -424,12 +547,23 @@ export default function Accounting() {
               </select>
             </div>
 
-            <button
-              onClick={openCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md cursor-pointer transition-all border border-white/20"
-            >
-              <Plus className="w-4 h-4" /> Registrar Gasto
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={openCreateIncomeModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md cursor-pointer transition-all border border-white/20 whitespace-nowrap shrink-0"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>Registrar Ingreso</span>
+              </button>
+
+              <button
+                onClick={openCreateModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs shadow-md cursor-pointer transition-all border border-white/20 whitespace-nowrap shrink-0"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>Registrar Gasto</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -999,6 +1133,172 @@ export default function Accounting() {
               className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Guardando...' : 'Registrar Gasto'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Registrar Ingreso Manual */}
+      <Modal isOpen={isIncomeModalOpen} onClose={() => setIsIncomeModalOpen(false)} title="Registrar Ingreso Manual">
+        <form onSubmit={handleCreateIncome} className="space-y-4">
+          {incomeFormError && (
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
+              ⚠️ {incomeFormError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Descripción del Ingreso
+            </label>
+            <input
+              type="text"
+              value={incomeDescription}
+              onChange={(e) => setIncomeDescription(e.target.value)}
+              placeholder="Ej. Venta de equipo usado / Aporte de socio"
+              required
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Monto ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={incomeAmount}
+                onChange={(e) => setIncomeAmount(e.target.value)}
+                placeholder="0.00"
+                required
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+                Forma de Pago
+              </label>
+              <select
+                value={incomePaymentMethod}
+                onChange={(e) => setIncomePaymentMethod(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              >
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="mixto">Pago Mixto</option>
+              </select>
+            </div>
+          </div>
+
+          <datalist id="incomeBankSuggestions">
+            <option value="Bre-B/Llave" />
+            <option value="Nequi" />
+            <option value="Bancolombia" />
+            <option value="Daviplata" />
+            <option value="Mercado Pago" />
+            <option value="Nu" />
+          </datalist>
+
+          {incomePaymentMethod === 'mixto' && (
+            <div className="p-3 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2E180E] border border-[#D4B28E]">
+              <label className="block text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] uppercase mb-1">
+                Monto abonado en Efectivo ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={incomeCashAmount}
+                onChange={(e) => setIncomeCashAmount(e.target.value)}
+                placeholder="Ej. 10000"
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              />
+            </div>
+          )}
+
+          {(incomePaymentMethod === 'transferencia' || incomePaymentMethod === 'mixto') && (
+            <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-[#9F6839]" />
+                  Desglose de Transferencias / Bancos
+                </span>
+                <button
+                  type="button"
+                  onClick={addIncomeBankLine}
+                  className="text-xs font-bold text-[#9F6839] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Agregar otro banco
+                </button>
+              </div>
+
+              {incomeBankLines.map((line, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    list="incomeBankSuggestions"
+                    value={line.bank}
+                    onChange={(e) => updateIncomeBankLine(idx, 'bank', e.target.value)}
+                    placeholder="Banco / Entidad (ej. Nequi, Bre-B/Llave)"
+                    className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={line.amount}
+                    onChange={(e) => updateIncomeBankLine(idx, 'amount', e.target.value)}
+                    placeholder={incomeBankLines.length > 1 ? "Monto ($)" : "Monto opcional ($)"}
+                    className="w-32 px-3 py-2 rounded-xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+                  />
+                  {incomeBankLines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeIncomeBankLine(idx)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors cursor-pointer"
+                      title="Eliminar línea de banco"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+              Categoría
+            </label>
+            <select
+              value={incomeCategory}
+              onChange={(e) => setIncomeCategory(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+            >
+              <option value="otros">Otros Ingresos</option>
+              <option value="venta_extra">Venta Extra / Directa</option>
+              <option value="aporte_socio">Aporte de Socio</option>
+              <option value="evento">Eventos & Catering</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-3">
+            <button
+              type="button"
+              onClick={() => setIsIncomeModalOpen(false)}
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={incomeSubmitting}
+              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
+            >
+              {incomeSubmitting ? 'Guardando...' : 'Registrar Ingreso'}
             </button>
           </div>
         </form>

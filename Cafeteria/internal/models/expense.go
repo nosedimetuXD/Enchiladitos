@@ -20,6 +20,17 @@ type Expense struct {
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
+type Income struct {
+	ID             uuid.UUID `json:"id"`
+	Description    string    `json:"description"`
+	Amount         float64   `json:"amount"`
+	Category       string    `json:"category"`
+	PaymentMethod  string    `json:"payment_method"`
+	RegisteredBy   uuid.UUID `json:"registered_by"`
+	RegistererName string    `json:"registerer_name,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type CustomerStat struct {
 	CustomerName string  `json:"customer_name"`
 	TotalSpent   float64 `json:"total_spent"`

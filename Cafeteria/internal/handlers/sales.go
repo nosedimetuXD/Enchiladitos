@@ -89,7 +89,9 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var timeCondition string
 	if rawCond != "" {
-		timeCondition = "WHERE " + rawCond
+		timeCondition = "WHERE (c.status IS NULL OR c.status != 'cancelado') AND (" + rawCond + ")"
+	} else {
+		timeCondition = "WHERE (c.status IS NULL OR c.status != 'cancelado')"
 	}
 
 	query := fmt.Sprintf(`SELECT s.id, s.sold_by, COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Personal'), COALESCE(s.customer_name, 'Cliente General'), 
@@ -106,6 +108,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		           WHERE si.sale_id = s.id), '[]'::json) AS items
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
+		 LEFT JOIN comandas c ON c.sale_id = s.id
 		 %s
 		 ORDER BY s.created_at DESC`, timeCondition)
 

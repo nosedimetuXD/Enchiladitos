@@ -8,7 +8,8 @@ import {
   Bell,
   Play,
   Check,
-  User
+  User,
+  XCircle
 } from 'lucide-react'
 
 export default function Comandas() {
@@ -120,12 +121,12 @@ export default function Comandas() {
   const pending = comandas.filter((c) => c.status === 'pendiente')
   const inPrep = comandas.filter((c) => c.status === 'en_preparacion')
   const ready = comandas.filter((c) => c.status === 'listo')
-  const delivered = comandas.filter((c) => c.status === 'entregado').slice(0, 15)
+  const delivered = comandas.filter((c) => c.status === 'entregado' || c.status === 'cancelado').slice(0, 15)
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando comandas en vivo...</p>
 
   const renderCard = (c, colType) => {
-    const isFinished = c.status === 'listo' || c.status === 'entregado'
+    const isFinished = c.status === 'listo' || c.status === 'entregado' || c.status === 'cancelado'
     const prepDuration = isFinished
       ? formatDuration(c.created_at, c.ready_at || c.updated_at)
       : formatElapsedTime(c.created_at)
@@ -196,13 +197,26 @@ export default function Comandas() {
 
         <div className="pt-2 border-t border-[#D4B28E]/60 dark:border-[#9F6839]/30">
           {colType === 'pending' && (
-            <button
-              onClick={() => handleStatusChange(c.id, 'en_preparacion')}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Iniciar Preparación</span>
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleStatusChange(c.id, 'en_preparacion')}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Iniciar Preparación</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('¿Estás seguro de cancelar esta venta?')) {
+                    handleStatusChange(c.id, 'cancelado')
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-red-300 dark:border-red-800/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Cancelar Venta</span>
+              </button>
+            </div>
           )}
 
           {colType === 'in_prep' && (
@@ -226,9 +240,15 @@ export default function Comandas() {
           )}
 
           {colType === 'delivered' && (
-            <span className="text-xs text-emerald-600 font-bold flex items-center justify-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Entregada
-            </span>
+            c.status === 'cancelado' ? (
+              <span className="text-xs text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-1">
+                <XCircle className="w-3.5 h-3.5" /> Cancelada
+              </span>
+            ) : (
+              <span className="text-xs text-emerald-600 font-bold flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Entregada
+              </span>
+            )
           )}
         </div>
       </div>

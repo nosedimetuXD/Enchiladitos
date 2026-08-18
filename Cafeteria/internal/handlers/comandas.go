@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -123,6 +125,48 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var currentStatus string
+	_ = h.DB.QueryRow(r.Context(), "SELECT status FROM comandas WHERE id = $1", id).Scan(&currentStatus)
+
+	// Si se está cancelando una comanda que no estaba cancelada previa a este request, devolver los insumos al inventario
+	if statusStr == "cancelado" && currentStatus != "cancelado" {
+		itemRows, errItem := h.DB.Query(r.Context(),
+			`SELECT product_id, quantity FROM comanda_items WHERE comanda_id = $1`, id)
+		if errItem == nil {
+			type itemToReturn struct {
+				ProductID uuid.UUID
+				Quantity  int
+			}
+			var items []itemToReturn
+			for itemRows.Next() {
+				var it itemToReturn
+				if errScan := itemRows.Scan(&it.ProductID, &it.Quantity); errScan == nil {
+					items = append(items, it)
+				}
+			}
+			itemRows.Close()
+
+			for _, it := range items {
+				ingRows, errIng := h.DB.Query(r.Context(),
+					`SELECT ingredient_id, quantity_used FROM product_ingredients WHERE product_id = $1`, it.ProductID)
+				if errIng == nil {
+					for ingRows.Next() {
+						var ingID uuid.UUID
+						var qtyUsed float64
+						if errScan := ingRows.Scan(&ingID, &qtyUsed); errScan == nil {
+							restorationQty := qtyUsed * float64(it.Quantity)
+							_, _ = h.DB.Exec(r.Context(),
+								`UPDATE ingredients SET quantity = quantity + $1, updated_at = now() WHERE id = $2`,
+								restorationQty, ingID)
+						}
+					}
+					ingRows.Close()
+				}
+			}
+			h.Hub.Publish("inventory_updated", map[string]interface{}{"action": "comanda_cancellation_restore"})
+		}
+	}
+
 	userIDVal := r.Context().Value(custommw.ContextUserID)
 
 	var userID *uuid.UUID
@@ -136,15 +180,21 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	var preparedBy *uuid.UUID
 	var preparedByName string
+
+	if strings.TrimSpace(req.PreparedByUsername) != "" {
+		preparedByName = strings.TrimSpace(req.PreparedByUsername)
+	}
+
 	if userID != nil {
 		var validID uuid.UUID
-		errU := h.DB.QueryRow(r.Context(), "SELECT id, username FROM users WHERE id = $1", *userID).Scan(&validID, &preparedByName)
+		var dbUsername string
+		errU := h.DB.QueryRow(r.Context(), "SELECT id, username FROM users WHERE id = $1", *userID).Scan(&validID, &dbUsername)
 		if errU == nil {
 			preparedBy = &validID
+			if preparedByName == "" {
+				preparedByName = dbUsername
+			}
 		}
-	}
-	if preparedByName == "" {
-		preparedByName = strings.TrimSpace(req.PreparedByUsername)
 	}
 
 	var c models.Comanda
@@ -156,8 +206,8 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 			 SET status = $1, 
 			     updated_at = now(), 
 			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
-			     prepared_by = COALESCE(prepared_by, $3),
-			     prepared_by_username = CASE WHEN COALESCE(prepared_by_username, '') = '' OR prepared_by_username = 'Por asignar' THEN $4 ELSE prepared_by_username END
+			     prepared_by = COALESCE($3, prepared_by),
+			     prepared_by_username = CASE WHEN $4 <> '' THEN $4 ELSE prepared_by_username END
 			 WHERE id = $2 
 			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
 			statusStr, id, preparedBy, preparedByName,
@@ -203,3 +253,66 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(c)
 }
+
+// Handler genérico de cancelación para capturar cualquier ruta alternativa (/comandas/{id}/cancel, /sales/{id}/cancel, etc.)
+func (h *ComandaHandler) CancelComanda(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	if idParam == "" {
+		idParam = chi.URLParam(r, "sale_id")
+	}
+
+	var comandaID uuid.UUID
+
+	if idParam != "" {
+		parsed, pErr := uuid.Parse(idParam)
+		if pErr == nil {
+			// Probar si el ID es de comanda o sale_id
+			var foundID uuid.UUID
+			errSearch := h.DB.QueryRow(r.Context(), "SELECT id FROM comandas WHERE id = $1 OR sale_id = $1 LIMIT 1", parsed).Scan(&foundID)
+			if errSearch == nil {
+				comandaID = foundID
+			}
+		}
+	}
+
+	if comandaID == uuid.Nil {
+		// Leer del cuerpo si viene en JSON
+		var body struct {
+			ID        string `json:"id"`
+			ComandaID string `json:"comanda_id"`
+			SaleID    string `json:"sale_id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		targetStr := body.ID
+		if targetStr == "" {
+			targetStr = body.ComandaID
+		}
+		if targetStr == "" {
+			targetStr = body.SaleID
+		}
+		if targetStr != "" {
+			if parsed, pErr := uuid.Parse(targetStr); pErr == nil {
+				_ = h.DB.QueryRow(r.Context(), "SELECT id FROM comandas WHERE id = $1 OR sale_id = $1 LIMIT 1", parsed).Scan(&comandaID)
+			}
+		}
+	}
+
+	if comandaID == uuid.Nil {
+		http.Error(w, "Comanda no encontrada para cancelar", http.StatusNotFound)
+		return
+	}
+
+	// Ejecutar la cancelación del estado
+	r.URL.RawQuery = ""
+	rctx := chi.RouteContext(r.Context())
+	if rctx != nil {
+		rctx.URLParams.Add("id", comandaID.String())
+	}
+
+	// Crear request sintético para UpdateStatus
+	reqBody, _ := json.Marshal(updateComandaStatusRequest{Status: "cancelado"})
+	r.Body = io.NopCloser(bytes.NewReader(reqBody))
+
+	h.UpdateStatus(w, r)
+}
+

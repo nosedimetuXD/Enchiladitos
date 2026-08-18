@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,6 +24,21 @@ type AccountingHandler struct {
 }
 
 func NewAccountingHandler(db *pgxpool.Pool, hub *events.Hub) *AccountingHandler {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, _ = db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS incomes (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			description TEXT NOT NULL,
+			amount NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+			category VARCHAR(50) NOT NULL DEFAULT 'otros',
+			payment_method VARCHAR(255) NOT NULL DEFAULT 'efectivo',
+			registered_by UUID REFERENCES users(id) ON DELETE SET NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`)
+
 	return &AccountingHandler{DB: db, Hub: hub}
 }
 
@@ -400,3 +416,121 @@ func (h *AccountingHandler) CreateExpense(w http.ResponseWriter, r *http.Request
 		"created_at": createdAt,
 	})
 }
+
+// GET /incomes?period=today|week|month|all
+func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	var timeCondition string
+
+	switch period {
+	case "today":
+		timeCondition = "WHERE i.created_at >= ((now() AT TIME ZONE 'America/Bogota')::date AT TIME ZONE 'America/Bogota')"
+	case "week":
+		timeCondition = "WHERE i.created_at >= (now() - INTERVAL '7 days')"
+	case "month":
+		timeCondition = "WHERE i.created_at >= (now() - INTERVAL '30 days')"
+	default:
+		timeCondition = ""
+	}
+
+	query := fmt.Sprintf(`SELECT i.id, i.description, i.amount, i.category, i.payment_method, i.registered_by, 
+		        COALESCE(u.username, ''), i.created_at 
+		 FROM incomes i
+		 LEFT JOIN users u ON i.registered_by = u.id
+		 %s
+		 ORDER BY i.created_at DESC`, timeCondition)
+
+	rows, err := h.DB.Query(r.Context(), query)
+	if err != nil {
+		log.Printf("error consultando ingresos manuales: %v", err)
+		http.Error(w, "error consultando ingresos", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var incomes []models.Income
+	for rows.Next() {
+		var inc models.Income
+		if err := rows.Scan(&inc.ID, &inc.Description, &inc.Amount, &inc.Category, &inc.PaymentMethod,
+			&inc.RegisteredBy, &inc.RegistererName, &inc.CreatedAt); err != nil {
+			log.Printf("error leyendo ingresos: %v", err)
+			http.Error(w, "error leyendo ingresos", http.StatusInternalServerError)
+			return
+		}
+		incomes = append(incomes, inc)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(incomes)
+}
+
+// POST /incomes
+type createIncomeRequest struct {
+	Description   string  `json:"description"`
+	Amount        float64 `json:"amount"`
+	Category      string  `json:"category"`
+	PaymentMethod string  `json:"payment_method"`
+}
+
+func (h *AccountingHandler) CreateIncome(w http.ResponseWriter, r *http.Request) {
+	var req createIncomeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "cuerpo inválido", http.StatusBadRequest)
+		return
+	}
+
+	desc := strings.TrimSpace(req.Description)
+	if desc == "" || req.Amount <= 0 {
+		http.Error(w, "descripción y monto válido son requeridos", http.StatusBadRequest)
+		return
+	}
+
+	category := strings.ToLower(strings.TrimSpace(req.Category))
+	if category == "" {
+		category = "otros"
+	}
+
+	paymentMethod := strings.ToLower(strings.TrimSpace(req.PaymentMethod))
+	if paymentMethod == "" {
+		paymentMethod = "efectivo"
+	}
+
+	ctx := r.Context()
+	userVal := ctx.Value(custommw.ContextUserID)
+	var registeredBy uuid.UUID
+	if userVal != nil {
+		if id, ok := userVal.(uuid.UUID); ok {
+			registeredBy = id
+		} else if idStr, ok := userVal.(string); ok {
+			registeredBy, _ = uuid.Parse(idStr)
+		}
+	}
+
+	var incID uuid.UUID
+	var createdAt time.Time
+	err := h.DB.QueryRow(ctx,
+		`INSERT INTO incomes (description, amount, category, payment_method, registered_by)
+		 VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+		desc, req.Amount, category, paymentMethod, registeredBy,
+	).Scan(&incID, &createdAt)
+	if err != nil {
+		log.Printf("error creando ingreso manual: %v", err)
+		http.Error(w, "error registrando ingreso", http.StatusInternalServerError)
+		return
+	}
+
+	h.Hub.Publish("income_created", map[string]interface{}{
+		"id":          incID,
+		"description": desc,
+		"amount":      req.Amount,
+		"category":    category,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":         incID,
+		"created_at": createdAt,
+	})
+}
+

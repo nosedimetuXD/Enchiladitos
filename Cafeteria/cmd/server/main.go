@@ -116,6 +116,9 @@ func main() {
 		r.Use(custommw.RequireAuth)
 		r.Get("/comandas", comandaHandler.List)
 		r.Patch("/comandas/{id}/status", comandaHandler.UpdateStatus)
+		r.Post("/comandas/{id}/cancel", comandaHandler.CancelComanda)
+		r.Patch("/comandas/{id}/cancel", comandaHandler.CancelComanda)
+		r.Post("/sales/{id}/cancel", comandaHandler.CancelComanda)
 	})
 
 	// Ver tareas y cambiar su propio estado: cualquier usuario logueado
@@ -150,6 +153,8 @@ func main() {
 		r.Get("/accounting/summary", accountingHandler.GetSummary)
 		r.Get("/expenses", accountingHandler.ListExpenses)
 		r.Post("/expenses", accountingHandler.CreateExpense)
+		r.Get("/incomes", accountingHandler.ListIncomes)
+		r.Post("/incomes", accountingHandler.CreateIncome)
 	})
 
 	log.Println("servidor corriendo en :8080")
