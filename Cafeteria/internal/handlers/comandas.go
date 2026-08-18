@@ -150,47 +150,30 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	var c models.Comanda
 	var updateErr error
 
-	if preparedBy != nil || preparedByName != "" {
-		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas 
-			 SET status = $1, 
-			     updated_at = now(), 
-			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
-			     prepared_by = COALESCE($3, prepared_by),
-			     prepared_by_username = CASE WHEN $4 <> '' AND $4 <> 'Por asignar' THEN $4 WHEN COALESCE(prepared_by_username, '') <> '' AND prepared_by_username <> 'Por asignar' THEN prepared_by_username ELSE 'Por asignar' END
-			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
-			statusStr, id, preparedBy, preparedByName,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
-	} else {
-		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas 
-			 SET status = $1, 
-			     updated_at = now(), 
-			     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END)
-			 WHERE id = $2 
-			 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
-			statusStr, id,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
-	}
+	updateErr = h.DB.QueryRow(r.Context(),
+		`UPDATE comandas 
+		 SET status = $1, 
+		     updated_at = now(), 
+		     ready_at = COALESCE(ready_at, CASE WHEN $1 IN ('listo', 'entregado') THEN now() ELSE NULL END),
+		     prepared_by = COALESCE($3::uuid, prepared_by),
+		     prepared_by_username = CASE 
+		                              WHEN $4::text <> '' AND $4::text <> 'Por asignar' THEN $4::text 
+		                              WHEN COALESCE(prepared_by_username, '') <> '' AND prepared_by_username <> 'Por asignar' THEN prepared_by_username 
+		                              ELSE 'Por asignar' 
+		                            END
+		 WHERE id = $2 
+		 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
+		statusStr, id, preparedBy, preparedByName,
+	).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
 
-	// Ultimate fallback si falla cualquier cosa
 	if updateErr != nil {
 		if errors.Is(updateErr, pgx.ErrNoRows) {
 			http.Error(w, "comanda no encontrada", http.StatusNotFound)
 			return
 		}
-		log.Printf("ejecutando fallback minimo para comanda %s por error: %v", id, updateErr)
-		updateErr = h.DB.QueryRow(r.Context(),
-			`UPDATE comandas SET status = $1, updated_at = now() WHERE id = $2 RETURNING id, order_number, COALESCE(sale_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(customer_name, ''), status, COALESCE(notes, ''), created_at, updated_at, ready_at, prepared_by, COALESCE(prepared_by_username, '')`,
-			statusStr, id,
-		).Scan(&c.ID, &c.OrderNumber, &c.SaleID, &c.CustomerName, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.ReadyAt, &c.PreparedBy, &c.PreparedByUsername)
-
-		if updateErr != nil {
-			log.Printf("error crítico actualizando comanda %s: %v", id, updateErr)
-			http.Error(w, fmt.Sprintf("Error actualizando comanda: %v", updateErr), http.StatusInternalServerError)
-			return
-		}
+		log.Printf("error crítico actualizando comanda %s: %v", id, updateErr)
+		http.Error(w, fmt.Sprintf("Error actualizando comanda: %v", updateErr), http.StatusInternalServerError)
+		return
 	}
 
 	h.Hub.Publish("comanda_updated", map[string]interface{}{
