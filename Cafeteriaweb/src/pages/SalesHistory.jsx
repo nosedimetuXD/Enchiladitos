@@ -35,7 +35,10 @@ const MONTH_NAMES = [
   { num: 12, short: 'dic.', full: 'Diciembre' }
 ]
 
+import { useAuth } from '../context/AuthContext'
+
 export default function SalesHistory() {
+  const { isOwner } = useAuth()
   const [sales, setSales] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMethod, setSelectedMethod] = useState('Todos')
@@ -130,8 +133,11 @@ export default function SalesHistory() {
     setSelectedSale(sale)
     setIsReceiptOpen(true)
   }
-
   async function handleCancelSale(sale) {
+    if (!isOwner) {
+      alert('Solo los usuarios con rol Dueño pueden cancelar ventas.')
+      return
+    }
     if (!window.confirm(`¿Estás seguro de cancelar la venta de ${sale.customer_name || 'Cliente General'} por $${sale.total.toLocaleString()}?`)) return
     try {
       await api.post(`/sales/${sale.id}/cancel`)
@@ -178,76 +184,76 @@ export default function SalesHistory() {
             </div>
             <div>
               <span className="text-[10px] text-[#9F6839] uppercase font-bold tracking-wider block">Total Facturado</span>
-              <div className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+              <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
                 ${totalSalesVolume.toLocaleString()}
-              </div>
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {pageError && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-          ⚠️ {pageError}
+        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
+          <XCircle className="w-4 h-4 text-red-600" />
+          <span>{pageError}</span>
         </div>
       )}
 
-      {/* Buscador & Filtros */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9F6839]" />
+      {/* Buscador & Filtro por Método de Pago */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 p-4 rounded-3xl shadow-xs">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9F6839]" />
           <input
             type="text"
-            placeholder="Buscar por cliente o cajero..."
+            placeholder="Buscar por cliente o vendedor..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 focus:border-[#9F6839] rounded-2xl pl-10 pr-3 py-2.5 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs"
+            className="w-full pl-10 pr-4 py-2 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/60 dark:border-[#9F6839]/40 text-xs font-semibold text-[#432414] dark:text-[#FEE4D7] focus:outline-none focus:border-[#9F6839]"
           />
         </div>
 
-        <select
-          value={selectedMethod}
-          onChange={(e) => setSelectedMethod(e.target.value)}
-          className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-2xl px-3 py-2.5 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] focus:outline-none shadow-xs cursor-pointer"
-        >
-          <option value="Todos">Todos los Métodos de Pago</option>
-          <option value="efectivo">Efectivo</option>
-          <option value="transferencia">Transferencia</option>
-          <option value="mixto">Pago Mixto</option>
-        </select>
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {['Todos', 'efectivo', 'transferencia', 'mixto'].map((method) => (
+            <button
+              key={method}
+              onClick={() => setSelectedMethod(method)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold capitalize transition-all cursor-pointer whitespace-nowrap ${
+                selectedMethod === method
+                  ? 'bg-[#9F6839] text-white shadow-xs'
+                  : 'bg-[#FEE4D7]/40 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] hover:bg-[#FEE4D7]'
+              }`}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tabla de Historial de Ventas */}
+      {/* Tabla de Ventas */}
       <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-xs">
-            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider text-[10px] border-b border-[#D4B28E]/60 font-bold">
+          <table className="w-full text-left text-xs text-[#432414] dark:text-[#FEE4D7]">
+            <thead className="bg-[#FEE4D7]/50 dark:bg-[#2A150C] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-[10px] uppercase tracking-wider border-b border-[#D4B28E]/60">
               <tr>
-                <th className="py-3.5 px-4">Fecha / Hora</th>
-                <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Método de Pago & Entidad</th>
-                <th className="py-3.5 px-4">Atendido Por</th>
-                <th className="py-3.5 px-4">Estado</th>
-                <th className="py-3.5 px-4 text-right">Total</th>
-                <th className="py-3.5 px-4 text-center">Acciones</th>
+                <th className="py-3 px-4">Fecha / Hora</th>
+                <th className="py-3 px-4">Cliente</th>
+                <th className="py-3 px-4">Método Pago</th>
+                <th className="py-3 px-4">Vendedor</th>
+                <th className="py-3 px-4">Estado</th>
+                <th className="py-3 px-4 text-right">Total</th>
+                <th className="py-3 px-4 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#D4B28E]/30 text-[#432414] dark:text-[#FEE4D7]">
+            <tbody className="divide-y divide-[#D4B28E]/30 dark:divide-[#9F6839]/20">
               {filteredSales.map((s) => {
-                const sDate = new Date(s.created_at)
-                const dateFormatted = sDate.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                const timeFormatted = sDate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
                 const isCanceled = s.status === 'cancelado' || s.status === 'cancelada'
 
                 return (
-                  <tr key={s.id} className={`hover:bg-[#FEE4D7]/30 transition-colors ${isCanceled ? 'opacity-70 bg-red-50/20 dark:bg-red-950/10' : ''}`}>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-[#9F6839] shrink-0" />
-                        <div className="flex flex-col">
-                          <span className="font-extrabold text-[#432414] dark:text-[#FEE4D7]">{dateFormatted}</span>
-                          <span className="text-[11px] font-semibold text-[#9F6839] dark:text-[#DABA8C]">{timeFormatted}</span>
-                        </div>
+                  <tr key={s.id} className={`hover:bg-[#FEE4D7]/20 dark:hover:bg-[#2A150C]/50 transition-colors ${isCanceled ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}>
+                    <td className="py-3.5 px-4 font-medium whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#9F6839]" />
+                        <span>{new Date(s.created_at).toLocaleString()}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-bold">{s.customer_name || 'Cliente General'}</td>
@@ -287,7 +293,7 @@ export default function SalesHistory() {
                         >
                           <Printer className="w-4 h-4" />
                         </button>
-                        {!isCanceled && (
+                        {!isCanceled && isOwner && (
                           <button
                             onClick={() => handleCancelSale(s)}
                             className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
