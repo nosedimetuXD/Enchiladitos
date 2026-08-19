@@ -254,12 +254,15 @@ export default function Users() {
 
   const roleBadges = {
     owner: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+    dueño: { label: 'DUEÑO', style: 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
     admin: { label: 'ADMINISTRADOR', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-    employee: { label: 'EMPLEADO', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' }
+    administrador: { label: 'ADMINISTRADOR', style: 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+    employee: { label: 'EMPLEADO', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+    empleado: { label: 'EMPLEADO', style: 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' }
   }
 
   const isPrimaryOwner = Boolean(
-    editingUser?.is_primary || (editingUser && editingUser.username.trim().toLowerCase() === 'camilo osorio')
+    editingUser?.is_primary || (editingUser?.username && String(editingUser.username).trim().toLowerCase() === 'camilo osorio')
   )
 
   if (loading) return <p className="p-4 text-sm font-semibold text-[#9F6839]">Cargando usuarios...</p>
@@ -296,11 +299,15 @@ export default function Users() {
       {/* Grid de Tarjetas de Usuario */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {users.map((u) => {
+          if (!u) return null
           const isCurrentUser = currentUser?.id === u.id
-          const badge = roleBadges[u.role] || roleBadges.employee
+          const uRole = String(u.role || 'employee').toLowerCase()
+          const badge = roleBadges[uRole] || roleBadges.employee
           const rawUAvatar = u.avatar_url || ''
           const uAvatar = processImageUrl(rawUAvatar)
-          const isPrimary = Boolean(u.is_primary || u.username.trim().toLowerCase() === 'camilo osorio')
+          const uName = String(u.username || 'Usuario').trim()
+          const isPrimary = Boolean(u.is_primary || uName.toLowerCase() === 'camilo osorio')
+          const initial = uName ? uName.charAt(0).toUpperCase() : 'U'
 
           return (
             <div
@@ -316,7 +323,7 @@ export default function Users() {
                   {uAvatar ? (
                     <img
                       src={uAvatar}
-                      alt={u.username}
+                      alt={uName}
                       className="w-12 h-12 rounded-2xl object-cover border border-[#D4B28E]/50 shadow-xs"
                       onError={(e) => {
                         e.target.style.display = 'none'
@@ -324,7 +331,7 @@ export default function Users() {
                     />
                   ) : (
                     <div className="w-12 h-12 rounded-2xl bg-[#FEE4D7] dark:bg-[#34180D] text-[#9F6839] dark:text-[#DABA8C] font-extrabold text-xl flex items-center justify-center border border-[#D4B28E]/50">
-                      {u.username.charAt(0).toUpperCase()}
+                      {initial}
                     </div>
                   )}
 
@@ -334,7 +341,7 @@ export default function Users() {
                 </div>
 
                 <h3 className="text-base font-bold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-1.5">
-                  {u.username}
+                  {uName}
                   {isCurrentUser && (
                     <span className="text-[10px] font-bold bg-[#FEE4D7] text-[#9F6839] px-2 py-0.5 rounded-full border border-[#D4B28E]">
                       (Tú)
@@ -345,7 +352,7 @@ export default function Users() {
                 <div className="mt-4 pt-3 border-t border-[#D4B28E]/40 dark:border-[#9F6839]/30 space-y-1.5 text-xs text-[#9F6839] dark:text-[#DABA8C]">
                   <div className="flex items-center gap-2">
                     <Shield className="w-3.5 h-3.5 text-[#9F6839]" />
-                    <span>Permisos: {u.role === 'owner' ? 'Acceso Total' : u.role === 'admin' ? 'Administración' : 'POS & Ventas'}</span>
+                    <span>Permisos: {uRole === 'owner' || uRole === 'dueño' ? 'Acceso Total' : uRole === 'admin' || uRole === 'administrador' ? 'Administración' : 'POS & Ventas'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Key className="w-3.5 h-3.5 text-[#9F6839]" />
