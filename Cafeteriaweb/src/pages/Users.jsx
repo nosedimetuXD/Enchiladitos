@@ -76,8 +76,29 @@ export default function Users() {
     setIsModalOpen(true)
   }
 
-  function openStatsModal(userItem) {
+  const [statsLoading, setStatsLoading] = useState(false)
+
+  async function openStatsModal(userItem) {
     setSelectedUserForStats(userItem)
+    setStatsLoading(true)
+    try {
+      const [sData, eData, tData, wData, cData] = await Promise.all([
+        api.get('/sales?period=all').catch(() => []),
+        api.get('/expenses?period=all').catch(() => []),
+        api.get('/tasks').catch(() => []),
+        api.get('/waste').catch(() => []),
+        api.get('/comandas').catch(() => [])
+      ])
+      setSales(sData || [])
+      setExpenses(eData || [])
+      setTasks(tData || [])
+      setWasteReports(wData || [])
+      setComandas(cData || [])
+    } catch (err) {
+      console.error('Error cargando estadísticas:', err)
+    } finally {
+      setStatsLoading(false)
+    }
   }
 
   function handleFileChange(e) {
@@ -160,7 +181,13 @@ export default function Users() {
     const safeWaste = Array.isArray(wasteReports) ? wasteReports : []
     const safeComandas = Array.isArray(comandas) ? comandas : []
 
-    const uSales = safeSales.filter((s) => s.sold_by === targetId || (s.sold_by_username && String(s.sold_by_username).toLowerCase() === targetUsername))
+    const uSales = safeSales.filter(
+      (s) => s.status !== 'cancelado' && (
+        (targetId && s.sold_by === targetId) ||
+        (s.sold_by_username && String(s.sold_by_username).toLowerCase() === targetUsername) ||
+        (s.sold_by_name && String(s.sold_by_name).toLowerCase() === targetUsername)
+      )
+    )
     const uExpenses = safeExpenses.filter((e) => e.registered_by === targetId || (e.registerer_name && String(e.registerer_name).toLowerCase() === targetUsername))
     const uTasksAssigned = safeTasks.filter((t) => t.assigned_to === targetId || (t.assigned_username && String(t.assigned_username).toLowerCase() === targetUsername))
     const uTasksCompleted = uTasksAssigned.filter((t) => t.completed)
@@ -171,8 +198,12 @@ export default function Users() {
 
     uSales.forEach((s) => {
       totalRevenue += Number(s.total) || 0
-      if (Array.isArray(s.items)) {
-        s.items.forEach((item) => {
+      let items = s.items
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items) } catch (e) { items = [] }
+      }
+      if (Array.isArray(items)) {
+        items.forEach((item) => {
           const pName = item.product_name || item.name || 'Producto'
           const qty = Number(item.quantity) || 1
           productCounts[pName] = (productCounts[pName] || 0) + qty
@@ -364,7 +395,12 @@ export default function Users() {
           onClose={() => setSelectedUserForStats(null)}
           title={`Stats & Rendimiento de: ${selectedUserForStats?.username || 'Usuario'}`}
         >
-          {userStatsCalculated ? (
+          {statsLoading ? (
+            <div className="py-12 text-center space-y-3">
+              <div className="w-8 h-8 border-3 border-[#9F6839] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-xs font-bold text-[#9F6839]">Cargando rendimiento del usuario...</p>
+            </div>
+          ) : userStatsCalculated ? (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] flex items-center gap-3">
                 {selectedUserForStats.avatar_url ? (
