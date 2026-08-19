@@ -18,7 +18,17 @@ function ProtectedRoute({ children, roles }) {
   const { user } = useAuth()
 
   if (!user) return <Navigate to="/login" replace />
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
+
+  if (roles && Array.isArray(roles)) {
+    const userRole = (user.role || '').toLowerCase()
+    const isAllowed = roles.some((r) => {
+      const targetRole = r.toLowerCase()
+      if (targetRole === 'owner' || targetRole === 'dueño') return userRole === 'owner' || userRole === 'dueño'
+      if (targetRole === 'admin' || targetRole === 'administrador') return userRole === 'admin' || userRole === 'administrador' || userRole === 'owner' || userRole === 'dueño'
+      return userRole === targetRole
+    })
+    if (!isAllowed) return <Navigate to="/" replace />
+  }
 
   return children
 }

@@ -77,8 +77,8 @@ export default function Layout() {
   }
 
   const currentRole = (user?.role || '').toLowerCase()
-  const isOwner = currentRole === 'owner'
-  const isAdmin = isOwner || currentRole === 'admin'
+  const isOwner = currentRole === 'owner' || currentRole === 'dueño'
+  const isAdmin = isOwner || currentRole === 'admin' || currentRole === 'administrador'
 
   const rawAvatarUrl = user?.avatar_url || (user && user.id && userAvatars[user.id]) || ''
   const userAvatarUrl = processImageUrl(rawAvatarUrl)
