@@ -149,13 +149,22 @@ export default function Users() {
   }
 
   const userStatsCalculated = useMemo(() => {
-    if (!selectedUserForStats) return null
+    if (!selectedUserForStats || !selectedUserForStats.username) return null
 
-    const uSales = sales.filter((s) => s.sold_by === selectedUserForStats.id || s.sold_by_username?.toLowerCase() === selectedUserForStats.username.toLowerCase())
-    const uExpenses = expenses.filter((e) => e.registered_by === selectedUserForStats.id || e.registerer_name?.toLowerCase() === selectedUserForStats.username.toLowerCase())
-    const uTasksAssigned = tasks.filter((t) => t.assigned_to === selectedUserForStats.id || t.assigned_username?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+    const targetUsername = String(selectedUserForStats.username).toLowerCase()
+    const targetId = selectedUserForStats.id
+
+    const safeSales = Array.isArray(sales) ? sales : []
+    const safeExpenses = Array.isArray(expenses) ? expenses : []
+    const safeTasks = Array.isArray(tasks) ? tasks : []
+    const safeWaste = Array.isArray(wasteReports) ? wasteReports : []
+    const safeComandas = Array.isArray(comandas) ? comandas : []
+
+    const uSales = safeSales.filter((s) => s.sold_by === targetId || (s.sold_by_username && String(s.sold_by_username).toLowerCase() === targetUsername))
+    const uExpenses = safeExpenses.filter((e) => e.registered_by === targetId || (e.registerer_name && String(e.registerer_name).toLowerCase() === targetUsername))
+    const uTasksAssigned = safeTasks.filter((t) => t.assigned_to === targetId || (t.assigned_username && String(t.assigned_username).toLowerCase() === targetUsername))
     const uTasksCompleted = uTasksAssigned.filter((t) => t.completed)
-    const uWaste = wasteReports.filter((w) => w.reported_by === selectedUserForStats.id || w.reporter_name?.toLowerCase() === selectedUserForStats.username.toLowerCase())
+    const uWaste = safeWaste.filter((w) => w.reported_by === targetId || (w.reporter_name && String(w.reporter_name).toLowerCase() === targetUsername))
 
     let totalRevenue = 0
     const productCounts = {}
@@ -180,10 +189,9 @@ export default function Users() {
 
     let totalPrepMin = 0
     let prepCount = 0
-    const safeComandas = Array.isArray(comandas) ? comandas : []
     safeComandas.forEach((c) => {
-      const isMyPrep = (selectedUserForStats?.id && c.prepared_by === selectedUserForStats.id) ||
-                       (c.prepared_by_username && c.prepared_by_username.toLowerCase() === selectedUserForStats?.username?.toLowerCase())
+      const isMyPrep = (targetId && c.prepared_by === targetId) ||
+                       (c.prepared_by_username && String(c.prepared_by_username).toLowerCase() === targetUsername)
 
       if (isMyPrep && (c.status === 'listo' || c.status === 'entregado') && c.created_at) {
         const end = new Date(c.ready_at || c.updated_at || c.created_at)

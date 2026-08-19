@@ -41,6 +41,16 @@ func NewComandaHandler(db *pgxpool.Pool, hub *events.Hub) *ComandaHandler {
 		LEFT JOIN users u ON s.sold_by = u.id
 		WHERE c.sale_id = s.id AND (c.prepared_by_username IS NULL OR c.prepared_by_username = '' OR c.prepared_by_username = 'Por asignar')
 	`)
+	_, _ = db.Exec(ctx, `
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT 1 FROM comandas) THEN
+				IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'comandas_order_number_seq') THEN
+					PERFORM setval('comandas_order_number_seq', 1, false);
+				END IF;
+			END IF;
+		END $$;
+	`)
 	return &ComandaHandler{DB: db, Hub: hub}
 }
 

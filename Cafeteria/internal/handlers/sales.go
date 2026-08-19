@@ -393,6 +393,17 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Crear la Comanda (Kitchen ticket) automáticamente
+	_, _ = tx.Exec(ctx, `
+		DO $$
+		BEGIN
+			IF (SELECT COUNT(*) FROM comandas) = 0 THEN
+				IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'comandas_order_number_seq') THEN
+					PERFORM setval('comandas_order_number_seq', 1, false);
+				END IF;
+			END IF;
+		END $$;
+	`)
+
 	var comandaID uuid.UUID
 	var orderNumber int
 	err = tx.QueryRow(ctx,
