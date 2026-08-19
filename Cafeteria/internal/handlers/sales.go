@@ -395,9 +395,14 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// 5. Crear la Comanda (Kitchen ticket) automáticamente
 	_, _ = tx.Exec(ctx, `
 		DO $$
+		DECLARE
+			seq_name text;
 		BEGIN
 			IF (SELECT COUNT(*) FROM comandas) = 0 THEN
-				IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'comandas_order_number_seq') THEN
+				seq_name := pg_get_serial_sequence('comandas', 'order_number');
+				IF seq_name IS NOT NULL AND seq_name != '' THEN
+					EXECUTE 'SELECT setval(' || quote_literal(seq_name) || ', 1, false)';
+				ELSIF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'comandas_order_number_seq') THEN
 					PERFORM setval('comandas_order_number_seq', 1, false);
 				END IF;
 			END IF;
