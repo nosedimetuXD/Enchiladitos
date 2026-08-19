@@ -53,8 +53,12 @@ export function AuthProvider({ children }) {
     setUser(nextUser)
   }
 
+  const currentRole = String(user?.role || '').toLowerCase()
+  const isOwner = currentRole === 'owner' || currentRole === 'dueño'
+  const isManager = isOwner || currentRole === 'admin' || currentRole === 'administrador'
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isOwner, isManager }}>
       {children}
     </AuthContext.Provider>
   )

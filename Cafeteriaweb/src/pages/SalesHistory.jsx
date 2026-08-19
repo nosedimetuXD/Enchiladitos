@@ -38,7 +38,9 @@ const MONTH_NAMES = [
 import { useAuth } from '../context/AuthContext'
 
 export default function SalesHistory() {
-  const { isOwner } = useAuth()
+  const { user, isOwner: isOwnerFromAuth } = useAuth()
+  const userRole = String(user?.role || '').toLowerCase()
+  const isOwner = Boolean(isOwnerFromAuth || userRole === 'owner' || userRole === 'dueño')
   const [sales, setSales] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMethod, setSelectedMethod] = useState('Todos')
