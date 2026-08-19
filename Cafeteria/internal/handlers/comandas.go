@@ -290,6 +290,14 @@ func (h *ComandaHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 // Handler genérico de cancelación para capturar cualquier ruta alternativa (/comandas/{id}/cancel, /sales/{id}/cancel, etc.)
 func (h *ComandaHandler) CancelComanda(w http.ResponseWriter, r *http.Request) {
+	// Verificar que el usuario solicitante tenga rol dueño
+	roleVal, _ := r.Context().Value(custommw.ContextRole).(models.UserRole)
+	roleStr := strings.ToLower(string(roleVal))
+	if roleStr != "owner" && roleStr != "dueño" {
+		http.Error(w, "Acceso denegado: solo usuarios con rol Dueño pueden cancelar ventas", http.StatusForbidden)
+		return
+	}
+
 	idParam := chi.URLParam(r, "id")
 	if idParam == "" {
 		idParam = chi.URLParam(r, "sale_id")
