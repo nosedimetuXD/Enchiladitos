@@ -3,7 +3,203 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
 import { processImageUrl, compressAndReadFile } from '../utils/imageUtils'
-import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2, BarChart3, TrendingUp, DollarSign, ShoppingBag, CheckSquare, ShieldAlert, AlertCircle } from 'lucide-react'
+import { Users as UsersIcon, Shield, Key, Plus, Edit2, Lock, Camera, Upload, Trash2, BarChart3, TrendingUp, DollarSign, ShoppingBag, CheckSquare, ShieldAlert, AlertCircle, Award, FileText, Clock } from 'lucide-react'
+
+function UserStatsProfileModal({ selectedUser, sales, comandas, onClose, loading }) {
+  const targetUsername = String(selectedUser?.username || '').toLowerCase()
+  const targetId = selectedUser?.id
+
+  const userSales = useMemo(() => {
+    const safeSales = Array.isArray(sales) ? sales : []
+    return safeSales.filter(
+      (s) => s.status !== 'cancelado' && (
+        (targetId && s.sold_by === targetId) ||
+        (s.sold_by_username && String(s.sold_by_username).toLowerCase() === targetUsername) ||
+        (s.sold_by_name && String(s.sold_by_name).toLowerCase() === targetUsername)
+      )
+    )
+  }, [sales, targetId, targetUsername])
+
+  const userComandas = useMemo(() => {
+    const safeComandas = Array.isArray(comandas) ? comandas : []
+    return safeComandas.filter(
+      (c) => (targetId && c.prepared_by === targetId) ||
+             (c.prepared_by_username && String(c.prepared_by_username).toLowerCase() === targetUsername)
+    )
+  }, [comandas, targetId, targetUsername])
+
+  const stats = useMemo(() => {
+    const totalCount = userSales.length
+    const totalRevenue = userSales.reduce((sum, s) => sum + (Number(s.total) || 0), 0)
+    const avgSale = totalCount > 0 ? totalRevenue / totalCount : 0
+
+    const productCounts = {}
+    userSales.forEach((s) => {
+      let items = s.items
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items) } catch (e) { items = [] }
+      }
+      (items || []).forEach((it) => {
+        const name = it.product_name || it.ProductName || it.name || 'Producto'
+        const q = Number(it.quantity || it.Quantity || 1)
+        productCounts[name] = (productCounts[name] || 0) + q
+      })
+    })
+
+    let topProduct = 'Ninguno aún'
+    let maxQty = 0
+    Object.entries(productCounts).forEach(([name, qty]) => {
+      if (qty > maxQty) {
+        maxQty = qty
+        topProduct = name
+      }
+    })
+
+    let totalPrepMin = 0
+    let prepCount = 0
+    userComandas.forEach((c) => {
+      if ((c.status === 'listo' || c.status === 'entregado') && c.created_at) {
+        const end = new Date(c.ready_at || c.updated_at || c.created_at)
+        const start = new Date(c.created_at)
+        const min = (end - start) / (1000 * 60)
+        if (min >= 0 && min < 1440) {
+          totalPrepMin += min
+          prepCount += 1
+        }
+      }
+    })
+    const avgPrepTimeMin = prepCount > 0 ? Math.round(totalPrepMin / prepCount) : 0
+
+    return {
+      totalCount,
+      totalRevenue,
+      avgSale,
+      topProduct,
+      maxQty,
+      avgPrepTimeMin
+    }
+  }, [userSales, userComandas])
+
+  const rawAvatar = selectedUser?.avatar_url || ''
+  const avatarUrl = processImageUrl(rawAvatar)
+  const roleLabel = selectedUser?.role === 'owner' || selectedUser?.role === 'dueño' ? 'DUEÑO' : selectedUser?.role === 'admin' || selectedUser?.role === 'administrador' ? 'ADMINISTRADOR' : 'EMPLEADO'
+
+  return (
+    <Modal
+      isOpen={Boolean(selectedUser)}
+      onClose={onClose}
+      title={`Perfil & Estadísticas: ${selectedUser?.username || 'Usuario'}`}
+      maxWidth="max-w-xl"
+    >
+      {loading ? (
+        <div className="py-12 text-center space-y-3">
+          <div className="w-8 h-8 border-3 border-[#9F6839] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold text-[#9F6839]">Cargando métricas del usuario...</p>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* Tarjeta Perfil de Usuario */}
+          <div className="flex items-center gap-4 p-4 rounded-3xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] dark:border-[#9F6839]/40">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={selectedUser?.username}
+                className="w-16 h-16 rounded-full object-cover border-2 border-[#9F6839] shadow-sm"
+                onError={(e) => { e.target.style.display = 'none' }}
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-[#9F6839] text-[#FEE4D7] font-black text-2xl flex items-center justify-center border-2 border-[#D4B28E]">
+                {selectedUser?.username ? selectedUser.username.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
+            <div>
+              <h3 className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                {selectedUser?.username}
+              </h3>
+              <span className="inline-block mt-1 px-3 py-0.5 rounded-full bg-[#9F6839] text-white text-[10px] font-black uppercase tracking-wider">
+                {roleLabel}
+              </span>
+            </div>
+          </div>
+
+          {/* Grid de 4 Estadísticas exactas a Mi Perfil */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-1">
+              <span className="text-[11px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider">Ventas Realizadas</span>
+              <p className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">{stats.totalCount}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-1">
+              <span className="text-[11px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider">Ingresos Generados</span>
+              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">${stats.totalRevenue.toLocaleString()}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-1">
+              <span className="text-[11px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider">Promedio Ticket</span>
+              <p className="text-2xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">${Math.round(stats.avgSale).toLocaleString()}</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-1">
+              <span className="text-[11px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider flex items-center gap-1">
+                <Award className="w-3.5 h-3.5 text-[#9F6839]" /> Más Vendido
+              </span>
+              <p className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{stats.topProduct}</p>
+              {stats.maxQty > 0 && (
+                <span className="text-[10px] font-bold text-[#9F6839]">{stats.maxQty} unidades</span>
+              )}
+            </div>
+          </div>
+
+          {/* Demora Comandas */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-1">
+            <span className="text-[11px] font-bold text-[#9F6839] dark:text-[#DABA8C] uppercase tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#9F6839]" /> Demora Promedio Preparación
+            </span>
+            <p className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+              {stats.avgPrepTimeMin > 0 ? `${stats.avgPrepTimeMin} min` : '—'}
+            </p>
+          </div>
+
+          {/* Últimas Ventas Registradas */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] dark:border-[#9F6839]/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[#9F6839]" /> Últimas Ventas Registradas
+              </span>
+              <span className="text-[10px] font-bold text-[#9F6839]">{userSales.length} ventas totales</span>
+            </div>
+
+            {userSales.length === 0 ? (
+              <p className="text-xs text-[#9F6839] italic py-2">Este usuario no tiene ventas registradas.</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {userSales.slice(0, 5).map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FEE4D7]/20 dark:bg-[#201009] border border-[#D4B28E]/30 text-xs">
+                    <div>
+                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block">{sale.customer_name || 'Cliente'}</span>
+                      <span className="text-[10px] text-[#9F6839]">{new Date(sale.created_at).toLocaleString()}</span>
+                    </div>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">${Number(sale.total).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white font-extrabold text-xs cursor-pointer shadow-md"
+            >
+              Cerrar Rendimiento
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
 
 export default function Users() {
   const { user: currentUser, updateUser } = useAuth()
@@ -395,120 +591,15 @@ export default function Users() {
         })}
       </div>
 
-      {/* Modal Rendimiento & Stats Personales de Usuario */}
+      {/* Modal Rendimiento & Stats Personales de Usuario (idéntico a Mi Perfil) */}
       {Boolean(selectedUserForStats) && (
-        <Modal
-          isOpen={Boolean(selectedUserForStats)}
+        <UserStatsProfileModal
+          selectedUser={selectedUserForStats}
+          sales={sales}
+          comandas={comandas}
+          loading={statsLoading}
           onClose={() => setSelectedUserForStats(null)}
-          title={`Stats & Rendimiento de: ${selectedUserForStats?.username || 'Usuario'}`}
-        >
-          {statsLoading ? (
-            <div className="py-12 text-center space-y-3">
-              <div className="w-8 h-8 border-3 border-[#9F6839] border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-xs font-bold text-[#9F6839]">Cargando rendimiento del usuario...</p>
-            </div>
-          ) : userStatsCalculated ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E] flex items-center gap-3">
-                {selectedUserForStats.avatar_url ? (
-                  <img
-                    src={processImageUrl(selectedUserForStats.avatar_url)}
-                    alt={selectedUserForStats.username}
-                    className="w-12 h-12 rounded-2xl object-cover border border-[#9F6839]"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-2xl bg-[#9F6839] text-white font-black text-xl flex items-center justify-center">
-                    {(selectedUserForStats?.username || 'U').charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <h4 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    {selectedUserForStats.username}
-                  </h4>
-                  <span className="text-xs font-bold text-[#9F6839] uppercase tracking-wider">
-                    Rol: {selectedUserForStats.role}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-1">
-                  <span className="text-[11px] font-bold text-[#9F6839] uppercase flex items-center gap-1">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Total Vendido
-                  </span>
-                  <p className="text-xl font-extrabold text-emerald-600">
-                    ${userStatsCalculated.totalRevenue.toLocaleString()}
-                  </p>
-                  <span className="text-[10px] text-[#9F6839] font-medium">
-                    {userStatsCalculated.salesCount} ventas registradas
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-1">
-                  <span className="text-[11px] font-bold text-[#9F6839] uppercase flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5 text-blue-600" /> Promedio Ticket
-                  </span>
-                  <p className="text-xl font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    ${Math.round(userStatsCalculated.ticketAverage).toLocaleString()}
-                  </p>
-                  <span className="text-[10px] text-[#9F6839] font-medium">
-                    Por venta realizada
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-[#9F6839]" /> Producto Estrella Vendido
-                  </span>
-                  <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    {userStatsCalculated.topProductName} ({userStatsCalculated.topProductQty} un.)
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
-                  <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
-                    <CheckSquare className="w-3.5 h-3.5 text-[#9F6839]" /> Tareas Completadas
-                  </span>
-                  <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    {userStatsCalculated.tasksCompletedCount} / {userStatsCalculated.tasksAssignedCount} asignadas
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
-                  <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-600" /> Demora Promedio Comandas
-                  </span>
-                  <span className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                    {userStatsCalculated.avgUserPrepMin > 0 ? `${userStatsCalculated.avgUserPrepMin} min` : '—'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-[#D4B28E]/40">
-                  <span className="text-[#9F6839] uppercase flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> Reportes de Daños
-                  </span>
-                  <span className="text-xs font-extrabold text-amber-600">
-                    {userStatsCalculated.wasteCount} mermas reportadas
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedUserForStats(null)}
-                  className="px-5 py-2.5 rounded-2xl bg-[#9F6839] text-white font-extrabold text-xs cursor-pointer shadow-md"
-                >
-                  Cerrar Stats
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="p-4 text-xs font-semibold text-[#9F6839]">Cargando estadísticas del usuario...</p>
-          )}
-        </Modal>
+        />
       )}
 
       {/* Modal Crear / Editar Usuario */}
