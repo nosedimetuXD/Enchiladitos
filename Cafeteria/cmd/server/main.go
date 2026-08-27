@@ -157,6 +157,12 @@ func main() {
 		r.Post("/incomes", accountingHandler.CreateIncome)
 	})
 
-	log.Println("servidor corriendo en :8080")
-	http.ListenAndServe(":8080", r)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("servidor corriendo en :%s", port)
+	if err := http.ListenAndServe(":"+port, r); err != nil {
+		log.Fatalf("error levantando servidor: %v", err)
+	}
 }
