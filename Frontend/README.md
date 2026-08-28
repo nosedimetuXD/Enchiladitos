@@ -1,16 +1,16 @@
-# React + Vite
+# Frontend de Enchiladitos
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Aplicación web progresiva (PWA) desarrollada en **React 19** con **Vite** y **Tailwind CSS** para el sistema de punto de venta y gestión de Enchiladitos.
 
-Currently, two official plugins are available:
+## Scripts Disponibles
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `npm run dev`: Inicia el servidor de desarrollo en local (`http://localhost:5173`).
+- `npm run build`: Compila la aplicación para producción en la carpeta `dist/`.
+- `npm run preview`: Previsualiza la compilación de producción en local.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Paleta de Colores
+- **Rojo Chile / Fuego**: `#dc2626`, `#b91c1c`
+- **Naranja Tajín**: `#ea580c`
+- **Amarillo Picante**: `#f59e0b`
+- **Fondos Chamoy / Vino Oscuro**: `#140505`, `#1c0707`
+- **Fondos Claros**: `#fff5f2`, `#fef2f2`
