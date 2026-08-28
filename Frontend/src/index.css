@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --color-chili-red: #dc2626;
+    --color-chili-dark: #991b1b;
+    --color-chamoy-deep: #7f1d1d;
+    --color-tajin-orange: #ea580c;
+    --color-spicy-yellow: #f59e0b;
+    --color-spicy-crema: #fff5f2;
+    --color-spicy-sand: #fee2e2;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #fff5f2;
+    color: #450a0a;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html.dark body {
+    background-color: #140505;
+    color: #fff5f2;
+  }
+
+  h1, h2, h3, .font-serif-display {
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    font-weight: 700;
+  }
+}
+
+/* Enchiladitos Spicy Flare Pattern */
+.enchiladitos-fluid-pattern {
+  background-color: #fee2e2;
+  background-image: radial-gradient(#dc2626 15%, transparent 16%),
+    radial-gradient(#ea580c 15%, transparent 16%),
+    radial-gradient(#f59e0b 20%, transparent 22%),
+    radial-gradient(#7f1d1d 15%, transparent 17%);
+  background-position: 0 0, 40px 40px, 20px 60px, 60px 20px;
+  background-size: 80px 80px;
+}
+
+html.dark .enchiladitos-fluid-pattern {
+  background-color: #1c0707;
+  background-image: radial-gradient(#140505 15%, transparent 16%),
+    radial-gradient(#dc2626 15%, transparent 16%),
+    radial-gradient(#7f1d1d 20%, transparent 22%),
+    radial-gradient(#ea580c 15%, transparent 17%);
+}
+
+/* Custom smooth warm spicy scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(254, 226, 226, 0.25);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(220, 38, 38, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 38, 38, 0.7);
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: rgba(28, 7, 7, 0.6);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(220, 38, 38, 0.5);
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.7);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: #450a0a !important;
+  }
+}
