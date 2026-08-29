@@ -10,11 +10,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Toffee',
-        short_name: 'Toffee',
-        description: 'Toffee — "Hecho por y para estudiantes". Sistema de POS, comandas y gestión.',
-        theme_color: '#46231d',
-        background_color: '#46231d',
+        name: 'Enchiladitos',
+        short_name: 'Enchiladitos',
+        description: 'Enchiladitos — Sabor, Chamoy y Fuego. Sistema de POS, clientes y gestión.',
+        theme_color: '#dc2626',
+        background_color: '#140505',
         display: 'standalone',
         orientation: 'any',
         icons: [
