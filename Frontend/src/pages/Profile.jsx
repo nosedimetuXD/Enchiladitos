@@ -10,13 +10,12 @@ import {
   CheckCircle2,
   Shield,
   Upload,
-  ShoppingBag,
   TrendingUp,
   Award,
   FileText,
   Edit2,
   Clock,
-  Sparkles
+  DollarSign
 } from 'lucide-react'
 
 export default function Profile() {
@@ -41,10 +40,18 @@ export default function Profile() {
 
   useEffect(() => {
     async function fetchUserData() {
+      if (!user) return
       try {
         const sales = await api.get('/sales?period=all').catch(() => [])
-        const mySales = (sales || []).filter(
-          (s) => (user?.id && s.sold_by === user.id) || s.sold_by_username?.toLowerCase() === user?.username?.toLowerCase()
+        const safeSales = Array.isArray(sales) ? sales : []
+        const currentUname = String(user?.username || '').toLowerCase()
+        const currentUid = user?.id
+
+        const mySales = safeSales.filter(
+          (s) => s && (
+            (currentUid && s.sold_by === currentUid) ||
+            (s.sold_by_username && String(s.sold_by_username).toLowerCase() === currentUname)
+          )
         )
         setUserSales(mySales)
       } catch (e) {
@@ -65,21 +72,26 @@ export default function Profile() {
 
   // Cálculo de Estadísticas Personales
   const stats = useMemo(() => {
-    const totalCount = userSales.length
-    const totalRevenue = userSales.reduce((sum, s) => sum + (Number(s.total) || 0), 0)
+    const safeSales = Array.isArray(userSales) ? userSales : []
+    const totalCount = safeSales.length
+    const totalRevenue = safeSales.reduce((sum, s) => sum + (Number(s?.total) || 0), 0)
     const avgSale = totalCount > 0 ? totalRevenue / totalCount : 0
 
     const productCounts = {}
-    userSales.forEach((s) => {
+    safeSales.forEach((s) => {
+      if (!s) return
       let items = s.items
       if (typeof items === 'string') {
         try { items = JSON.parse(items) } catch (e) { items = [] }
       }
-      (items || []).forEach((it) => {
-        const name = it.product_name || it.ProductName || it.name || 'Producto'
-        const q = Number(it.quantity || it.Quantity || 1)
-        productCounts[name] = (productCounts[name] || 0) + q
-      })
+      if (Array.isArray(items)) {
+        items.forEach((it) => {
+          if (!it) return
+          const name = it.product_name || it.ProductName || it.name || 'Producto'
+          const q = Number(it.quantity || it.Quantity || 1)
+          productCounts[name] = (productCounts[name] || 0) + q
+        })
+      }
     })
 
     let topProduct = 'Ninguno aún'
@@ -132,10 +144,7 @@ export default function Profile() {
         payload.password = password.trim()
       }
 
-      // Guardar avatar_url en la base de datos PostgreSQL de Supabase
       const updatedUser = await api.put('/users/me', payload)
-
-      // Actualizar estado global del AuthContext
       updateUser({ ...updatedUser, avatar_url: finalAvatar })
 
       setPassword('')
@@ -150,9 +159,15 @@ export default function Profile() {
 
   const roleLabels = {
     owner: 'DUEÑO',
+    dueño: 'DUEÑO',
     admin: 'ADMINISTRADOR',
-    employee: 'EMPLEADO'
+    administrador: 'ADMINISTRADOR',
+    employee: 'EMPLEADO',
+    empleado: 'EMPLEADO'
   }
+
+  const rawRole = String(user?.role || 'employee').toLowerCase()
+  const displayRole = roleLabels[rawRole] || 'EMPLEADO'
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -173,13 +188,12 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Grid Principal Armónico */}
+      {/* Grid Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Tarjeta Perfil de Usuario (Izquierda / 5 cols) */}
         <div className="lg:col-span-5 bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl overflow-hidden shadow-xs">
           {/* Banner de Fondo de Marca Enchiladitos */}
-          <div className="relative h-28 bg-gradient-to-r from-red-900 via-amber-900 to-red-950 p-4">
-          </div>
+          <div className="relative h-28 bg-gradient-to-r from-red-900 via-amber-900 to-red-950 p-4" />
 
           <div className="px-6 pb-6 pt-0 relative space-y-5">
             {/* Avatar Superpuesto */}
@@ -187,7 +201,7 @@ export default function Profile() {
               {currentAvatarUrl ? (
                 <img
                   src={currentAvatarUrl}
-                  alt={user?.username}
+                  alt={user?.username || 'Usuario'}
                   className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-[#1c0707] shadow-md bg-white mb-2"
                   onError={(e) => {
                     e.target.style.display = 'none'
@@ -200,12 +214,12 @@ export default function Profile() {
               )}
 
               <h3 className="text-xl font-black text-[#450a0a] dark:text-[#fef2f2] leading-tight">
-                {user?.username}
+                {user?.username || 'Usuario'}
               </h3>
               <div className="mt-1.5">
                 <span className="text-[10px] font-black px-3 py-1 rounded-full bg-red-50 dark:bg-[#2e0e0e] text-red-600 dark:text-amber-300 border border-red-200 dark:border-red-900 uppercase tracking-wider inline-flex items-center gap-1">
                   <Shield className="w-3 h-3 text-red-600" />
-                  ROL: {roleLabels[user?.role] || user?.role}
+                  ROL: {displayRole}
                 </span>
               </div>
             </div>
@@ -216,28 +230,28 @@ export default function Profile() {
                 <span className="font-bold flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-red-600" /> Usuario:
                 </span>
-                <strong className="text-[#450a0a] dark:text-[#fef2f2] font-black">{user?.username}</strong>
+                <strong className="text-[#450a0a] dark:text-[#fef2f2] font-black">{user?.username || '—'}</strong>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-red-100 dark:border-red-950/50">
                 <span className="font-bold flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-red-600" /> Permisos:
                 </span>
                 <strong className="text-[#450a0a] dark:text-[#fef2f2] font-black">
-                  {user?.role === 'owner' ? 'Acceso Total (Dueño)' : user?.role === 'admin' ? 'Administración' : 'Ventas & Caja'}
+                  {rawRole === 'owner' || rawRole === 'dueño' ? 'Acceso Total (Dueño)' : rawRole === 'admin' || rawRole === 'administrador' ? 'Administración' : 'Ventas & Caja'}
                 </strong>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="font-semibold flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Cuenta:
                 </span>
-                <strong className="text-emerald-600 font-extrabold">✓ Activa</strong>
+                <strong className="text-emerald-600 font-black">✓ Activa</strong>
               </div>
             </div>
 
             {/* Botón de Acción */}
             <button
               onClick={openEditModal}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all border border-white/20"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white text-xs font-black shadow-md cursor-pointer transition-all border border-white/20"
             >
               <Edit2 className="w-4 h-4" />
               <span>Editar Mi Perfil</span>
@@ -248,26 +262,26 @@ export default function Profile() {
         {/* Panel de Estadísticas Personales & Últimas Ventas (Derecha / 7 cols) */}
         <div className="lg:col-span-7 space-y-5">
           {/* Tarjeta de Métricas */}
-          <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-4">
-            <h3 className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2 pb-2 border-b border-[#D4B28E]/40">
-              <TrendingUp className="w-4 h-4 text-[#9F6839]" /> Mis Estadísticas Personales en Caja
+          <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs space-y-4">
+            <h3 className="text-sm font-black text-[#450a0a] dark:text-[#fef2f2] flex items-center gap-2 pb-2 border-b border-red-200/60 dark:border-red-950">
+              <TrendingUp className="w-4 h-4 text-red-600" /> Mis Estadísticas Personales en Caja
             </h3>
 
             {loadingStats ? (
-              <p className="text-xs font-semibold text-[#9F6839] py-4 text-center">Cargando tus métricas...</p>
+              <p className="text-xs font-bold text-red-600 py-4 text-center">Cargando tus métricas...</p>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
-                  <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#240a0a] border border-red-200/60 dark:border-red-950 space-y-1">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-wider block">
                     Ventas Realizadas
                   </span>
-                  <p className="text-2xl font-black text-[#432414] dark:text-[#FEE4D7]">
+                  <p className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2]">
                     {stats.totalCount}
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
-                  <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#240a0a] border border-red-200/60 dark:border-red-950 space-y-1">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-wider block">
                     Ingresos Generados
                   </span>
                   <p className="text-2xl font-black text-emerald-600">
@@ -275,77 +289,65 @@ export default function Profile() {
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
-                  <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block">
-                    Venta Promedio Ticket
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#240a0a] border border-red-200/60 dark:border-red-950 space-y-1">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-wider block flex items-center gap-1">
+                    <DollarSign className="w-3 h-3 text-red-600" /> Ticket Promedio
                   </span>
-                  <p className="text-lg font-extrabold text-[#432414] dark:text-[#FEE4D7]">
+                  <p className="text-lg font-black text-[#450a0a] dark:text-[#fef2f2]">
                     ${Math.round(stats.avgSale).toLocaleString()}
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#2A150C] border border-[#D4B28E]/60 space-y-1">
-                  <span className="text-[10px] font-bold text-[#9F6839] uppercase tracking-wider block flex items-center gap-1">
-                    <Award className="w-3 h-3 text-[#9F6839]" /> Más Vendido por Ti
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#240a0a] border border-red-200/60 dark:border-red-950 space-y-1">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-wider block flex items-center gap-1">
+                    <Award className="w-3 h-3 text-red-600" /> Más Vendido por Ti
                   </span>
-                  <p className="text-xs font-bold text-[#432414] dark:text-[#FEE4D7] truncate" title={stats.topProduct}>
+                  <p className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] truncate" title={stats.topProduct}>
                     {stats.topProduct}
                   </p>
                   {stats.maxQty > 0 && (
-                    <span className="text-[10px] text-[#9F6839] font-semibold block">
+                    <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold block">
                       ({stats.maxQty} unidades)
                     </span>
                   )}
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-[#240a0a] border border-red-200 dark:border-red-950 space-y-1">
-                  <span className="text-[10px] font-black text-red-600 dark:text-amber-400 uppercase tracking-wider block flex items-center gap-1">
-                    <DollarSign className="w-3 h-3 text-red-600" /> Ticket Promedio
-                  </span>
-                  <p className="text-lg font-black text-[#450a0a] dark:text-[#fef2f2]">
-                    ${Math.round(stats.avgSale || 0).toLocaleString()}
-                  </p>
-                  <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold block">
-                    Por cada venta
-                  </span>
                 </div>
               </div>
             )}
           </div>
 
           {/* Historial Reciente de Mis Ventas */}
-          <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-[#D4B28E]/40">
-              <h4 className="text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#9F6839]" /> Mis Últimas Ventas Registradas
+          <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-red-200/60 dark:border-red-950">
+              <h4 className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-red-600" /> Mis Últimas Ventas Registradas
               </h4>
-              <span className="text-[11px] font-bold text-[#9F6839]">
+              <span className="text-[11px] font-black text-amber-600">
                 {userSales.length} ventas totales
               </span>
             </div>
 
             <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
               {userSales.length === 0 ? (
-                <p className="text-xs text-[#9F6839] py-6 text-center font-medium">
+                <p className="text-xs text-red-400 py-6 text-center font-bold">
                   Aún no has registrado ventas en el punto de venta.
                 </p>
               ) : (
                 userSales.slice(0, 8).map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between p-3 rounded-2xl bg-[#FEE4D7]/30 dark:bg-[#2A150C] border border-[#D4B28E]/50 text-xs hover:border-[#9F6839] transition-colors"
+                    className="flex items-center justify-between p-3 rounded-2xl bg-red-50/30 dark:bg-[#240a0a] border border-red-100 dark:border-red-950/60 text-xs hover:border-red-500 transition-colors"
                   >
                     <div className="space-y-0.5">
-                      <span className="font-bold text-[#432414] dark:text-[#FEE4D7] block text-xs">
+                      <span className="font-bold text-[#450a0a] dark:text-[#fef2f2] block text-xs">
                         {s.customer_name || 'Cliente General'}
                       </span>
-                      <div className="flex items-center gap-2 text-[10px] text-[#9F6839] font-semibold">
+                      <div className="flex items-center gap-2 text-[10px] text-amber-700 dark:text-amber-400 font-bold">
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-[#9F6839]" />
-                          {new Date(s.created_at).toLocaleString()}
+                          <Clock className="w-3 h-3 text-red-500" />
+                          {new Date(s.created_at).toLocaleString('es-CO')}
                         </span>
                         <span>•</span>
-                        <span className="uppercase text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-[#9F6839]/10 text-[#9F6839]">
+                        <span className="uppercase text-[9px] font-black px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-950 text-red-600">
                           {s.payment_method || 'Efectivo'}
                         </span>
                       </div>
@@ -371,21 +373,21 @@ export default function Profile() {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[#9F6839]" /> Nombre de Usuario
+            <label className="block text-xs font-black text-[#450a0a] dark:text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-red-600" /> Nombre de Usuario
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-sm font-bold text-[#450a0a] dark:text-[#fef2f2]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-[#9F6839]" /> Nueva Contraseña (Opcional)
+            <label className="block text-xs font-black text-[#450a0a] dark:text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-red-600" /> Nueva Contraseña (Opcional)
             </label>
             <input
               type="password"
@@ -393,19 +395,19 @@ export default function Profile() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mínimo 8 caracteres (vacío para conservar)"
               minLength={8}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-sm font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-sm font-bold text-[#450a0a] dark:text-[#fef2f2]"
             />
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-[#D4B28E]/30">
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-[#9F6839]" /> Foto de Perfil (Avatar)
+          <div className="space-y-2 pt-2 border-t border-red-200 dark:border-red-950">
+            <label className="block text-xs font-black text-[#450a0a] dark:text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-red-600" /> Foto de Perfil (Avatar)
             </label>
 
             <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#FEE4D7] dark:bg-[#2A150C] border border-[#D4B28E] hover:bg-[#9F6839] hover:text-white text-xs font-extrabold text-[#432414] dark:text-[#FEE4D7] transition-all cursor-pointer shadow-xs">
+              <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-red-50 dark:bg-[#240a0a] border border-red-200 dark:border-red-950 hover:bg-red-600 hover:text-white text-xs font-black text-[#450a0a] dark:text-[#fef2f2] transition-all cursor-pointer shadow-xs">
                 <Upload className="w-4 h-4" />
-                <span>Subir foto del dispositivo</span>
+                <span>Subir foto</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -413,27 +415,27 @@ export default function Profile() {
                   className="hidden"
                 />
               </label>
-              <span className="text-[11px] text-[#9F6839] font-medium">o pega un enlace abajo</span>
+              <span className="text-[11px] text-amber-700 dark:text-amber-400 font-bold">o escribe una URL</span>
             </div>
 
             <input
               type="text"
               value={avatarInput}
               onChange={(e) => setAvatarInput(e.target.value)}
-              placeholder="https://... o enlace de foto"
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-semibold text-[#432414] dark:text-[#FEE4D7]"
+              placeholder="https://... o foto seleccionada"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase tracking-wider mb-1">
+            <label className="block text-xs font-black text-[#450a0a] dark:text-amber-300 uppercase tracking-wider mb-1">
               Rol de Usuario (Solo Lectura)
             </label>
             <input
               type="text"
-              value={roleLabels[user?.role] || user?.role || ''}
+              value={displayRole}
               disabled
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-[#FEE4D7]/40 dark:bg-[#150904] border border-[#D4B28E] text-sm font-extrabold text-[#9F6839] cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#140505] border border-red-200 text-sm font-black text-red-600 cursor-not-allowed"
             />
           </div>
 
@@ -441,14 +443,14 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setIsEditModalOpen(false)}
-              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#201009] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
+              className="px-4 py-2.5 rounded-2xl bg-white dark:bg-[#1c0707] border border-red-200 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar Mi Perfil'}
             </button>
