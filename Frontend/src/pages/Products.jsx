@@ -331,9 +331,9 @@ export default function Products() {
           onChange={(e) => setStockFilter(e.target.value)}
           className="px-3.5 py-2.5 rounded-2xl bg-red-50/70 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-red-950 dark:text-red-100 cursor-pointer"
         >
-          <option value="all">📦 Todo el Stock</option>
-          <option value="low">⚠️ Stock Bajo</option>
-          <option value="out">🛑 Agotados</option>
+          <option value="all">Todo el Stock</option>
+          <option value="low">Stock Bajo</option>
+          <option value="out">Agotados</option>
         </select>
       </div>
 
@@ -710,10 +710,10 @@ export default function Products() {
               onChange={(e) => setStockReason(e.target.value)}
               className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/80 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer"
             >
-              <option value="Reabastecimiento">📦 Reabastecimiento de producción / Lote nuevo</option>
-              <option value="Merma">⚠️ Merma / Producto dañado o vencido</option>
-              <option value="Corrección de conteo">🔍 Corrección de conteo físico</option>
-              <option value="Degustación">🍬 Degustación / Muestra a clientes</option>
+              <option value="Reabastecimiento">Reabastecimiento de producción / Lote nuevo</option>
+              <option value="Merma">Merma / Producto dañado o vencido</option>
+              <option value="Corrección de conteo">Corrección de conteo físico</option>
+              <option value="Degustación">Degustación / Muestra a clientes</option>
             </select>
           </div>
 

@@ -283,9 +283,9 @@ export default function Customers() {
 
     let msg = ''
     if (templateType === 'greeting') {
-      msg = `¡Hola ${name}! ¿Cómo estás? Te escribimos de Enchiladitos 🌶️. Queríamos saber cómo te fue con tu pedido y si te provoca consentirte con unos deliciosos antojitos hoy.`
+      msg = `¡Hola ${name}! ¿Cómo estás? Te escribimos de Enchiladitos. Queríamos saber cómo te fue con tu pedido y si te provoca consentirte con unos deliciosos antojitos hoy.`
     } else if (templateType === 'promo') {
-      msg = `¡Hola ${name}! 🔥 En Enchiladitos tenemos promociones especiales esta semana. ¡Pregúntanos por la variedad disponible para enviarte el menú!`
+      msg = `¡Hola ${name}! En Enchiladitos tenemos promociones especiales esta semana. ¡Pregúntanos por la variedad disponible para enviarte el menú!`
     } else if (templateType === 'debt_reminder') {
       const debt = whatsAppCustomer.total_debt || 0
       msg = `¡Hola ${name}! Te escribimos de Enchiladitos para recordarte tu saldo pendiente de $${Number(debt).toLocaleString('es-CO')}. Cuando puedas realizar tu abono nos confirmas por este medio. ¡Muchas gracias!`
@@ -429,8 +429,8 @@ export default function Customers() {
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
           {[
             { id: 'all', label: 'Todos' },
-            { id: 'with_debt', label: '🔴 Con Deuda' },
-            { id: 'clean', label: '✅ Al Día' }
+            { id: 'with_debt', label: 'Con Deuda' },
+            { id: 'clean', label: 'Al Día' }
           ].map((f) => (
             <button
               key={f.id}
@@ -781,7 +781,7 @@ export default function Customers() {
                   abonoMethod === 'efectivo' ? 'bg-red-600 text-white border-red-600' : 'bg-red-50/50 border-red-200 text-red-950'
                 }`}
               >
-                💵 Efectivo
+                Efectivo
               </button>
               <button
                 type="button"
@@ -790,7 +790,7 @@ export default function Customers() {
                   abonoMethod === 'transferencia' ? 'bg-red-600 text-white border-red-600' : 'bg-red-50/50 border-red-200 text-red-950'
                 }`}
               >
-                📱 Transferencia
+                Transferencia
               </button>
             </div>
           </div>
@@ -955,7 +955,7 @@ export default function Customers() {
             onClick={() => sendWhatsAppMessage('greeting')}
             className="w-full p-4 rounded-2xl bg-red-50/60 dark:bg-[#200808] border border-red-200 text-left hover:bg-red-100/60 cursor-pointer transition-colors"
           >
-            <h4 className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">👋 Saludo & Seguimiento</h4>
+            <h4 className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">Saludo & Seguimiento</h4>
             <p className="text-[11px] text-gray-600 mt-1">Preguntar cómo le fue con su pedido anterior y si le provoca un antojo hoy.</p>
           </button>
 
@@ -963,7 +963,7 @@ export default function Customers() {
             onClick={() => sendWhatsAppMessage('promo')}
             className="w-full p-4 rounded-2xl bg-amber-50/60 dark:bg-[#200808] border border-amber-200 text-left hover:bg-amber-100/60 cursor-pointer transition-colors"
           >
-            <h4 className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">🔥 Promociones Especiales</h4>
+            <h4 className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">Promociones Especiales</h4>
             <p className="text-[11px] text-gray-600 mt-1">Invitarlo a conocer la variedad de la semana en Enchiladitos.</p>
           </button>
 
@@ -972,7 +972,7 @@ export default function Customers() {
               onClick={() => sendWhatsAppMessage('debt_reminder')}
               className="w-full p-4 rounded-2xl bg-rose-50/60 dark:bg-[#200808] border border-rose-200 text-left hover:bg-rose-100/60 cursor-pointer transition-colors"
             >
-              <h4 className="font-black text-xs text-rose-700">🔴 Recordatorio Amable de Saldo Pendiente</h4>
+              <h4 className="font-black text-xs text-rose-700">Recordatorio Amable de Saldo Pendiente</h4>
               <p className="text-[11px] text-gray-600 mt-1">Recordar el saldo pendiente de ${Number(whatsAppCustomer.total_debt).toLocaleString('es-CO')}.</p>
             </button>
           )}

@@ -1,5 +1,5 @@
 -- ====================================================================
--- 🌶️ ENCHILADITOS - SCHEMA OFICIAL PARA SUPABASE (POSTGRESQL)
+-- ENCHILADITOS - SCHEMA OFICIAL PARA SUPABASE (POSTGRESQL)
 -- ====================================================================
 
 -- 1. Extensión para generación de UUIDs

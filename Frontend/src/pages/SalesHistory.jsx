@@ -401,9 +401,9 @@ export default function SalesHistory() {
           onChange={(e) => setSelectedDebtStatus(e.target.value)}
           className="px-3.5 py-2.5 rounded-2xl bg-red-50/70 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-red-950 dark:text-red-100 cursor-pointer"
         >
-          <option value="Todos">⚖️ Todo Estado</option>
-          <option value="paid">✅ Pagadas Totalmente</option>
-          <option value="debt">🔴 Con Saldo Pendiente</option>
+          <option value="Todos">Todo Estado</option>
+          <option value="paid">Pagadas Totalmente</option>
+          <option value="debt">Con Saldo Pendiente</option>
         </select>
 
         {/* Filtro por Método de Pago */}
@@ -412,11 +412,11 @@ export default function SalesHistory() {
           onChange={(e) => setSelectedMethod(e.target.value)}
           className="px-3.5 py-2.5 rounded-2xl bg-red-50/70 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-red-950 dark:text-red-100 cursor-pointer"
         >
-          <option value="Todos">💳 Todos los Métodos</option>
-          <option value="Efectivo">💵 Efectivo</option>
-          <option value="Transferencia">📱 Transferencia</option>
-          <option value="Credito">🔴 Crédito / Fiado</option>
-          <option value="Mixto">🔄 Mixto</option>
+          <option value="Todos">Todos los Métodos</option>
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Credito">Crédito / Fiado</option>
+          <option value="Mixto">Mixto</option>
         </select>
       </div>
 

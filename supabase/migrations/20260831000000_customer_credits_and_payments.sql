@@ -1,5 +1,5 @@
 -- ====================================================================
--- 🌶️ ENCHILADITOS - MIGRACIÓN: CRÉDITOS, DEUDAS Y ABONOS POR CLIENTE
+-- ENCHILADITOS - MIGRACIÓN: CRÉDITOS, DEUDAS Y ABONOS POR CLIENTE
 -- ====================================================================
 
 -- 1. Agregar soporte de cliente vinculado y saldo deudor en la tabla de ventas

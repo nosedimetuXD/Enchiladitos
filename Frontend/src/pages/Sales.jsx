@@ -842,7 +842,7 @@ export default function Sales() {
                 onChange={handleCustomerSelect}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
               >
-                <option value="">👤 Seleccionar del directorio CRM...</option>
+                <option value="">Seleccionar del directorio de clientes...</option>
                 {customersList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.first_name} {c.last_name || ''} {c.phone ? `(${c.phone})` : ''} {c.total_debt > 0 ? `[Debe $${Number(c.total_debt).toLocaleString('es-CO')}]` : ''}

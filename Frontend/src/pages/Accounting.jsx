@@ -597,8 +597,8 @@ export default function Accounting() {
                 onChange={(e) => setExpPaymentMethod(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold cursor-pointer"
               >
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="transferencia">📱 Transferencia / Nequi / Bancolombia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia / Nequi / Bancolombia</option>
               </select>
             </div>
           </div>
@@ -700,8 +700,8 @@ export default function Accounting() {
                 onChange={(e) => setIncPaymentMethod(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold cursor-pointer"
               >
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="transferencia">📱 Transferencia / Nequi / Bancolombia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia / Nequi / Bancolombia</option>
               </select>
             </div>
           </div>
