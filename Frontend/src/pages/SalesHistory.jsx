@@ -612,10 +612,9 @@ export default function SalesHistory() {
           <div className="space-y-4">
             <div className="p-5 rounded-3xl bg-white border-2 border-dashed border-red-200 text-black space-y-3 font-mono text-xs">
               <div className="text-center pb-2 border-b border-gray-200">
-                <img src="/logo.png" alt="Enchiladitos Logo" className="w-12 h-12 mx-auto mb-1.5 object-contain" />
-                <h2 className="font-black text-sm uppercase tracking-wider text-black">ENCHILADITOS</h2>
-                <p className="text-[10px] text-gray-500">Sabor, Chamoy y Fuego</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <img src="/logo.png" alt="Enchiladitos Logo" className="w-14 h-14 mx-auto mb-1.5 object-contain rounded-2xl shadow-xs" />
+                <p className="text-[11px] font-black text-red-700">Sabor, Chamoy y Fuego</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">
                   {new Date(selectedSale.created_at).toLocaleString('es-CO')}
                 </p>
               </div>

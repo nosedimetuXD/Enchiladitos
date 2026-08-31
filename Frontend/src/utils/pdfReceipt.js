@@ -3,27 +3,47 @@ import { jsPDF } from 'jspdf'
 let cachedLogoBase64 = null
 
 /**
- * Carga la imagen del logo y la convierte a base64 para jsPDF.
+ * Carga el logo oficial y lo recorta con esquinas redondeadas elegantes para el ticket.
  */
-async function getLogoBase64() {
+async function getRoundedLogoBase64() {
   if (cachedLogoBase64) return cachedLogoBase64
 
-  try {
-    const response = await fetch('/logo.png')
-    const blob = await response.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        cachedLogoBase64 = reader.result
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'Anonymous'
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        const size = 300
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+
+        // Recorte redondeado moderno
+        const radius = 60
+        ctx.beginPath()
+        ctx.moveTo(radius, 0)
+        ctx.lineTo(size - radius, 0)
+        ctx.quadraticCurveTo(size, 0, size, radius)
+        ctx.lineTo(size, size - radius)
+        ctx.quadraticCurveTo(size, size, size - radius, size)
+        ctx.lineTo(radius, size)
+        ctx.quadraticCurveTo(0, size, 0, size - radius)
+        ctx.lineTo(0, radius)
+        ctx.quadraticCurveTo(0, 0, radius, 0)
+        ctx.closePath()
+        ctx.clip()
+
+        ctx.drawImage(img, 0, 0, size, size)
+        cachedLogoBase64 = canvas.toDataURL('image/png')
         resolve(cachedLogoBase64)
+      } catch (err) {
+        resolve(null)
       }
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch (err) {
-    console.warn('No se pudo precargar logo.png para el PDF', err)
-    return null
-  }
+    }
+    img.onerror = () => resolve(null)
+    img.src = '/logo.png'
+  })
 }
 
 /**
@@ -34,8 +54,8 @@ async function getLogoBase64() {
 export async function createReceiptPDF(order) {
   const items = order.items || []
   const itemsCount = items.length
-  // Altura dinámica: base 130mm + 8mm por cada producto
-  const dynamicHeight = Math.max(160, 120 + itemsCount * 8.5)
+  // Altura dinámica: base 130mm + espacio por cada producto
+  const dynamicHeight = Math.max(160, 115 + itemsCount * 9)
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -43,45 +63,47 @@ export async function createReceiptPDF(order) {
     format: [80, dynamicHeight]
   })
 
-  let y = 7
+  let y = 8
 
-  // 1. Logo Oficial de Enchiladitos
+  // 1. Logo Oficial de Enchiladitos (Emblema redondeado)
   try {
-    const logoData = await getLogoBase64()
+    const logoData = await getRoundedLogoBase64()
     if (logoData) {
-      // Dibujar logo centrado (16mm x 16mm)
-      doc.addImage(logoData, 'PNG', 32, y, 16, 16)
-      y += 18
+      // Dibujar logo centrado (22mm x 22mm)
+      doc.addImage(logoData, 'PNG', 29, y, 22, 22)
+      y += 24
+    } else {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(180, 20, 20)
+      doc.text('ENCHILADITOS', 40, y + 4, { align: 'center' })
+      y += 10
     }
   } catch (e) {
-    console.warn('Error insertando logo en PDF', e)
+    y += 5
   }
 
-  // 2. Encabezado de Marca
+  // 2. Lema y Fecha
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.setTextColor(180, 20, 20) // Rojo oficial
-  doc.text('ENCHILADITOS', 40, y, { align: 'center' })
-  y += 4.5
-
-  doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.setTextColor(100, 100, 100)
+  doc.setTextColor(140, 20, 20)
   doc.text('Sabor, Chamoy y Fuego', 40, y, { align: 'center' })
   y += 3.5
 
   const dateStr = new Date(order.created_at || Date.now()).toLocaleString('es-CO')
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
+  doc.setTextColor(110, 110, 110)
   doc.text(dateStr, 40, y, { align: 'center' })
   y += 5
 
   // Línea divisoria
-  doc.setDrawColor(220, 220, 220)
+  doc.setDrawColor(210, 210, 210)
   doc.setLineWidth(0.3)
   doc.line(6, y, 74, y)
   y += 4.5
 
-  // 3. Información de la Venta
+  // 3. Información del Cliente y Método de Pago
   doc.setFontSize(8)
   doc.setTextColor(30, 30, 30)
 
@@ -111,29 +133,34 @@ export async function createReceiptPDF(order) {
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
-  doc.setTextColor(50, 50, 50)
+  doc.setTextColor(60, 60, 60)
   doc.text('Cant.  Producto', 6, y)
   doc.text('Total', 74, y, { align: 'right' })
   y += 2.5
 
   doc.line(6, y, 74, y)
-  y += 3.5
+  y += 4
 
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(30, 30, 30)
-
+  // Lista de Productos (Con ajuste de texto para que los nombres no se corten)
   items.forEach((it) => {
     const name = it.product?.name || it.product_name || 'Producto'
     const qty = it.quantity || 1
     const price = it.product?.price || it.unit_price || 0
     const itemTotal = price * qty
 
-    const shortName = name.length > 22 ? name.slice(0, 20) + '...' : name
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.5)
+    doc.setTextColor(30, 30, 30)
+    doc.text(`${qty}x`, 6, y)
 
-    doc.text(`${qty}x  ${shortName}`, 6, y)
+    doc.setFont('helvetica', 'normal')
+    const lines = doc.splitTextToSize(name, 45)
+    doc.text(lines, 12, y)
+
+    doc.setFont('helvetica', 'bold')
     doc.text(`$${itemTotal.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
-    y += 4
+
+    y += Math.max(lines.length * 3.8, 4.5)
   })
 
   y += 1
@@ -148,6 +175,7 @@ export async function createReceiptPDF(order) {
 
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
+  doc.setTextColor(50, 50, 50)
   doc.text('Subtotal:', 6, y)
   doc.text(`$${subtotal.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
   y += 3.5
@@ -158,7 +186,7 @@ export async function createReceiptPDF(order) {
     doc.text(`Descuento${reason}:`, 6, y)
     doc.text(`-$${discountAmount.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
     y += 3.5
-    doc.setTextColor(30, 30, 30)
+    doc.setTextColor(50, 50, 50)
   }
 
   y += 1
