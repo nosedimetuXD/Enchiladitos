@@ -208,7 +208,7 @@ export default function Customers() {
               <UserCheck className="w-5 h-5" />
             </span>
             <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
-              Directorio de Clientes (CRM)
+              Directorio de Clientes
             </h1>
           </div>
           <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">

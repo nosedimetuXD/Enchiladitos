@@ -72,9 +72,9 @@ export default function Layout() {
     {
       title: 'OPERACIÓN & VENTAS',
       items: [
-        { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true },
+        { to: '/', label: 'Ventas', icon: ShoppingBag, end: true },
         { to: '/sales/history', label: 'Historial Ventas', icon: FileText },
-        { to: '/customers', label: 'Clientes (CRM)', icon: UserCheck }
+        { to: '/customers', label: 'Clientes', icon: UserCheck }
       ]
     },
     {
