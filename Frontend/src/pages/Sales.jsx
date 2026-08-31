@@ -25,7 +25,9 @@ import {
   Download,
   Package,
   Boxes,
-  Sparkles
+  Sparkles,
+  Receipt,
+  BadgeDollarSign
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 
@@ -49,8 +51,10 @@ export default function Sales() {
   // Carrito de compras
   const [cartItems, setCartItems] = useState([])
 
-  // Modal de cobro
+  // Modal de cobro & Modalidad de Pago
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [saleType, setSaleType] = useState('total') // 'total' | 'parcial' | 'credito'
+  const [partialPaidAmount, setPartialPaidAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [cashAmount, setCashAmount] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
@@ -155,7 +159,7 @@ export default function Sales() {
     return Math.max(0, cartSubtotal - discountCalculated.amount)
   }, [cartSubtotal, discountCalculated])
 
-  // Verificación estricta de stock disponible en los productos del carrito
+  // Verificación estricta de stock disponible
   const hasOutOfStockItems = useMemo(() => {
     return cartItems.some((it) => (it.product.stock ?? 0) < it.quantity)
   }, [cartItems])
@@ -166,6 +170,21 @@ export default function Sales() {
       .map((it) => `${it.product.name} (Stock: ${it.product.stock ?? 0}, Solicitado: ${it.quantity})`)
       .join(', ')
   }, [cartItems])
+
+  // Cálculo de montos pagados y pendientes según la modalidad
+  const effectivePaidAmount = useMemo(() => {
+    if (saleType === 'total') return cartTotal
+    if (saleType === 'credito') return 0
+    if (saleType === 'parcial') {
+      const val = Number(partialPaidAmount) || 0
+      return Math.min(cartTotal, Math.max(0, val))
+    }
+    return cartTotal
+  }, [saleType, cartTotal, partialPaidAmount])
+
+  const effectivePendingAmount = useMemo(() => {
+    return Math.max(0, cartTotal - effectivePaidAmount)
+  }, [cartTotal, effectivePaidAmount])
 
   function isProductActive(p) {
     return p.active !== false && p.active !== 'false' && p.active !== 0
@@ -189,6 +208,8 @@ export default function Sales() {
     setCustomerName('')
     setCustomerPhone('')
     setSelectedCustomerId('')
+    setSaleType('total')
+    setPartialPaidAmount('')
     setPaymentMethod('efectivo')
     setCashAmount(String(cartTotal))
     setTransferAmount('0')
@@ -212,18 +233,39 @@ export default function Sales() {
   function handleSelectPaymentMethod(method) {
     setPaymentMethod(method)
     setCheckoutError('')
+    const targetAmount = effectivePaidAmount
     if (method === 'efectivo') {
-      setCashAmount(String(cartTotal))
+      setCashAmount(String(targetAmount))
       setTransferAmount('0')
     } else if (method === 'transferencia') {
       setCashAmount('0')
-      setTransferAmount(String(cartTotal))
-      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
+      setTransferAmount(String(targetAmount))
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(targetAmount) }])
     } else if (method === 'mixto') {
-      const half = Math.round(cartTotal / 2)
+      const half = Math.round(targetAmount / 2)
       setCashAmount(String(half))
-      setTransferAmount(String(cartTotal - half))
-      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal - half) }])
+      setTransferAmount(String(targetAmount - half))
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(targetAmount - half) }])
+    }
+  }
+
+  function handleSaleTypeChange(type) {
+    setSaleType(type)
+    setCheckoutError('')
+    if (type === 'total') {
+      setCashAmount(String(cartTotal))
+      setTransferAmount('0')
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
+    } else if (type === 'credito') {
+      setCashAmount('0')
+      setTransferAmount('0')
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: '0' }])
+    } else if (type === 'parcial') {
+      const half = Math.round(cartTotal / 2)
+      setPartialPaidAmount(String(half))
+      setCashAmount(String(half))
+      setTransferAmount('0')
+      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(half) }])
     }
   }
 
@@ -244,7 +286,7 @@ export default function Sales() {
       const sum = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
       setTransferAmount(String(sum))
       if (paymentMethod === 'mixto') {
-        const remaining = Math.max(0, cartTotal - sum)
+        const remaining = Math.max(0, effectivePaidAmount - sum)
         setCashAmount(String(remaining))
       }
     }
@@ -277,36 +319,53 @@ export default function Sales() {
         )
       }
 
+      // Si queda saldo deudor, el cliente es obligatorio
+      if (effectivePendingAmount > 0) {
+        if (!selectedCustomerId && !customerName.trim()) {
+          throw new Error('Para ventas a crédito o con saldo pendiente, es obligatorio seleccionar o ingresar el nombre del cliente para registrar la deuda.')
+        }
+      }
+
       const cashVal = Number(cashAmount) || 0
       const transferVal = Number(transferAmount) || 0
 
-      if (paymentMethod === 'efectivo' && cashVal < cartTotal) {
-        throw new Error('El monto en efectivo ingresado es menor al total a pagar')
-      }
-      if (paymentMethod === 'transferencia' && transferVal < cartTotal) {
-        throw new Error('El monto de la transferencia debe cubrir el total')
-      }
-      if (paymentMethod === 'mixto' && cashVal + transferVal < cartTotal) {
-        throw new Error('La suma de efectivo y transferencia no cubre el total')
+      if (saleType !== 'credito') {
+        if (paymentMethod === 'efectivo' && cashVal < effectivePaidAmount) {
+          throw new Error('El monto en efectivo ingresado es menor al valor abonado')
+        }
+        if (paymentMethod === 'transferencia' && transferVal < effectivePaidAmount) {
+          throw new Error('El monto de la transferencia debe cubrir el valor abonado')
+        }
+        if (paymentMethod === 'mixto' && cashVal + transferVal < effectivePaidAmount) {
+          throw new Error('La suma de efectivo y transferencia no cubre el valor abonado')
+        }
       }
 
       let bankDetailsString = ''
-      if (paymentMethod === 'transferencia' || paymentMethod === 'mixto') {
+      if (saleType !== 'credito' && (paymentMethod === 'transferencia' || paymentMethod === 'mixto')) {
         bankDetailsString = bankPayments
           .filter((bp) => (Number(bp.amount) || 0) > 0 || bankPayments.length === 1)
           .map((bp) => `${bp.bank}: $${Number(bp.amount || transferVal).toLocaleString('es-CO')}`)
           .join(' | ')
       }
 
+      let finalPaymentMethod = paymentMethod
+      if (saleType === 'credito') {
+        finalPaymentMethod = 'credito'
+      }
+
       const payload = {
+        customer_id: selectedCustomerId || undefined,
         customer_name: customerName.trim() || 'Cliente General',
-        payment_method: paymentMethod,
-        cash_amount: cashVal,
-        transfer_amount: transferVal,
+        payment_method: finalPaymentMethod,
+        cash_amount: saleType === 'credito' ? 0 : cashVal,
+        transfer_amount: saleType === 'credito' ? 0 : transferVal,
         bank_details: bankDetailsString,
         discount_percent: discountCalculated.percent,
         discount_amount: discountCalculated.amount,
         discount_reason: discountReason.trim(),
+        paid_amount: effectivePaidAmount,
+        pending_amount: effectivePendingAmount,
         deduct_stock: deductStock,
         custom_date: isPastDate ? customSaleDate : undefined,
         items: cartItems.map((it) => ({
@@ -334,9 +393,12 @@ export default function Sales() {
         discount_percent: discountCalculated.percent,
         discount_reason: payload.discount_reason,
         total: cartTotal,
-        payment_method: paymentMethod,
+        paid_amount: effectivePaidAmount,
+        pending_amount: effectivePendingAmount,
+        payment_status: effectivePendingAmount === 0 ? 'paid' : (effectivePaidAmount > 0 ? 'partial' : 'pending'),
+        payment_method: finalPaymentMethod,
         cash_amount: cashVal,
-        change: paymentMethod === 'efectivo' ? Math.max(0, cashVal - cartTotal) : 0,
+        change: paymentMethod === 'efectivo' && saleType !== 'credito' ? Math.max(0, cashVal - effectivePaidAmount) : 0,
         bank_details: bankDetailsString,
         created_at: isPastDate ? new Date(customSaleDate) : new Date()
       })
@@ -603,7 +665,7 @@ export default function Sales() {
                   className="flex items-center gap-1.5 text-xs font-black text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                 >
                   <Tag className="w-3.5 h-3.5" />
-                  <span>+ Aplicar Descuento / Promoción</span>
+                  <span>Aplicar Descuento / Promoción</span>
                 </button>
               ) : (
                 <div className="p-3 rounded-2xl bg-white dark:bg-[#200808] border border-amber-300 dark:border-amber-900/60 space-y-2">
@@ -707,10 +769,72 @@ export default function Sales() {
             </div>
           )}
 
+          {/* Modalidad de Pago: Completo, Abono Parcial o Crédito Total */}
+          <div>
+            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1.5">
+              Modalidad de Venta & Cobro
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'total', label: 'Pago Completo', desc: '100% Cobrado' },
+                { id: 'parcial', label: 'Pago Parcial', desc: 'Abono inicial' },
+                { id: 'credito', label: 'A Crédito / Fiado', desc: '100% Pendiente' }
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleSaleTypeChange(t.id)}
+                  className={`p-2.5 rounded-2xl border text-center cursor-pointer transition-all ${
+                    saleType === t.id
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white border-red-600 shadow-xs'
+                      : 'bg-red-50/50 dark:bg-[#200808] border-red-200/60 dark:border-red-950 text-red-950/70 dark:text-red-200/70 hover:bg-red-100/50'
+                  }`}
+                >
+                  <span className="block text-xs font-black">{t.label}</span>
+                  <span className={`block text-[10px] ${saleType === t.id ? 'text-white/80' : 'text-gray-500'}`}>
+                    {t.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Campo de Abono Parcial */}
+          {saleType === 'parcial' && (
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-[#200808] border border-amber-300 dark:border-amber-900/60 space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold text-amber-900 dark:text-amber-200">
+                <span>¿Cuánto abonará el cliente hoy? ($)</span>
+                <span>Total: ${cartTotal.toLocaleString('es-CO')}</span>
+              </div>
+              <input
+                type="number"
+                min="1"
+                max={cartTotal}
+                value={partialPaidAmount}
+                onChange={(e) => setPartialPaidAmount(e.target.value)}
+                placeholder="Monto abonado hoy..."
+                className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-amber-300 text-sm font-black focus:outline-none"
+              />
+              <div className="flex justify-between items-center text-xs font-black text-red-600 dark:text-red-400 pt-1">
+                <span>Saldo que quedará debiendo:</span>
+                <span className="text-sm">${effectivePendingAmount.toLocaleString('es-CO')}</span>
+              </div>
+            </div>
+          )}
+
+          {saleType === 'credito' && (
+            <div className="p-3 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
+              <BadgeDollarSign className="w-5 h-5 text-red-600 shrink-0" />
+              <span>
+                Venta 100% a crédito. El cliente quedará debiendo <strong>${cartTotal.toLocaleString('es-CO')}</strong>.
+              </span>
+            </div>
+          )}
+
           {/* Selección de Cliente */}
           <div>
             <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
-              Cliente (Opcional)
+              Cliente {effectivePendingAmount > 0 ? <span className="text-red-600">*(Obligatorio por deuda)</span> : '(Opcional)'}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <select
@@ -718,10 +842,10 @@ export default function Sales() {
                 onChange={handleCustomerSelect}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
               >
-                <option value="">👤 Cliente de Mostrador (General)</option>
+                <option value="">Seleccionar del directorio de clientes...</option>
                 {customersList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.first_name} {c.last_name || ''} {c.phone ? `(${c.phone})` : ''}
+                    {c.first_name} {c.last_name || ''} {c.phone ? `(${c.phone})` : ''} {c.total_debt > 0 ? `[Debe $${Number(c.total_debt).toLocaleString('es-CO')}]` : ''}
                   </option>
                 ))}
               </select>
@@ -736,108 +860,111 @@ export default function Sales() {
             </div>
           </div>
 
-          {/* Método de Pago */}
-          <div>
-            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-2">
-              Método de Pago
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'efectivo', label: 'Efectivo', icon: Banknote },
-                { id: 'transferencia', label: 'Transferencia', icon: Smartphone },
-                { id: 'mixto', label: 'Mixto', icon: CreditCard }
-              ].map((m) => {
-                const Icon = m.icon
-                const active = paymentMethod === m.id
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => handleSelectPaymentMethod(m.id)}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-black cursor-pointer transition-all ${
-                      active
-                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
-                        : 'bg-red-50/50 dark:bg-[#200808] border-red-200/60 dark:border-red-950 text-red-950/70 dark:text-red-200/70 hover:bg-red-100/50'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{m.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Campos según método */}
-          {paymentMethod === 'efectivo' && (
-            <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-2">
-              <label className="block text-xs font-bold text-red-950 dark:text-red-200">
-                Efectivo Recibido ($)
-              </label>
-              <input
-                type="number"
-                value={cashAmount}
-                onChange={(e) => setCashAmount(e.target.value)}
-                placeholder={String(cartTotal)}
-                className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black focus:outline-none"
-              />
-              {Number(cashAmount) >= cartTotal && (
-                <div className="flex justify-between items-center text-xs font-black text-emerald-600 dark:text-emerald-400 pt-1">
-                  <span>Cambio / Vueltos:</span>
-                  <span className="text-sm">
-                    ${(Number(cashAmount) - cartTotal).toLocaleString('es-CO')}
-                  </span>
+          {/* Método de Pago (Solo si hay dinero que cobrar hoy) */}
+          {saleType !== 'credito' && (
+            <>
+              <div>
+                <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-2">
+                  Método de Pago para lo Cobrado (${effectivePaidAmount.toLocaleString('es-CO')})
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'efectivo', label: 'Efectivo', icon: Banknote },
+                    { id: 'transferencia', label: 'Transferencia', icon: Smartphone },
+                    { id: 'mixto', label: 'Mixto', icon: CreditCard }
+                  ].map((m) => {
+                    const Icon = m.icon
+                    const active = paymentMethod === m.id
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => handleSelectPaymentMethod(m.id)}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-black cursor-pointer transition-all ${
+                          active
+                            ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                            : 'bg-red-50/50 dark:bg-[#200808] border-red-200/60 dark:border-red-950 text-red-950/70 dark:text-red-200/70 hover:bg-red-100/50'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{m.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
 
-          {(paymentMethod === 'transferencia' || paymentMethod === 'mixto') && (
-            <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-3">
-              <label className="block text-xs font-bold text-red-950 dark:text-red-200">
-                Desglose de Transferencia / Bancos
-              </label>
-
-              {bankPayments.map((bp, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <select
-                    value={bp.bank}
-                    onChange={(e) => handleBankChange(idx, 'bank', e.target.value)}
-                    className="w-1/2 px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold"
-                  >
-                    {COMMON_BANKS.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
+              {paymentMethod === 'efectivo' && (
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-2">
+                  <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                    Efectivo Recibido ($)
+                  </label>
                   <input
                     type="number"
-                    placeholder="Monto ($)"
-                    value={bp.amount}
-                    onChange={(e) => handleBankChange(idx, 'amount', e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold focus:outline-none"
+                    value={cashAmount}
+                    onChange={(e) => setCashAmount(e.target.value)}
+                    placeholder={String(effectivePaidAmount)}
+                    className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black focus:outline-none"
                   />
-                  {bankPayments.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBank(idx)}
-                      className="p-2 text-red-500 hover:text-red-700 cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  {Number(cashAmount) >= effectivePaidAmount && (
+                    <div className="flex justify-between items-center text-xs font-black text-emerald-600 dark:text-emerald-400 pt-1">
+                      <span>Cambio / Vueltos:</span>
+                      <span className="text-sm">
+                        ${(Number(cashAmount) - effectivePaidAmount).toLocaleString('es-CO')}
+                      </span>
+                    </div>
                   )}
                 </div>
-              ))}
+              )}
 
-              <button
-                type="button"
-                onClick={handleAddBank}
-                className="text-[11px] font-black text-red-600 dark:text-amber-400 hover:underline cursor-pointer"
-              >
-                + Añadir otro banco (pago dividido)
-              </button>
-            </div>
+              {(paymentMethod === 'transferencia' || paymentMethod === 'mixto') && (
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-3">
+                  <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                    Desglose de Transferencia / Bancos
+                  </label>
+
+                  {bankPayments.map((bp, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <select
+                        value={bp.bank}
+                        onChange={(e) => handleBankChange(idx, 'bank', e.target.value)}
+                        className="w-1/2 px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold"
+                      >
+                        {COMMON_BANKS.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Monto ($)"
+                        value={bp.amount}
+                        onChange={(e) => handleBankChange(idx, 'amount', e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold focus:outline-none"
+                      />
+                      {bankPayments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBank(idx)}
+                          className="p-2 text-red-500 hover:text-red-700 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleAddBank}
+                    className="text-[11px] font-black text-red-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    + Añadir otro banco (pago dividido)
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {/* Opciones Avanzadas: Descuento de Stock & Fecha Pasada */}
@@ -908,7 +1035,11 @@ export default function Sales() {
               disabled={submitting}
               className="px-7 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-xs shadow-md cursor-pointer disabled:opacity-50"
             >
-              {submitting ? 'Procesando...' : `Confirmar Venta $${cartTotal.toLocaleString('es-CO')}`}
+              {submitting
+                ? 'Procesando...'
+                : saleType === 'credito'
+                ? `Confirmar Crédito $${cartTotal.toLocaleString('es-CO')}`
+                : `Confirmar Venta $${effectivePaidAmount.toLocaleString('es-CO')}`}
             </button>
           </div>
         </form>
@@ -930,7 +1061,10 @@ export default function Sales() {
 
               <div>
                 <p className="text-[11px] font-bold">Cliente: {lastOrder.customer_name}</p>
-                <p className="text-[10px] text-gray-500">Pago: {lastOrder.payment_method.toUpperCase()}</p>
+                <p className="text-[10px] text-gray-500">
+                  Pago: {lastOrder.payment_method.toUpperCase()}
+                  {lastOrder.pending_amount > 0 && ` (Saldo Pendiente: $${lastOrder.pending_amount.toLocaleString('es-CO')})`}
+                </p>
               </div>
 
               <div className="space-y-1 py-2 border-y border-gray-200">
@@ -959,6 +1093,21 @@ export default function Sales() {
                   <span>TOTAL:</span>
                   <span>${lastOrder.total.toLocaleString('es-CO')}</span>
                 </div>
+
+                {/* Si hay saldo deudor en la venta */}
+                {lastOrder.pending_amount > 0 && (
+                  <>
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span>Abonado / Pagado:</span>
+                      <span>${Number(lastOrder.paid_amount || 0).toLocaleString('es-CO')}</span>
+                    </div>
+                    <div className="flex justify-between text-red-600 font-black">
+                      <span>SALDO PENDIENTE:</span>
+                      <span>${lastOrder.pending_amount.toLocaleString('es-CO')}</span>
+                    </div>
+                  </>
+                )}
+
                 {lastOrder.payment_method === 'efectivo' && lastOrder.change > 0 && (
                   <div className="flex justify-between text-[11px] text-emerald-700">
                     <span>Cambio Devuelto:</span>

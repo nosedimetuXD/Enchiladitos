@@ -47,15 +47,17 @@ async function getRoundedLogoBase64() {
 }
 
 /**
- * Genera el documento jsPDF con el diseño estándar oficial e imagen de logo.
+ * Genera el documento jsPDF con el diseño estándar oficial, imagen de logo y soporte de créditos/deudas.
  * @param {Object} order - Datos de la venta
  * @returns {Promise<jsPDF>}
  */
 export async function createReceiptPDF(order) {
   const items = order.items || []
   const itemsCount = items.length
-  // Altura dinámica: base 130mm + espacio por cada producto
-  const dynamicHeight = Math.max(160, 115 + itemsCount * 9)
+  const hasDebt = (order.pending_amount || 0) > 0 || order.payment_status === 'pending' || order.payment_status === 'partial'
+
+  // Altura dinámica calculada
+  const dynamicHeight = Math.max(165, 125 + itemsCount * 9 + (hasDebt ? 16 : 0))
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -69,9 +71,8 @@ export async function createReceiptPDF(order) {
   try {
     const logoData = await getRoundedLogoBase64()
     if (logoData) {
-      // Dibujar logo centrado (22mm x 22mm)
       doc.addImage(logoData, 'PNG', 29, y, 22, 22)
-      y += 27 // Separación adecuada respecto al texto inferior
+      y += 27 // Separación adecuada
     } else {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(14)
@@ -103,26 +104,35 @@ export async function createReceiptPDF(order) {
   doc.line(6, y, 74, y)
   y += 5
 
-  // 3. Información del Cliente y Método de Pago
+  // 3. Información del Cliente (Multilínea para nombres largos completos)
   doc.setFontSize(8)
   doc.setTextColor(30, 30, 30)
 
   doc.setFont('helvetica', 'bold')
   doc.text('Cliente:', 6, y)
   doc.setFont('helvetica', 'normal')
-  doc.text(order.customer_name || 'Cliente General', 22, y)
-  y += 4
+  const custLines = doc.splitTextToSize(order.customer_name || 'Cliente General', 52)
+  doc.text(custLines, 20, y)
+  y += Math.max(custLines.length * 3.8, 4.5)
 
   doc.setFont('helvetica', 'bold')
   doc.text('Pago:', 6, y)
   doc.setFont('helvetica', 'normal')
-  doc.text((order.payment_method || 'EFECTIVO').toUpperCase(), 22, y)
+  let payMethodText = (order.payment_method || 'EFECTIVO').toUpperCase()
+  if (hasDebt) {
+    if ((order.paid_amount || 0) === 0) {
+      payMethodText = 'CRÉDITO / FIADO'
+    } else {
+      payMethodText = `PARCIAL (${payMethodText})`
+    }
+  }
+  doc.text(payMethodText, 20, y)
 
   if (order.bank_details) {
     y += 3.5
     doc.setFontSize(6.5)
     doc.setTextColor(90, 90, 90)
-    doc.text(`(${order.bank_details})`, 22, y)
+    doc.text(`(${order.bank_details})`, 20, y)
   }
   y += 5
 
@@ -141,7 +151,7 @@ export async function createReceiptPDF(order) {
   doc.line(6, y, 74, y)
   y += 4
 
-  // Lista de Productos (Con ajuste de texto para que los nombres no se corten)
+  // Lista de Productos (Con ajuste multilínea íntegro)
   items.forEach((it) => {
     const name = it.product?.name || it.product_name || 'Producto'
     const qty = it.quantity || 1
@@ -172,6 +182,8 @@ export async function createReceiptPDF(order) {
   const subtotal = order.subtotal || order.total || 0
   const discountAmount = order.discount_amount || 0
   const total = order.total || 0
+  const paidAmount = order.paid_amount !== undefined ? order.paid_amount : total
+  const pendingAmount = order.pending_amount !== undefined ? order.pending_amount : Math.max(0, total - paidAmount)
 
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
@@ -196,16 +208,42 @@ export async function createReceiptPDF(order) {
   y += 4.5
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9.5)
-  doc.setTextColor(180, 20, 20)
+  doc.setFontSize(9)
+  doc.setTextColor(30, 30, 30)
   doc.text('TOTAL:', 6, y)
   doc.text(`$${total.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
-  y += 6
+  y += 4.5
+
+  // 5.1 Desglose de Crédito y Saldo Pendiente si aplica
+  if (hasDebt || pendingAmount > 0) {
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(16, 185, 129) // Verde para lo pagado
+    doc.text('Abonado / Pagado:', 6, y)
+    doc.text(`$${paidAmount.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
+    y += 3.5
+
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(220, 38, 38) // Rojo para saldo pendiente
+    doc.text('SALDO PENDIENTE:', 6, y)
+    doc.text(`$${pendingAmount.toLocaleString('es-CO')}`, 74, y, { align: 'right' })
+    y += 4.5
+  }
+
+  y += 2
 
   // 6. Pie de Página
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(120, 120, 120)
+  if (hasDebt) {
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(180, 20, 20)
+    doc.text('** VENTA REGISTRADA A CRÉDITO **', 40, y, { align: 'center' })
+    y += 3.5
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(120, 120, 120)
+  }
   doc.text('¡Gracias por tu compra!', 40, y, { align: 'center' })
   y += 3.5
   doc.text('Enchiladitos — Sabor, Chamoy y Fuego', 40, y, { align: 'center' })
@@ -264,9 +302,13 @@ export async function shareReceiptPDFToWhatsApp(order) {
   const file = new File([blob], fileName, { type: 'application/pdf' })
 
   const phone = order.customer_phone ? order.customer_phone.replace(/\D/g, '') : ''
-  const companionMessage = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n¡Hola ${order.customer_name || 'Cliente'}! Adjunto encuentras tu comprobante de compra por valor de $${Number(order.total || 0).toLocaleString('es-CO')}. ¡Muchas gracias por tu preferencia!`
+  const hasDebt = (order.pending_amount || 0) > 0
+  let companionMessage = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n¡Hola ${order.customer_name || 'Cliente'}! Adjunto encuentras tu comprobante de compra por valor de $${Number(order.total || 0).toLocaleString('es-CO')}.`
+  if (hasDebt) {
+    companionMessage += `\n*Abonado:* $${Number(order.paid_amount || 0).toLocaleString('es-CO')}\n*Saldo Pendiente:* $${Number(order.pending_amount || 0).toLocaleString('es-CO')}`
+  }
+  companionMessage += `\n¡Muchas gracias por tu preferencia!`
 
-  // Si el navegador soporta compartir archivos nativamente a WhatsApp (móviles y apps de escritorio)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
@@ -284,7 +326,6 @@ export async function shareReceiptPDFToWhatsApp(order) {
     }
   }
 
-  // Fallback para navegadores de escritorio: Descarga el PDF y abre WhatsApp con el mensaje
   doc.save(fileName)
 
   const url = phone

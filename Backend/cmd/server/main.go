@@ -51,7 +51,7 @@ func main() {
 	productHandler := handlers.NewProductHandler(pool)
 	saleHandler := handlers.NewSaleHandler(pool, hub)
 	userHandler := handlers.NewUserHandler(pool)
-	customerHandler := handlers.NewCustomerHandler(pool)
+	customerHandler := handlers.NewCustomerHandler(pool, hub)
 	accountingHandler := handlers.NewAccountingHandler(pool, hub)
 	eventHandler := handlers.NewEventHandler(hub)
 
@@ -80,9 +80,12 @@ func main() {
 		r.Patch("/products/{id}/stock", productHandler.AdjustStock)
 		r.Delete("/products/{id}", productHandler.Delete)
 
-		// Clientes (CRM)
+		// Clientes (CRM) & Cuentas/Créditos
 		r.Get("/customers", customerHandler.List)
 		r.Get("/customers/{id}", customerHandler.Get)
+		r.Get("/customers/{id}/account", customerHandler.GetAccount)
+		r.Post("/customers/{id}/payments", customerHandler.CreatePayment)
+		r.Delete("/customer-payments/{id}", customerHandler.DeletePayment)
 		r.Post("/customers", customerHandler.Create)
 		r.Put("/customers/{id}", customerHandler.Update)
 		r.Delete("/customers/{id}", customerHandler.Delete)

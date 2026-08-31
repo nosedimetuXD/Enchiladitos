@@ -12,7 +12,8 @@ import {
   Edit2,
   ShieldCheck,
   KeyRound,
-  UserCircle
+  UserCircle,
+  AlertCircle
 } from 'lucide-react'
 
 export default function Profile() {
@@ -195,8 +196,9 @@ export default function Profile() {
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Modificar Datos de Acceso">
         <form onSubmit={handleSaveProfile} className="space-y-4">
           {formError && (
-            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold">
-              ⚠️ {formError}
+            <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{formError}</span>
             </div>
           )}
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, User, Flame } from 'lucide-react'
+import { Lock, User, Flame, AlertCircle } from 'lucide-react'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -28,20 +28,23 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative bg-[#140505] overflow-hidden p-4">
-      {/* Background Subtle Gradient & Glow */}
-      <div className="absolute inset-0 bg-radial from-red-950/40 via-[#140505] to-[#0a0202] pointer-events-none" />
-      <div className="absolute top-1/4 -left-20 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center bg-[#0d0303] p-4 relative overflow-hidden">
+      {/* Background Glows */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative w-full max-w-md bg-[#1c0707] border border-red-950/80 rounded-3xl p-8 shadow-2xl z-10 backdrop-blur-md">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-black/40 border-2 border-red-600/60 shadow-xl mb-4 overflow-hidden p-1.5 group">
-            <img src="/logo.png" alt="Enchiladitos Logo" className="w-full h-full object-contain rounded-2xl group-hover:scale-105 transition-transform" />
+      <div className="max-w-md w-full bg-[#180505] border border-red-900/60 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-sm">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="relative inline-block mb-3">
+            <img
+              src="/logo.png"
+              alt="Enchiladitos Logo"
+              className="w-20 h-20 rounded-3xl shadow-xl shadow-red-950/50 object-contain mx-auto border-2 border-red-600/40 p-1 bg-[#120303]"
+            />
           </div>
-          <span className="font-black text-white text-3xl tracking-tight leading-none block bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent">
-            ENCHILADITOS
+          <span className="block text-2xl font-black tracking-tight text-white uppercase">
+            Enchiladitos
           </span>
           <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mt-1.5">
             Sabor, Chamoy y Fuego
@@ -55,8 +58,9 @@ export default function Login() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-950/70 text-red-300 border border-red-800 p-3 rounded-2xl text-xs font-bold text-center animate-shake">
-              ⚠️ {error}
+            <div className="bg-red-950/70 text-red-300 border border-red-800 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
