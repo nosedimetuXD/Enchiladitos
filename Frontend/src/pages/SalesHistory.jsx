@@ -21,7 +21,7 @@ import {
   Clock,
   Package
 } from 'lucide-react'
-import { downloadReceiptPDF, shareReceiptPDFToWhatsApp } from '../utils/pdfReceipt'
+import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 
 const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
 
@@ -672,7 +672,7 @@ export default function SalesHistory() {
               </button>
 
               <button
-                onClick={() => window.print()}
+                onClick={() => printReceiptPDF(selectedSale)}
                 className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors whitespace-nowrap"
               >
                 <Printer className="w-4 h-4 shrink-0" />

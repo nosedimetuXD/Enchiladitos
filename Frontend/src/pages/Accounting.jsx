@@ -272,14 +272,14 @@ export default function Accounting() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Ingreso</span>
+            <span>Ingreso</span>
           </button>
           <button
             onClick={openCreateExpense}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-xs cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Gasto</span>
+            <span>Gasto</span>
           </button>
         </div>
       </div>
