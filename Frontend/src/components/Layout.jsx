@@ -5,12 +5,9 @@ import { processImageUrl } from '../utils/imageUtils'
 import {
   ShoppingBag,
   FileText,
-  Package,
   Flame,
   DollarSign,
   BarChart3,
-  CheckSquare,
-  Users,
   UserCheck,
   User as UserIcon,
   ChevronLeft,
@@ -68,17 +65,6 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const roleLabels = {
-    owner: 'DUEÑO',
-    admin: 'ADMINISTRADOR',
-    employee: 'EMPLEADO',
-    empleado: 'EMPLEADO'
-  }
-
-  const currentRole = (user?.role || '').toLowerCase()
-  const isOwner = currentRole === 'owner' || currentRole === 'dueño'
-  const isAdmin = isOwner || currentRole === 'admin' || currentRole === 'administrador'
-
   const rawAvatarUrl = user?.avatar_url || (user && user.id && userAvatars[user.id]) || ''
   const userAvatarUrl = processImageUrl(rawAvatarUrl)
 
@@ -86,31 +72,28 @@ export default function Layout() {
     {
       title: 'OPERACIÓN & VENTAS',
       items: [
-        { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true, show: true },
-        { to: '/sales/history', label: 'Historial Ventas', icon: FileText, show: true },
-        { to: '/customers', label: 'Clientes', icon: UserCheck, show: true }
+        { to: '/', label: 'Ventas (POS)', icon: ShoppingBag, end: true },
+        { to: '/sales/history', label: 'Historial Ventas', icon: FileText },
+        { to: '/customers', label: 'Clientes (CRM)', icon: UserCheck }
       ]
     },
     {
-      title: 'CATÁLOGO & INVENTARIO',
+      title: 'CATÁLOGO & STOCK',
       items: [
-        { to: '/inventory', label: 'Inventario', icon: Package, show: true },
-        { to: '/products', label: 'Productos', icon: Flame, show: true }
+        { to: '/products', label: 'Productos & Stock', icon: Flame }
       ]
     },
     {
       title: 'FINANZAS & CONTROL',
       items: [
-        { to: '/accounting', label: 'Contabilidad', icon: DollarSign, show: isOwner },
-        { to: '/stats', label: 'Estadísticas', icon: BarChart3, show: isOwner },
-        { to: '/tasks', label: 'Tareas', icon: CheckSquare, show: true }
+        { to: '/accounting', label: 'Contabilidad', icon: DollarSign },
+        { to: '/stats', label: 'Estadísticas', icon: BarChart3 }
       ]
     },
     {
-      title: 'SISTEMA & CUENTA',
+      title: 'CUENTA',
       items: [
-        { to: '/users', label: 'Usuarios', icon: Users, show: isOwner },
-        { to: '/profile', label: 'Mi Perfil', icon: UserIcon, show: true }
+        { to: '/profile', label: 'Mi Perfil', icon: UserIcon }
       ]
     }
   ]
@@ -217,53 +200,48 @@ export default function Layout() {
 
           {/* Navigation Items */}
           <nav className="p-3 space-y-4">
-            {navSections.map((section, sIdx) => {
-              const visibleItems = section.items.filter((it) => it.show)
-              if (visibleItems.length === 0) return null
+            {navSections.map((section, sIdx) => (
+              <div key={section.title} className="space-y-1">
+                {!isCollapsed ? (
+                  <span className="text-[10px] font-black text-red-600/80 dark:text-amber-500/90 uppercase tracking-wider px-3 pb-1 block">
+                    {section.title}
+                  </span>
+                ) : (
+                  sIdx > 0 && <div className="my-2 border-t border-red-200 dark:border-red-950" />
+                )}
 
-              return (
-                <div key={section.title} className="space-y-1">
-                  {!isCollapsed ? (
-                    <span className="text-[10px] font-black text-red-600/80 dark:text-amber-500/90 uppercase tracking-wider px-3 pb-1 block">
-                      {section.title}
-                    </span>
-                  ) : (
-                    sIdx > 0 && <div className="my-2 border-t border-red-200 dark:border-red-950" />
-                  )}
-
-                  {visibleItems.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.end}
-                        onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 group relative ${
-                            isActive
-                              ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xs'
-                              : 'text-[#450a0a]/80 dark:text-[#fef2f2]/80 hover:text-red-600 dark:hover:text-amber-400 hover:bg-red-100/60 dark:hover:bg-red-950/40'
-                          } ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`
-                        }
-                        title={isCollapsed ? item.label : undefined}
-                      >
-                        {({ isActive }) => (
-                          <>
-                            <Icon
-                              className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
-                                isActive ? 'text-white' : 'text-red-500 dark:text-amber-400'
-                              }`}
-                            />
-                            {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
-                          </>
-                        )}
-                      </NavLink>
-                    )
-                  })}
-                </div>
-              )
-            })}
+                {section.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-200 group relative ${
+                          isActive
+                            ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xs'
+                            : 'text-[#450a0a]/80 dark:text-[#fef2f2]/80 hover:text-red-600 dark:hover:text-amber-400 hover:bg-red-100/60 dark:hover:bg-red-950/40'
+                        } ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`
+                      }
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <Icon
+                            className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
+                              isActive ? 'text-white' : 'text-red-500 dark:text-amber-400'
+                            }`}
+                          />
+                          {!isCollapsed && <span className="truncate flex-1 text-left">{item.label}</span>}
+                        </>
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </div>
+            ))}
           </nav>
         </div>
 
@@ -339,18 +317,18 @@ export default function Layout() {
                 />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-sm shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                  {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
+                  {user?.username ? user.username.charAt(0).toUpperCase() : 'D'}
                 </div>
               )}
 
               {!isCollapsed && (
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] truncate group-hover:text-red-600 transition-colors">
-                    {user?.username}
+                    {user?.username || 'Dueño'}
                   </span>
                   <span className="inline-block mt-0.5">
                     <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-[#140505] text-red-600 dark:text-amber-400 border border-red-200 dark:border-red-900 uppercase tracking-wider">
-                      {roleLabels[user?.role] || user?.role}
+                      ADMINISTRADOR
                     </span>
                   </span>
                 </div>

@@ -1,482 +1,267 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
-import Modal from '../components/Modal'
 import {
   BarChart3,
   TrendingUp,
   TrendingDown,
   DollarSign,
-  Award,
   Users,
-  Calendar,
-  CalendarDays,
   Building2,
-  AlertTriangle,
   Trophy,
-  Clock,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Zap,
-  Sun,
-  Globe
+  Flame,
+  CreditCard,
+  ShoppingBag,
+  Sparkles
 } from 'lucide-react'
-
-const MONTH_NAMES = [
-  { num: 1, short: 'ene.', full: 'Enero' },
-  { num: 2, short: 'feb.', full: 'Febrero' },
-  { num: 3, short: 'mar.', full: 'Marzo' },
-  { num: 4, short: 'abr.', full: 'Abril' },
-  { num: 5, short: 'may.', full: 'Mayo' },
-  { num: 6, short: 'jun.', full: 'Junio' },
-  { num: 7, short: 'jul.', full: 'Julio' },
-  { num: 8, short: 'ago.', full: 'Agosto' },
-  { num: 9, short: 'sep.', full: 'Septiembre' },
-  { num: 10, short: 'oct.', full: 'Octubre' },
-  { num: 11, short: 'nov.', full: 'Noviembre' },
-  { num: 12, short: 'dic.', full: 'Diciembre' }
-]
 
 export default function Stats() {
   const [summary, setSummary] = useState(null)
+  const [period, setPeriod] = useState('month')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  // Control de filtro y modal
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('month_year')
-  const [displayLabel, setDisplayLabel] = useState('Mes Actual')
-
-  // Estados de filtro
-  const [period, setPeriod] = useState('month')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-
-  async function loadStats(params = {}) {
+  async function loadStats(p = period) {
     setLoading(true)
     setPageError('')
     try {
-      let queryStr = ''
-      if (params.startDate && params.endDate) {
-        queryStr = `start_date=${params.startDate}&end_date=${params.endDate}`
-      } else if (params.year && params.monthNum) {
-        queryStr = `year=${params.year}&month_num=${params.monthNum}`
-      } else {
-        queryStr = `period=${params.period || period}`
-      }
-
-      const data = await api.get(`/accounting/summary?${queryStr}`)
+      const data = await api.get(`/accounting/summary?period=${p}`)
       setSummary(data)
     } catch (err) {
-      setPageError('No se pudieron cargar las estadísticas del período seleccionado')
+      setPageError('No se pudieron cargar las estadísticas')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadStats({ period: 'month' })
-  }, [])
+    loadStats(period)
+  }, [period])
 
-  function handleSelectPreset(presetKey, label) {
-    setPeriod(presetKey)
-    setDisplayLabel(label)
-    setIsFilterModalOpen(false)
-    loadStats({ period: presetKey })
-  }
-
-  function handleSelectMonthYear(year, monthNum, monthFull) {
-    setSelectedYear(year)
-    setSelectedMonth(monthNum)
-    setDisplayLabel(`${monthFull} de ${year}`)
-    setIsFilterModalOpen(false)
-    loadStats({ year, monthNum })
-  }
-
-  function handleApplyCustomRange(e) {
-    e.preventDefault()
-    if (!startDate || !endDate) {
-      alert('Por favor selecciona una fecha de inicio y de fin')
-      return
-    }
-    setDisplayLabel(`${startDate} al ${endDate}`)
-    setIsFilterModalOpen(false)
-    loadStats({ startDate, endDate })
-  }
-
-  const mStats = summary?.monthly_stats
+  const mStats = summary?.monthly_stats || {}
+  const totalIncome = summary?.total_income || 0
+  const totalExpenses = summary?.total_expenses || 0
+  const netBalance = summary?.net_balance || 0
+  const avgTicket = summary?.average_ticket || (summary?.sales_count > 0 ? totalIncome / summary.sales_count : 0)
 
   return (
     <div className="space-y-6">
-      {/* Header Banner con Patron de Marca Enchiladitos */}
-      <div className="relative rounded-3xl overflow-hidden p-6 border border-red-950/60 shadow-sm bg-gradient-to-r from-red-900 via-amber-900 to-red-950 text-[#fff5f2]">
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-amber-400" />
-              <span>Estadísticas Ejecutivas & Reportes</span>
-            </h2>
-            <p className="text-xs font-bold text-amber-300 mt-1">
-              Dashboard de ventas, productos más vendidos y clientes frecuentes de Enchiladitos
-            </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+              <BarChart3 className="w-5 h-5" />
+            </span>
+            <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
+              Estadísticas Ejecutivas
+            </h1>
           </div>
+          <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
+            Rendimiento del negocio, productos más vendidos, clientes destacados y métodos de cobro.
+          </p>
+        </div>
 
-          <button
-            onClick={() => setIsFilterModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-xs font-black text-white shadow-sm transition-all cursor-pointer shrink-0"
-          >
-            <Calendar className="w-4 h-4 text-amber-400" />
-            <span>{displayLabel}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
-          </button>
+        {/* Selector de Periodo */}
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          {[
+            { id: 'today', label: 'Hoy' },
+            { id: 'week', label: '7 Días' },
+            { id: 'month', label: 'Este Mes' },
+            { id: 'year', label: 'Este Año' },
+            { id: 'all', label: 'Histórico Total' }
+          ].map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
+                period === p.id
+                  ? 'bg-red-600 text-white shadow-xs'
+                  : 'bg-red-50/70 dark:bg-[#200808] text-red-950/70 dark:text-red-200/70 hover:bg-red-100/70'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {pageError && (
-        <div className="p-3.5 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-600" />
-          <span>{pageError}</span>
+      {loading ? (
+        <div className="text-center py-20">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-red-600 border-t-transparent"></div>
+          <p className="text-xs font-bold text-red-900/60 dark:text-red-400/60 mt-3">Calculando estadísticas...</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Tarjetas Principales de KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Total Facturado</span>
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
+                ${totalIncome.toLocaleString('es-CO')}
+              </p>
+              <span className="text-[11px] font-medium text-gray-500 mt-1 block">
+                {summary?.sales_count || 0} ventas completadas
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Gastos Totales</span>
+                <div className="p-2 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+                  <TrendingDown className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-red-600 dark:text-amber-400 mt-2">
+                ${totalExpenses.toLocaleString('es-CO')}
+              </p>
+              <span className="text-[11px] font-medium text-gray-500 mt-1 block">
+                {summary?.expenses_count || 0} gastos registrados
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Utilidad Neta Real</span>
+                <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2] mt-2">
+                ${netBalance.toLocaleString('es-CO')}
+              </p>
+              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 mt-1 block">
+                {totalIncome > 0 ? `${((netBalance / totalIncome) * 100).toFixed(1)}% margen` : '0% margen'}
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Ticket Promedio</span>
+                <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-2">
+                ${avgTicket.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+              </p>
+              <span className="text-[11px] font-medium text-gray-500 mt-1 block">Por cliente en mostrador</span>
+            </div>
+          </div>
+
+          {/* Grids de Rankings */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Top 10 Productos Más Vendidos */}
+            <div className="bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+                  <Flame className="w-4 h-4" />
+                </span>
+                <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Top Productos Más Vendidos</h3>
+              </div>
+
+              {(mStats.top_products || []).length === 0 ? (
+                <p className="text-xs text-gray-500 py-6 text-center">No hay datos en este período</p>
+              ) : (
+                <div className="space-y-3">
+                  {(mStats.top_products || []).map((tp, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-amber-400 font-black text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-[#450a0a] dark:text-[#fef2f2] truncate">
+                          {tp.product_name}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-black text-red-600 dark:text-amber-400">{tp.total_qty} uds</span>
+                        <span className="text-[10px] text-gray-500 block">
+                          ${tp.total_amount.toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Top 10 Clientes Frecuentes */}
+            <div className="bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+                  <Users className="w-4 h-4" />
+                </span>
+                <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Top Clientes Frecuentes</h3>
+              </div>
+
+              {(mStats.top_customers || []).length === 0 ? (
+                <p className="text-xs text-gray-500 py-6 text-center">No hay clientes con nombre registrado en este período</p>
+              ) : (
+                <div className="space-y-3">
+                  {(mStats.top_customers || []).map((tc, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 font-black text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-[#450a0a] dark:text-[#fef2f2] truncate">
+                          {tc.customer_name}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-black text-emerald-600 dark:text-emerald-400">
+                          ${tc.total_spent.toLocaleString('es-CO')}
+                        </span>
+                        <span className="text-[10px] text-gray-500 block">{tc.orders_count} pedidos</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Distribución por Bancos y Medios Digitales */}
+            <div className="bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                  <Building2 className="w-4 h-4" />
+                </span>
+                <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Transferencias & Bancos</h3>
+              </div>
+
+              {(mStats.top_banks || []).length === 0 ? (
+                <p className="text-xs text-gray-500 py-6 text-center">No hay pagos por transferencia en este período</p>
+              ) : (
+                <div className="space-y-3">
+                  {(mStats.top_banks || []).map((tb, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 font-black text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-[#450a0a] dark:text-[#fef2f2] truncate">
+                          {tb.bank_name}
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-black text-blue-600 dark:text-blue-400">
+                          ${tb.total_amount.toLocaleString('es-CO')}
+                        </span>
+                        <span className="text-[10px] text-gray-500 block">{tb.count} pagos</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Tarjetas KPI Financieras Exec */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-black text-red-700 dark:text-amber-300 mb-2">
-            <span>Ventas Totales</span>
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-2xl font-black text-emerald-600">
-            ${(mStats?.monthly_income || 0).toLocaleString()}
-          </div>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold">
-            Ingreso bruto facturado
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-black text-red-700 dark:text-amber-300 mb-2">
-            <span>Gastos Totales</span>
-            <TrendingDown className="w-4 h-4 text-red-600" />
-          </div>
-          <div className="text-2xl font-black text-red-600">
-            ${(mStats?.monthly_expenses || 0).toLocaleString()}
-          </div>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold">
-            Egresos del período
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-black text-red-700 dark:text-amber-300 mb-2">
-            <span>Ganancia Neta</span>
-            <DollarSign className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className={`text-2xl font-black ${(mStats?.net_profit || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            ${(mStats?.net_profit || 0).toLocaleString()}
-          </div>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold">
-            Utilidad disponible
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-black text-red-700 dark:text-amber-300 mb-2">
-            <span>Transacciones</span>
-            <Clock className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2]">
-            {mStats?.sales_count || mStats?.orders_count || 0}
-          </div>
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-semibold">
-            Pedidos registrados
-          </p>
-        </div>
-
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-5 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-[#9F6839] dark:text-[#DABA8C] mb-2">
-            <span className="flex items-center gap-1.5">
-              <Trophy className="w-3.5 h-3.5 text-amber-500" /> Mejor Vendedor
-            </span>
-            <Award className="w-4 h-4 text-amber-600" />
-          </div>
-          {mStats?.top_seller ? (
-            <div>
-              <div className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                {mStats.top_seller.username} <span className="text-[10px] bg-[#FEE4D7] dark:bg-[#34180D] px-2 py-0.5 rounded-full border border-[#D4B28E]">({mStats.top_seller.role})</span>
-              </div>
-              <div className="text-xs font-bold text-emerald-600 mt-1">
-                ${mStats.top_seller.total_amount.toLocaleString()} ({mStats.top_seller.sales_count} ventas)
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-[#9F6839]">Sin ventas este mes</p>
-          )}
-        </div>
-      </div>
-
-
-
-      {/* Rankings Grid: Top 10 Productos Más Vendidos y Top 10 Clientes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Top 10 Productos Más Vendidos */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
-            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-500" />
-              <span>Top 10 Productos Más Vendidos</span>
-            </h3>
-            <span className="text-xs font-bold text-[#9F6839]">Por unidades vendidas</span>
-          </div>
-
-          {!mStats?.top_products || mStats.top_products.length === 0 ? (
-            <p className="text-xs text-[#9F6839] font-medium py-4 text-center">No hay productos vendidos en este periodo.</p>
-          ) : (
-            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-              {mStats.top_products.slice(0, 10).map((prod, idx) => (
-                <div key={prod.product_name || idx} className="p-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/50 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className={`w-6 h-6 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-amber-500 shadow-xs' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-amber-700' : 'bg-[#9F6839]'}`}>
-                      #{idx + 1}
-                    </span>
-                    <span className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{prod.product_name}</span>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-extrabold text-[#9F6839] dark:text-[#DABA8C] block">{prod.total_qty} ud(s)</span>
-                    <span className="text-[11px] font-bold text-emerald-600">${prod.total_amount.toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Top 10 Clientes del Periodo */}
-        <div className="bg-white dark:bg-[#201009] border border-[#D4B28E] dark:border-[#9F6839]/40 rounded-3xl p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
-            <h3 className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7] flex items-center gap-2">
-              <Users className="w-5 h-5 text-emerald-600" />
-              <span>Top 10 Clientes del Periodo</span>
-            </h3>
-            <span className="text-xs font-bold text-[#9F6839]">Por total invertido</span>
-          </div>
-
-          {!mStats?.top_customers || mStats.top_customers.length === 0 ? (
-            <p className="text-xs text-[#9F6839] font-medium py-4 text-center">No hay compras registradas con nombre de cliente este mes.</p>
-          ) : (
-            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-              {mStats.top_customers.slice(0, 10).map((c, idx) => (
-                <div key={c.customer_name || idx} className="p-3 rounded-2xl bg-[#FEE4D7]/20 dark:bg-[#2A150C] border border-[#D4B28E]/50 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className={`w-6 h-6 rounded-full text-white text-[11px] font-black flex items-center justify-center shrink-0 ${idx === 0 ? 'bg-emerald-600 shadow-xs' : idx === 1 ? 'bg-emerald-500' : idx === 2 ? 'bg-teal-600' : 'bg-[#9F6839]'}`}>
-                      #{idx + 1}
-                    </span>
-                    <span className="text-sm font-extrabold text-[#432414] dark:text-[#FEE4D7] truncate">{c.customer_name}</span>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-extrabold text-emerald-600 block">${c.total_spent.toLocaleString()}</span>
-                    <span className="text-[10px] font-bold text-[#9F6839]">{c.orders_count} compra(s)</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Modal / Popover de Filtro de Período y Fechas */}
-      <Modal
-        isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        title="Filtrar Período & Fechas de Estadísticas"
-      >
-        <div className="space-y-5">
-          {/* Navegación por pestañas */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#FEE4D7]/50 dark:bg-[#2E180E] border border-[#D4B28E]">
-            <button
-              type="button"
-              onClick={() => setActiveTab('month_year')}
-              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'month_year'
-                  ? 'bg-[#9F6839] text-white shadow-xs'
-                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Mes & Año</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('custom')}
-              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'custom'
-                  ? 'bg-[#9F6839] text-white shadow-xs'
-                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>Rango Calendario</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('preset')}
-              className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'preset'
-                  ? 'bg-[#9F6839] text-white shadow-xs'
-                  : 'text-[#432414] dark:text-[#FEE4D7] hover:bg-[#9F6839]/10'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Rápido</span>
-            </button>
-          </div>
-
-          {/* TAB 1: Mes & Año (Exacto a la imagen del usuario) */}
-          {activeTab === 'month_year' && (
-            <div className="space-y-4 p-4 rounded-3xl bg-white dark:bg-[#150904] border border-[#D4B28E] shadow-2xs">
-              {/* Selector de Año */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#D4B28E]/40">
-                <button
-                  type="button"
-                  onClick={() => setSelectedYear(selectedYear - 1)}
-                  className="p-2 rounded-xl border border-[#D4B28E] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-base font-extrabold text-[#432414] dark:text-[#FEE4D7]">
-                  {selectedYear}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedYear(selectedYear + 1)}
-                  className="p-2 rounded-xl border border-[#D4B28E] hover:bg-[#FEE4D7] dark:hover:bg-[#2E180E] text-[#432414] dark:text-[#FEE4D7] cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Grid de 12 Meses */}
-              <div className="grid grid-cols-4 gap-2.5 pt-1">
-                {MONTH_NAMES.map((m) => {
-                  const isSelected = selectedMonth === m.num
-
-                  return (
-                    <button
-                      key={m.num}
-                      type="button"
-                      onClick={() => handleSelectMonthYear(selectedYear, m.num, m.full)}
-                      className={`py-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#0066FF] text-white font-black shadow-md border-2 border-black dark:border-white ring-2 ring-blue-400'
-                          : 'bg-gray-100 dark:bg-[#2A150C] text-[#432414] dark:text-[#FEE4D7] hover:bg-blue-100 dark:hover:bg-blue-950/60 border border-gray-200 dark:border-[#9F6839]/40'
-                      }`}
-                    >
-                      {m.short}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Rango Calendario (Fecha Inicio - Fecha Fin) */}
-          {activeTab === 'custom' && (
-            <form onSubmit={handleApplyCustomRange} className="space-y-4 p-4 rounded-3xl bg-white dark:bg-[#150904] border border-[#D4B28E]">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
-                    Fecha Inicio
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                    className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#432414] dark:text-[#DABA8C] uppercase mb-1">
-                    Fecha Fin
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                    className="w-full px-3 py-2.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] text-xs font-bold text-[#432414] dark:text-[#FEE4D7]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-[#9F6839] hover:bg-[#835229] text-white text-xs font-extrabold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2"
-              >
-                <Filter className="w-4 h-4" />
-                <span>Aplicar Rango de Fechas</span>
-              </button>
-            </form>
-          )}
-
-          {/* TAB 3: Opciones Rápidas */}
-          {activeTab === 'preset' && (
-            <div className="grid grid-cols-2 gap-3 p-1">
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('month', 'Mes Actual')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <Calendar className="w-4 h-4 text-[#9F6839]" />
-                <span>Mes Actual</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('prev_month', 'Mes Anterior')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <Clock className="w-4 h-4 text-[#9F6839]" />
-                <span>Mes Anterior</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('week', 'Esta Semana')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <BarChart3 className="w-4 h-4 text-[#9F6839]" />
-                <span>Esta Semana</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('today', 'Hoy')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <Sun className="w-4 h-4 text-amber-500" />
-                <span>Hoy</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('year', 'Este Año')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <Building2 className="w-4 h-4 text-[#9F6839]" />
-                <span>Este Año</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('all', 'Histórico Total')}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#150904] border border-[#D4B28E] hover:bg-[#FEE4D7]/50 text-xs font-bold text-[#432414] dark:text-[#FEE4D7] text-left cursor-pointer flex items-center gap-2"
-              >
-                <Globe className="w-4 h-4 text-blue-600" />
-                <span>Histórico Total</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </Modal>
     </div>
   )
 }
