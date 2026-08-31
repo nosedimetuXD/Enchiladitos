@@ -15,16 +15,19 @@ import {
   CreditCard,
   Building2,
   AlertCircle,
+  AlertTriangle,
   Calendar,
   UserCheck,
   Printer,
   Tag,
   Percent,
   Send,
+  Download,
   Package,
   Boxes,
   Sparkles
 } from 'lucide-react'
+import { downloadReceiptPDF, shareReceiptPDFToWhatsApp } from '../utils/pdfReceipt'
 
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=600&auto=format&fit=crop&q=80'
 const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
@@ -46,54 +49,44 @@ export default function Sales() {
   // Carrito de compras
   const [cartItems, setCartItems] = useState([])
 
-  // Descuentos en la venta
+  // Modal de cobro
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('efectivo')
+  const [cashAmount, setCashAmount] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [bankPayments, setBankPayments] = useState([{ bank: 'Bre-B/Llave', amount: '' }])
+  const [deductStock, setDeductStock] = useState(true)
+  const [isPastDate, setIsPastDate] = useState(false)
+  const [customSaleDate, setCustomSaleDate] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [checkoutError, setCheckoutError] = useState('')
+
+  // Sistema de Descuentos
   const [discountType, setDiscountType] = useState('percent') // 'percent' | 'fixed'
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
   const [showDiscountInput, setShowDiscountInput] = useState(false)
 
-  // Modal de cobro y cliente
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState('efectivo')
-  const [cashAmount, setCashAmount] = useState('')
-  const [transferAmount, setTransferAmount] = useState('')
-  const [deductStock, setDeductStock] = useState(true)
-
-  // Fecha personalizada para ventas pasadas
-  const [isPastDate, setIsPastDate] = useState(false)
-  const [customSaleDate, setCustomSaleDate] = useState(() => {
-    const now = new Date()
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
-    return now.toISOString().slice(0, 16)
-  })
-
-  // Desglose de Bancos / Entidades para Transferencia y Pago Mixto
-  const [bankPayments, setBankPayments] = useState([
-    { bank: 'Bre-B/Llave', amount: '' }
-  ])
-
-  const [submitting, setSubmitting] = useState(false)
-  const [checkoutError, setCheckoutError] = useState('')
-
-  // Modal Recibo impreso / éxito
+  // Modal de Recibo Oficial / Éxito
   const [lastOrder, setLastOrder] = useState(null)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
 
-  const isProductActive = (p) => (typeof p.active !== 'undefined' ? p.active : (p.is_active ?? true))
-
   async function loadData() {
+    setLoading(true)
+    setError('')
     try {
-      const [prodData, custData] = await Promise.all([
+      const [prodsData, custData] = await Promise.all([
         api.get('/products'),
         api.get('/customers').catch(() => [])
       ])
-      setProducts(prodData || [])
-      setCustomersList(custData || [])
+      const activeProds = Array.isArray(prodsData) ? prodsData : []
+      setProducts(activeProds)
+      setCustomersList(Array.isArray(custData) ? custData : [])
 
-      const cats = Array.from(new Set((prodData || []).map((p) => p.category))).filter(Boolean)
-      setCategories(['Todos', ...cats])
+      const cats = ['Todos', ...new Set(activeProds.map((p) => p.category || 'Otros').filter(Boolean))]
+      setCategories(cats)
     } catch (err) {
-      setError('No se pudieron cargar los productos')
+      setError('No se pudo cargar el catálogo de productos')
     } finally {
       setLoading(false)
     }
@@ -103,17 +96,15 @@ export default function Sales() {
     loadData()
   }, [])
 
-  // Carrito helpers
-  function addToCart(product, qtyToAdd = 1) {
-    if (!isProductActive(product)) return
+  function addToCart(product) {
     setCartItems((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + qtyToAdd } : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         )
       }
-      return [...prev, { product, quantity: qtyToAdd }]
+      return [...prev, { product, quantity: 1 }]
     })
   }
 
@@ -122,8 +113,8 @@ export default function Sales() {
       prev
         .map((item) => {
           if (item.product.id === productId) {
-            const newQty = item.quantity + delta
-            return newQty > 0 ? { ...item, quantity: newQty } : null
+            const nextQty = item.quantity + delta
+            return nextQty > 0 ? { ...item, quantity: nextQty } : null
           }
           return item
         })
@@ -142,11 +133,10 @@ export default function Sales() {
     setShowDiscountInput(false)
   }
 
-  // Cálculos de Totales
-  const cartSubtotal = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0),
-    [cartItems]
-  )
+  // Cálculos del Carrito
+  const cartSubtotal = useMemo(() => {
+    return cartItems.reduce((acc, item) => acc + (item.product.price || 0) * item.quantity, 0)
+  }, [cartItems])
 
   const discountCalculated = useMemo(() => {
     const val = Number(discountValue) || 0
@@ -161,10 +151,25 @@ export default function Sales() {
     }
   }, [cartSubtotal, discountType, discountValue])
 
-  const cartTotal = useMemo(
-    () => Math.max(0, cartSubtotal - discountCalculated.amount),
-    [cartSubtotal, discountCalculated]
-  )
+  const cartTotal = useMemo(() => {
+    return Math.max(0, cartSubtotal - discountCalculated.amount)
+  }, [cartSubtotal, discountCalculated])
+
+  // Verificación estricta de stock disponible en los productos del carrito
+  const hasOutOfStockItems = useMemo(() => {
+    return cartItems.some((it) => (it.product.stock ?? 0) < it.quantity)
+  }, [cartItems])
+
+  const outOfStockNames = useMemo(() => {
+    return cartItems
+      .filter((it) => (it.product.stock ?? 0) < it.quantity)
+      .map((it) => `${it.product.name} (Stock: ${it.product.stock ?? 0}, Solicitado: ${it.quantity})`)
+      .join(', ')
+  }, [cartItems])
+
+  function isProductActive(p) {
+    return p.active !== false && p.active !== 'false' && p.active !== 0
+  }
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -188,9 +193,16 @@ export default function Sales() {
     setCashAmount(String(cartTotal))
     setTransferAmount('0')
     setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
-    setDeductStock(true)
     setCheckoutError('')
-    setIsPastDate(false)
+
+    if (hasOutOfStockItems) {
+      setDeductStock(false)
+      setIsPastDate(true)
+    } else {
+      setDeductStock(true)
+      setIsPastDate(false)
+    }
+
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
     setCustomSaleDate(now.toISOString().slice(0, 16))
@@ -259,6 +271,12 @@ export default function Sales() {
     setCheckoutError('')
 
     try {
+      if (hasOutOfStockItems && deductStock) {
+        throw new Error(
+          `Los productos (${outOfStockNames}) no tienen suficiente stock disponible. No puedes descontar inventario de productos agotados. Desmarca la opción de descontar stock para registrarla como Venta Pasada.`
+        )
+      }
+
       const cashVal = Number(cashAmount) || 0
       const transferVal = Number(transferAmount) || 0
 
@@ -326,7 +344,7 @@ export default function Sales() {
       setIsCheckoutOpen(false)
       setIsReceiptOpen(true)
       clearCart()
-      await loadData() // Refrescar stock de productos
+      await loadData() // Refrescar catálogo y stock
     } catch (err) {
       setCheckoutError(err.message || 'Error procesando la venta')
     } finally {
@@ -336,30 +354,6 @@ export default function Sales() {
 
   function handlePrintReceipt() {
     window.print()
-  }
-
-  function handleSendWhatsAppReceipt() {
-    if (!lastOrder) return
-    const phone = lastOrder.customer_phone ? lastOrder.customer_phone.replace(/\D/g, '') : ''
-    let msg = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n`
-    msg += `¡Hola ${lastOrder.customer_name}! Gracias por tu compra.\n\n`
-    msg += `*Fecha:* ${new Date(lastOrder.created_at).toLocaleString('es-CO')}\n`
-    msg += `*Detalle:* \n`
-    lastOrder.items.forEach((it) => {
-      msg += ` • ${it.quantity}x ${it.product.name} - $${(it.product.price * it.quantity).toLocaleString('es-CO')}\n`
-    })
-    msg += `\n*Subtotal:* $${lastOrder.subtotal.toLocaleString('es-CO')}\n`
-    if (lastOrder.discount_amount > 0) {
-      msg += `*Descuento:* -$${lastOrder.discount_amount.toLocaleString('es-CO')} (${lastOrder.discount_reason || 'Descuento'})\n`
-    }
-    msg += `*TOTAL PAGADO:* $${lastOrder.total.toLocaleString('es-CO')}\n`
-    msg += `*Método de pago:* ${lastOrder.payment_method.toUpperCase()}\n\n`
-    msg += `_¡Sabor, Chamoy y Fuego!_`
-
-    const url = phone
-      ? `https://wa.me/${phone.startsWith('57') ? phone : '57' + phone}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`
-    window.open(url, '_blank')
   }
 
   return (
@@ -375,7 +369,7 @@ export default function Sales() {
               placeholder="Buscar producto por nombre o categoría..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] placeholder-red-900/40 dark:placeholder-red-400/40 focus:outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
 
@@ -430,57 +424,64 @@ export default function Sales() {
                         : 'border-red-200/80 dark:border-red-950/60'
                     }`}
                   >
-                    <div>
-                      {/* Imagen y badges */}
-                      <div className="relative h-28 bg-black/10 overflow-hidden">
-                        <img
-                          src={prod.image_url || DEFAULT_PRODUCT_IMAGE}
-                          alt={prod.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                        {/* Stock Badge */}
-                        <span
-                          className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-black backdrop-blur-md shadow-xs ${
-                            isOutOfStock
-                              ? 'bg-rose-600/90 text-white'
-                              : isLowStock
-                              ? 'bg-amber-500/90 text-white'
-                              : 'bg-emerald-600/90 text-white'
-                          }`}
-                        >
-                          {isOutOfStock ? 'Agotado' : `${currentStock} disp`}
+                    {/* Badge de Stock */}
+                    <div className="absolute top-2.5 right-2.5 z-10">
+                      {isOutOfStock ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-zinc-800 text-white shadow-xs">
+                          Agotado ({currentStock})
                         </span>
-
-                        {inCart && (
-                          <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-600 text-white font-black text-xs flex items-center justify-center shadow-md">
-                            {inCart.quantity}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-3">
-                        <h3 className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2] line-clamp-1 leading-snug">
-                          {prod.name}
-                        </h3>
-                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                          {prod.category || 'General'}
-                        </p>
-                      </div>
+                      ) : isLowStock ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500 text-black shadow-xs">
+                          Poco Stock ({currentStock})
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-600 text-white shadow-xs">
+                          {currentStock} uds
+                        </span>
+                      )}
                     </div>
 
-                    <div className="p-3 pt-0 flex items-center justify-between">
-                      <span className="text-xs font-black text-red-600 dark:text-amber-400">
-                        ${Number(prod.price).toLocaleString('es-CO')}
-                      </span>
-                      <button
-                        type="button"
-                        className="p-1.5 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400 group-hover:bg-red-600 group-hover:text-white transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                    {/* Imagen del Producto */}
+                    <div className="relative h-28 w-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
+                      <img
+                        src={prod.image_url || DEFAULT_PRODUCT_IMAGE}
+                        alt={prod.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.target.src = DEFAULT_PRODUCT_IMAGE
+                        }}
+                      />
+                      {inCart && (
+                        <div className="absolute inset-0 bg-red-900/40 backdrop-blur-[2px] flex items-center justify-center">
+                          <span className="w-8 h-8 rounded-full bg-red-600 text-white font-black text-xs flex items-center justify-center shadow-lg">
+                            {inCart.quantity}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Información */}
+                    <div className="p-3 flex flex-col flex-1 justify-between">
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400">
+                          {prod.category}
+                        </span>
+                        <h4 className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] leading-tight line-clamp-1 mt-0.5">
+                          {prod.name}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-red-100 dark:border-red-950">
+                        <span className="text-sm font-black text-red-600 dark:text-amber-400">
+                          ${Number(prod.price).toLocaleString('es-CO')}
+                        </span>
+                        <button
+                          type="button"
+                          className="p-1.5 rounded-xl bg-red-50 dark:bg-[#200808] text-red-600 dark:text-amber-400 group-hover:bg-red-600 group-hover:text-white transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -490,18 +491,18 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* Columna Derecha: Carrito de Compras (1/3) */}
-      <div className="flex flex-col bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200/80 dark:border-red-950/60 overflow-hidden shadow-sm h-full">
-        {/* Header del carrito */}
-        <div className="p-4 border-b border-red-200/60 dark:border-red-950/60 bg-gradient-to-r from-red-50 to-amber-50 dark:from-[#240a0a] dark:to-[#1a0606] flex items-center justify-between">
+      {/* Columna Derecha: Carrito de Compras & Descuentos (1/3) */}
+      <div className="flex flex-col bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs overflow-hidden">
+        {/* Header Carrito */}
+        <div className="p-4 border-b border-red-200/60 dark:border-red-950/60 flex items-center justify-between bg-red-50/30 dark:bg-[#200808]">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-red-600 text-white">
+            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
               <ShoppingBag className="w-4 h-4" />
             </span>
             <div>
-              <h2 className="text-sm font-black text-[#450a0a] dark:text-[#fef2f2]">Carrito de Venta</h2>
-              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                {cartItems.reduce((acc, it) => acc + it.quantity, 0)} productos
+              <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Orden en Curso</h3>
+              <span className="text-[10px] font-bold text-red-900/60 dark:text-red-300/60">
+                {cartItems.reduce((acc, it) => acc + it.quantity, 0)} artículos
               </span>
             </div>
           </div>
@@ -509,69 +510,88 @@ export default function Sales() {
           {cartItems.length > 0 && (
             <button
               onClick={clearCart}
-              className="p-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
-              title="Vaciar Carrito"
+              className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase tracking-wider cursor-pointer"
             >
-              <Trash2 className="w-4 h-4" />
+              Vaciar
             </button>
           )}
         </div>
 
-        {/* Lista de Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Lista de Items en Carrito */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
           {cartItems.length === 0 ? (
-            <div className="text-center py-20">
-              <ShoppingBag className="w-12 h-12 mx-auto text-red-400/40 mb-2" />
-              <p className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">El carrito está vacío</p>
-              <p className="text-[11px] font-medium text-red-900/50 dark:text-red-400/50 mt-1">
-                Toca cualquier producto del catálogo para agregarlo.
-              </p>
+            <div className="text-center py-16 text-red-900/40 dark:text-red-400/40">
+              <ShoppingBag className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-xs font-bold">Haz clic en los productos para agregarlos al pedido</p>
             </div>
           ) : (
-            cartItems.map((item) => (
-              <div
-                key={item.product.id}
-                className="flex items-center justify-between p-3 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 gap-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] truncate">
-                    {item.product.name}
-                  </h4>
-                  <span className="text-[11px] font-bold text-red-600 dark:text-amber-400">
-                    ${(item.product.price * item.quantity).toLocaleString('es-CO')}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#140505] px-2 py-1 rounded-xl border border-red-200/60 dark:border-red-950/60 shrink-0">
-                  <button
-                    onClick={() => updateQuantity(item.product.id, -1)}
-                    className="p-1 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="text-xs font-black px-1">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(item.product.id, 1)}
-                    className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => removeFromCart(item.product.id)}
-                  className="p-1.5 text-red-400 hover:text-red-600 cursor-pointer shrink-0"
+            cartItems.map((item) => {
+              const isItemOutOfStock = (item.product.stock ?? 0) < item.quantity
+              return (
+                <div
+                  key={item.product.id}
+                  className={`flex items-center justify-between p-2.5 rounded-2xl border text-xs font-bold transition-all ${
+                    isItemOutOfStock
+                      ? 'bg-amber-50/70 dark:bg-[#2a0e0e] border-amber-300 dark:border-amber-900'
+                      : 'bg-red-50/30 dark:bg-[#200808] border-red-200/50 dark:border-red-950/60'
+                  }`}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h5 className="font-black text-[#450a0a] dark:text-[#fef2f2] truncate">
+                      {item.product.name}
+                    </h5>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-red-600 dark:text-amber-400 font-extrabold">
+                        ${(item.product.price * item.quantity).toLocaleString('es-CO')}
+                      </span>
+                      {isItemOutOfStock && (
+                        <span className="text-[9px] font-black text-amber-700 dark:text-amber-300">
+                          (Sin stock: disp. {item.product.stock ?? 0})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Controles de Cantidad */}
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-[#140505] p-1 rounded-xl border border-red-200/60 dark:border-red-950">
+                    <button
+                      onClick={() => updateQuantity(item.product.id, -1)}
+                      className="p-1 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-xs font-black px-1">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.product.id, 1)}
+                      className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => removeFromCart(item.product.id)}
+                    className="p-1.5 text-red-400 hover:text-red-600 cursor-pointer shrink-0 ml-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )
+            })
           )}
         </div>
 
-        {/* Footer del Carrito (Subtotal, Descuento, Total y Botón de Cobrar) */}
+        {/* Footer del Carrito */}
         {cartItems.length > 0 && (
           <div className="p-4 border-t border-red-200/60 dark:border-red-950/60 bg-red-50/50 dark:bg-[#180606] space-y-3">
+            {/* Aviso si hay productos agotados */}
+            {hasOutOfStockItems && (
+              <div className="p-2.5 rounded-xl bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-[11px] font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Hay productos sin stock. Se procesará como <strong>Venta Pasada</strong>.</span>
+              </div>
+            )}
+
             {/* Opción de Descuento */}
             <div>
               {!showDiscountInput ? (
@@ -621,7 +641,7 @@ export default function Sales() {
                     />
                     <input
                       type="text"
-                      placeholder="Motivo (ej. Amigos, Promo)"
+                      placeholder="Motivo (ej. Promo)"
                       value={discountReason}
                       onChange={(e) => setDiscountReason(e.target.value)}
                       className="px-3 py-1.5 rounded-xl bg-red-50/50 dark:bg-[#140505] border border-red-200 text-xs font-bold focus:outline-none"
@@ -672,6 +692,19 @@ export default function Sales() {
             <div className="p-3 rounded-2xl bg-red-100 text-red-700 text-xs font-bold">{checkoutError}</div>
           )}
 
+          {/* Banner de Aviso si hay productos agotados */}
+          {hasOutOfStockItems && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-[#200808] border border-amber-300 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs font-bold space-y-1">
+              <div className="flex items-center gap-1.5 font-black text-amber-700 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Producto sin stock disponible</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                {outOfStockNames} no tienen existencias suficientes. Esta venta se guardará obligatoriamente como <strong>Venta Pasada (sin descontar stock)</strong>.
+              </p>
+            </div>
+          )}
+
           {/* Selección de Cliente */}
           <div>
             <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
@@ -681,9 +714,9 @@ export default function Sales() {
               <select
                 value={selectedCustomerId}
                 onChange={handleCustomerSelect}
-                className="px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/80 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
               >
-                <option value="">👤 Cliente General / Mostrador</option>
+                <option value="">👤 Cliente de Mostrador (General)</option>
                 {customersList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.first_name} {c.last_name || ''} {c.phone ? `(${c.phone})` : ''}
@@ -695,18 +728,15 @@ export default function Sales() {
                 type="text"
                 placeholder="O escribe nombre del cliente..."
                 value={customerName}
-                onChange={(e) => {
-                  setCustomerName(e.target.value)
-                  setSelectedCustomerId('')
-                }}
-                className="px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/80 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Selector de Método de Pago */}
+          {/* Método de Pago */}
           <div>
-            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1.5">
+            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-2">
               Método de Pago
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -716,18 +746,19 @@ export default function Sales() {
                 { id: 'mixto', label: 'Mixto', icon: CreditCard }
               ].map((m) => {
                 const Icon = m.icon
+                const active = paymentMethod === m.id
                 return (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => handleSelectPaymentMethod(m.id)}
-                    className={`p-3 rounded-2xl border text-xs font-black flex flex-col items-center gap-1.5 cursor-pointer transition-all ${
-                      paymentMethod === m.id
-                        ? 'bg-red-600 text-white border-red-600 shadow-sm'
-                        : 'bg-red-50/50 dark:bg-[#200808] border-red-200 dark:border-red-950 text-red-950 dark:text-red-200 hover:bg-red-100/50'
+                    className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-black cursor-pointer transition-all ${
+                      active
+                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                        : 'bg-red-50/50 dark:bg-[#200808] border-red-200/60 dark:border-red-950 text-red-950/70 dark:text-red-200/70 hover:bg-red-100/50'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4" />
                     <span>{m.label}</span>
                   </button>
                 )
@@ -735,28 +766,23 @@ export default function Sales() {
             </div>
           </div>
 
-          {/* Desglose según método de pago */}
+          {/* Campos según método */}
           {paymentMethod === 'efectivo' && (
-            <div className="p-4 rounded-2xl bg-red-50/60 dark:bg-[#200808] border border-red-200/80 dark:border-red-950 space-y-3">
-              <div>
-                <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
-                  Efectivo Recibido ($)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={cartTotal}
-                  step="500"
-                  value={cashAmount}
-                  onChange={(e) => setCashAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
-                />
-              </div>
-
+            <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-2">
+              <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                Efectivo Recibido ($)
+              </label>
+              <input
+                type="number"
+                value={cashAmount}
+                onChange={(e) => setCashAmount(e.target.value)}
+                placeholder={String(cartTotal)}
+                className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black focus:outline-none"
+              />
               {Number(cashAmount) >= cartTotal && (
-                <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-red-200/60 dark:border-red-950">
-                  <span className="text-emerald-700 dark:text-emerald-400">Cambio a devolver:</span>
-                  <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                <div className="flex justify-between items-center text-xs font-black text-emerald-600 dark:text-emerald-400 pt-1">
+                  <span>Cambio / Vueltos:</span>
+                  <span className="text-sm">
                     ${(Number(cashAmount) - cartTotal).toLocaleString('es-CO')}
                   </span>
                 </div>
@@ -765,36 +791,17 @@ export default function Sales() {
           )}
 
           {(paymentMethod === 'transferencia' || paymentMethod === 'mixto') && (
-            <div className="p-4 rounded-2xl bg-red-50/60 dark:bg-[#200808] border border-red-200/80 dark:border-red-950 space-y-3">
-              {paymentMethod === 'mixto' && (
-                <div>
-                  <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
-                    Abono en Efectivo ($)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={cartTotal}
-                    value={cashAmount}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0
-                      setCashAmount(e.target.value)
-                      setTransferAmount(String(Math.max(0, cartTotal - val)))
-                    }}
-                    className="w-full px-4 py-2 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold focus:outline-none"
-                  />
-                </div>
-              )}
-
-              <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200">
-                Bancos / Pasarelas Digitales
+            <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-3">
+              <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                Desglose de Transferencia / Bancos
               </label>
+
               {bankPayments.map((bp, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <select
                     value={bp.bank}
                     onChange={(e) => handleBankChange(idx, 'bank', e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold cursor-pointer"
+                    className="w-1/2 px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-xs font-bold"
                   >
                     {COMMON_BANKS.map((b) => (
                       <option key={b} value={b}>
@@ -837,15 +844,23 @@ export default function Sales() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-red-600 dark:text-amber-400" />
-                <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">
-                  Descontar del stock de productos
-                </span>
+                <div>
+                  <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] block">
+                    Descontar del inventario de stock
+                  </span>
+                  {hasOutOfStockItems && (
+                    <span className="text-[10px] text-amber-600 font-bold">
+                      Desactivado por falta de stock
+                    </span>
+                  )}
+                </div>
               </div>
               <input
                 type="checkbox"
+                disabled={hasOutOfStockItems}
                 checked={deductStock}
                 onChange={(e) => setDeductStock(e.target.checked)}
-                className="w-4 h-4 rounded text-red-600 focus:ring-red-500 cursor-pointer"
+                className="w-4 h-4 rounded text-red-600 focus:ring-red-500 cursor-pointer disabled:opacity-50"
               />
             </div>
 
@@ -935,7 +950,7 @@ export default function Sales() {
                 </div>
                 {lastOrder.discount_amount > 0 && (
                   <div className="flex justify-between text-red-600 font-bold">
-                    <span>Descuento ({lastOrder.discount_reason || 'Promo'}):</span>
+                    <span>Descuento ({lastOrder.discount_reason || 'Descuento'}):</span>
                     <span>-${lastOrder.discount_amount.toLocaleString('es-CO')}</span>
                   </div>
                 )}
@@ -952,26 +967,34 @@ export default function Sales() {
               </div>
 
               <div className="text-center pt-2 border-t border-gray-200 text-[10px] text-gray-500">
-                ¡Gracias por tu compra! Regresa pronto.
+                ¡Gracias por tu compra!
               </div>
             </div>
 
-            {/* Botones de Acción (Imprimir & Compartir por WhatsApp) */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Botones de Acción (PDF, WhatsApp, Imprimir) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
               <button
-                onClick={handlePrintReceipt}
-                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors"
+                onClick={() => downloadReceiptPDF(lastOrder)}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs cursor-pointer transition-colors"
               >
-                <Printer className="w-4 h-4" />
-                <span>Imprimir Recibo</span>
+                <Download className="w-4 h-4" />
+                <span>Descargar PDF</span>
               </button>
 
               <button
-                onClick={handleSendWhatsAppReceipt}
-                className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md"
+                onClick={() => shareReceiptPDFToWhatsApp(lastOrder)}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md"
               >
                 <Send className="w-4 h-4" />
-                <span>Enviar por WhatsApp</span>
+                <span>Enviar a WhatsApp (PDF)</span>
+              </button>
+
+              <button
+                onClick={handlePrintReceipt}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir</span>
               </button>
             </div>
           </div>

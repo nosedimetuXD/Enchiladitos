@@ -21,6 +21,7 @@ import {
   Clock,
   Package
 } from 'lucide-react'
+import { downloadReceiptPDF, shareReceiptPDFToWhatsApp } from '../utils/pdfReceipt'
 
 const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
 
@@ -231,22 +232,7 @@ export default function SalesHistory() {
   }
 
   function handleSendWhatsApp(sale) {
-    let msg = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n`
-    msg += `¡Hola ${sale.customer_name}!\n`
-    msg += `*Fecha:* ${new Date(sale.created_at).toLocaleString('es-CO')}\n\n`
-    msg += `*Productos:* \n`
-    ;(sale.items || []).forEach((it) => {
-      msg += ` • ${it.quantity}x ${it.product_name} - $${(it.unit_price * it.quantity).toLocaleString('es-CO')}\n`
-    })
-    msg += `\n*Subtotal:* $${(sale.subtotal || sale.total).toLocaleString('es-CO')}\n`
-    if (sale.discount_amount > 0) {
-      msg += `*Descuento:* -$${sale.discount_amount.toLocaleString('es-CO')} (${sale.discount_reason || 'Descuento'})\n`
-    }
-    msg += `*TOTAL PAGADO:* $${sale.total.toLocaleString('es-CO')}\n`
-    msg += `*Método de pago:* ${sale.payment_method.toUpperCase()}\n\n`
-    msg += `_¡Sabor, Chamoy y Fuego!_`
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
-    window.open(url, '_blank')
+    shareReceiptPDFToWhatsApp(sale)
   }
 
   return (
@@ -668,10 +654,26 @@ export default function SalesHistory() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+              <button
+                onClick={() => downloadReceiptPDF(selectedSale)}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>Descargar PDF</span>
+              </button>
+
+              <button
+                onClick={() => shareReceiptPDFToWhatsApp(selectedSale)}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md"
+              >
+                <Send className="w-4 h-4" />
+                <span>Enviar a WhatsApp (PDF)</span>
+              </button>
+
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer"
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors"
               >
                 <Printer className="w-4 h-4" />
                 <span>Imprimir</span>

@@ -329,9 +329,10 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		var name string
 		var price float64
 		var active bool
+		var currentStock int
 		err := tx.QueryRow(ctx,
-			`SELECT name, price, active FROM products WHERE id = $1`, item.ProductID,
-		).Scan(&name, &price, &active)
+			`SELECT name, price, active, COALESCE(stock, 0) FROM products WHERE id = $1`, item.ProductID,
+		).Scan(&name, &price, &active, &currentStock)
 		if errors.Is(err, pgx.ErrNoRows) {
 			http.Error(w, fmt.Sprintf("producto %s no existe", item.ProductID), http.StatusBadRequest)
 			return
@@ -339,6 +340,11 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("error consultando producto: %v", err)
 			http.Error(w, "error interno", http.StatusInternalServerError)
+			return
+		}
+
+		if deductStock && currentStock < item.Quantity {
+			http.Error(w, fmt.Sprintf("El producto '%s' está agotado o no cuenta con suficiente stock (Disponible: %d, Solicitado: %d). Solo se permite registrarla si se marca como venta pasada (sin descontar stock).", name, currentStock, item.Quantity), http.StatusBadRequest)
 			return
 		}
 
@@ -531,11 +537,19 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	for _, item := range req.Items {
 		var name string
 		var price float64
-		err := tx.QueryRow(ctx, `SELECT name, price FROM products WHERE id = $1`, item.ProductID).Scan(&name, &price)
+		var currentStock int
+		err := tx.QueryRow(ctx, `SELECT name, price, COALESCE(stock, 0) FROM products WHERE id = $1`, item.ProductID).Scan(&name, &price, &currentStock)
 		if err != nil {
 			name = "Producto"
 			price = 0
+			currentStock = 0
 		}
+
+		if deductStock && currentStock < item.Quantity {
+			http.Error(w, fmt.Sprintf("El producto '%s' no cuenta con suficiente stock (Disponible: %d, Solicitado: %d). Solo se permite registrarla si se marca como venta pasada (sin descontar stock).", name, currentStock, item.Quantity), http.StatusBadRequest)
+			return
+		}
+
 		unitPrice := price
 		if item.UnitPrice != nil && *item.UnitPrice >= 0 {
 			unitPrice = *item.UnitPrice
