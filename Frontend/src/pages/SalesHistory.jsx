@@ -187,6 +187,7 @@ export default function SalesHistory() {
     try {
       await api.delete(`/sales/${sale.id}`)
       setSales((prev) => prev.filter((s) => s.id !== sale.id))
+      await loadData()
     } catch (err) {
       alert(err.message || 'Error eliminando venta')
     }
@@ -376,7 +377,7 @@ export default function SalesHistory() {
                   <th className="p-4 text-right">Subtotal</th>
                   <th className="p-4 text-right">Descuento</th>
                   <th className="p-4 text-right">Total</th>
-                  <th className="p-4 text-center">Acciones</th>
+                  <th className="p-4 text-center w-32">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-red-100 dark:divide-red-950/50">
@@ -412,25 +413,25 @@ export default function SalesHistory() {
                     <td className="p-4 text-right font-black text-red-600 dark:text-amber-400 text-sm">
                       ${s.total.toLocaleString('es-CO')}
                     </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="p-4 text-center w-32 whitespace-nowrap">
+                      <div className="inline-flex items-center justify-center gap-2">
                         <button
                           onClick={() => openReceiptModal(s)}
-                          className="p-2 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
                           title="Ver Recibo / Imprimir"
                         >
                           <Printer className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEditModal(s)}
-                          className="p-2 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
                           title="Editar Venta"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteSale(s)}
-                          className="p-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
                           title="Eliminar Venta"
                         >
                           <Trash2 className="w-4 h-4" />
