@@ -1,35 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
-import Users from './pages/Users'
 import Products from './pages/Products'
-import Inventory from './pages/Inventory'
 import Sales from './pages/Sales'
 import SalesHistory from './pages/SalesHistory'
 import Customers from './pages/Customers'
 import Accounting from './pages/Accounting'
 import Stats from './pages/Stats'
-import Tasks from './pages/Tasks'
-import Recipe from './pages/Recipe'
 import Profile from './pages/Profile'
 import Layout from './components/Layout'
 
-function ProtectedRoute({ children, roles }) {
+function ProtectedRoute({ children }) {
   const { user } = useAuth()
-
   if (!user) return <Navigate to="/login" replace />
-
-  if (roles && Array.isArray(roles)) {
-    const userRole = (user.role || '').toLowerCase()
-    const isAllowed = roles.some((r) => {
-      const targetRole = r.toLowerCase()
-      if (targetRole === 'owner' || targetRole === 'dueño') return userRole === 'owner' || userRole === 'dueño'
-      if (targetRole === 'admin' || targetRole === 'administrador') return userRole === 'admin' || userRole === 'administrador' || userRole === 'owner' || userRole === 'dueño'
-      return userRole === targetRole
-    })
-    if (!isAllowed) return <Navigate to="/" replace />
-  }
-
   return children
 }
 
@@ -50,46 +33,13 @@ function AppRoutes() {
         <Route index element={<Sales />} />
         <Route path="sales/history" element={<SalesHistory />} />
         <Route path="customers" element={<Customers />} />
-        <Route path="inventory" element={<Inventory />} />
         <Route path="products" element={<Products />} />
-        <Route path="tasks" element={<Tasks />} />
+        <Route path="accounting" element={<Accounting />} />
+        <Route path="stats" element={<Stats />} />
         <Route path="profile" element={<Profile />} />
 
-        <Route
-          path="accounting"
-          element={
-            <ProtectedRoute roles={['owner']}>
-              <Accounting />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="stats"
-          element={
-            <ProtectedRoute roles={['owner']}>
-              <Stats />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="users"
-          element={
-            <ProtectedRoute roles={['owner']}>
-              <Users />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="products/:id/recipe"
-          element={
-            <ProtectedRoute>
-              <Recipe />
-            </ProtectedRoute>
-          }
-        />
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
 import {
@@ -10,19 +10,23 @@ import {
   Phone,
   Mail,
   FileText,
-  AlertCircle,
-  CheckCircle2,
   MessageCircle,
   UserCheck,
-  Calendar
+  Calendar,
+  Download,
+  ShoppingBag,
+  Clock,
+  Sparkles,
+  Tag,
+  DollarSign
 } from 'lucide-react'
 
 export default function Customers() {
   const [customers, setCustomers] = useState([])
+  const [sales, setSales] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
 
   // Modal Crear / Editar
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -37,24 +41,32 @@ export default function Customers() {
   const [saving, setSaving] = useState(false)
   const [modalError, setModalError] = useState('')
 
-  // Modal Confirmar Eliminar
-  const [customerToDelete, setCustomerToDelete] = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  // Modal Ficha 360 / Timeline del Cliente (Inspirado en Twenty)
+  const [selectedCustomer360, setSelectedCustomer360] = useState(null)
+  const [is360ModalOpen, setIs360ModalOpen] = useState(false)
 
-  async function loadCustomers(search = '') {
+  // Modal Plantillas WhatsApp
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
+  const [whatsAppCustomer, setWhatsAppCustomer] = useState(null)
+
+  async function loadData(search = '') {
     try {
       const url = search ? `/customers?search=${encodeURIComponent(search)}` : '/customers'
-      const data = await api.get(url)
-      setCustomers(data || [])
+      const [custData, salesData] = await Promise.all([
+        api.get(url),
+        api.get('/sales?period=all').catch(() => [])
+      ])
+      setCustomers(custData || [])
+      setSales(salesData || [])
     } catch (err) {
-      setError(err.message || 'Error al cargar el listado de clientes')
+      setError(err.message || 'Error al cargar los clientes')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadCustomers(searchQuery)
+    loadData(searchQuery)
   }, [searchQuery])
 
   function handleOpenCreate() {
@@ -97,15 +109,11 @@ export default function Customers() {
     try {
       if (editingCustomer) {
         await api.put(`/customers/${editingCustomer.id}`, formData)
-        setSuccessMessage('¡Cliente actualizado exitosamente!')
       } else {
         await api.post('/customers', formData)
-        setSuccessMessage('¡Cliente registrado exitosamente!')
       }
-
       setIsModalOpen(false)
-      await loadCustomers(searchQuery)
-      setTimeout(() => setSuccessMessage(''), 3000)
+      await loadData(searchQuery)
     } catch (err) {
       setModalError(err.message || 'Error al guardar cliente')
     } finally {
@@ -113,153 +121,196 @@ export default function Customers() {
     }
   }
 
-  async function handleDeleteCustomer() {
-    if (!customerToDelete) return
-    setDeleting(true)
+  async function handleDeleteCustomer(customer) {
+    if (!window.confirm(`¿Estás seguro de eliminar a ${customer.first_name} ${customer.last_name || ''}?`)) return
     try {
-      await api.delete(`/customers/${customerToDelete.id}`)
-      setSuccessMessage('Cliente eliminado del sistema')
-      setCustomerToDelete(null)
-      await loadCustomers(searchQuery)
-      setTimeout(() => setSuccessMessage(''), 3000)
+      await api.delete(`/customers/${customer.id}`)
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id))
     } catch (err) {
-      setError(err.message || 'Error al eliminar cliente')
-    } finally {
-      setDeleting(false)
+      alert(err.message || 'Error al eliminar cliente')
     }
   }
 
-  function getCleanPhone(phone) {
-    if (!phone) return ''
-    return phone.replace(/[^0-9]/g, '')
+  function openCustomer360(customer) {
+    setSelectedCustomer360(customer)
+    setIs360ModalOpen(true)
+  }
+
+  function openWhatsAppTemplates(customer) {
+    setWhatsAppCustomer(customer)
+    setIsWhatsAppModalOpen(true)
+  }
+
+  function sendWhatsAppMessage(templateType) {
+    if (!whatsAppCustomer) return
+    const phone = (whatsAppCustomer.phone || '').replace(/\D/g, '')
+    const name = whatsAppCustomer.first_name
+
+    let msg = ''
+    if (templateType === 'greeting') {
+      msg = `¡Hola ${name}! 🌶️ Te escribimos de *Enchiladitos*. Queremos agradecerte por ser parte de nuestra comunidad de sabor y chamoy. ¿Se te antoja algo delicioso para hoy?`
+    } else if (templateType === 'promo') {
+      msg = `¡Hola ${name}! 🔥 En *Enchiladitos* tenemos una promoción especial para ti: 10% de descuento en tu próximo pedido de Gomitas o Sparkies escarchados. ¡Haz tu pedido respondiendo a este mensaje!`
+    } else if (templateType === 'new_flavors') {
+      msg = `¡Hola ${name}! 🍓✨ Acabamos de preparar un nuevo lote con el chamoy más fresco y picante de *Enchiladitos*. ¡No te quedes sin el tuyo!`
+    }
+
+    const url = phone
+      ? `https://wa.me/${phone.startsWith('57') ? phone : '57' + phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`
+
+    window.open(url, '_blank')
+    setIsWhatsAppModalOpen(false)
+  }
+
+  // Compras de cada cliente asociadas
+  const customerStatsMap = useMemo(() => {
+    const map = {}
+    sales.forEach((s) => {
+      const cName = (s.customer_name || '').trim().toLowerCase()
+      if (!cName || cName === 'cliente general') return
+      if (!map[cName]) {
+        map[cName] = { totalSpent: 0, ordersCount: 0, salesList: [] }
+      }
+      map[cName].totalSpent += s.total || 0
+      map[cName].ordersCount += 1
+      map[cName].salesList.push(s)
+    })
+    return map
+  }, [sales])
+
+  // Exportar a CSV (Inspirado en Twenty CRM)
+  function exportCustomersCSV() {
+    let csv = 'Nombre,Apellido,Telefono,Email,Notas,TotalGastado,Pedidos\n'
+    customers.forEach((c) => {
+      const key = `${c.first_name} ${c.last_name || ''}`.trim().toLowerCase()
+      const stats = customerStatsMap[key] || { totalSpent: 0, ordersCount: 0 }
+      csv += `"${c.first_name}","${c.last_name || ''}","${c.phone || ''}","${c.email || ''}","${c.notes || ''}",${stats.totalSpent},${stats.ordersCount}\n`
+    })
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `Clientes_Enchiladitos_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200 dark:border-red-950/60 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-2xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2] tracking-tight">
-                Gestión de Clientes
-              </h1>
-              <p className="text-xs font-bold text-red-600 dark:text-red-400">
-                Directorio y registro de clientes para ventas y fidelización
-              </p>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+              <UserCheck className="w-5 h-5" />
+            </span>
+            <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
+              Directorio de Clientes
+            </h1>
           </div>
-        </div>
-
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-extrabold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Registrar Nuevo Cliente</span>
-        </button>
-      </div>
-
-      {/* Alertas */}
-      {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Buscador & Métricas */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#1c0707] p-4 rounded-3xl border border-red-200 dark:border-red-950/60 shadow-xs">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-red-500" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre, apellido, teléfono o correo..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#fff5f2] dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/60 dark:border-red-900/40">
-          <UserCheck className="w-4 h-4 text-red-600 dark:text-red-400" />
-          <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">
-            Total Clientes: {customers.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Lista / Grid de Clientes */}
-      {loading ? (
-        <div className="p-8 text-center text-xs font-bold text-red-600">
-          Cargando clientes...
-        </div>
-      ) : customers.length === 0 ? (
-        <div className="p-12 text-center bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200 dark:border-red-950/60 space-y-3">
-          <Users className="w-12 h-12 mx-auto text-red-300 dark:text-red-900" />
-          <h3 className="text-base font-extrabold text-[#450a0a] dark:text-[#fef2f2]">
-            {searchQuery ? 'No se encontraron clientes para la búsqueda' : 'Aún no hay clientes registrados'}
-          </h3>
-          <p className="text-xs text-red-600/80 dark:text-red-400/80 max-w-sm mx-auto">
-            Registra a tus clientes frecuentes para llevar un mejor control y seleccionarlos rápido en caja.
+          <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
+            Ficha 360°, historial de compras, notas de preferencias y contacto directo por WhatsApp.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCustomersCSV}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar CSV</span>
+          </button>
           <button
             onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-xs shadow-md cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Crear Primer Cliente</span>
+            <span>Nuevo Cliente</span>
           </button>
         </div>
+      </div>
+
+      {/* Buscador */}
+      <div className="bg-white dark:bg-[#1c0707] p-4 rounded-3xl border border-red-200/70 dark:border-red-950/60 shadow-xs">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-red-900/40 dark:text-red-400/40" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, teléfono, correo o notas de preferencia..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
+        </div>
+      </div>
+
+      {/* Grid / Listado de Clientes */}
+      {loading ? (
+        <div className="text-center py-16">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-red-600 border-t-transparent"></div>
+          <p className="text-xs font-bold text-red-900/60 dark:text-red-400/60 mt-3">Cargando clientes...</p>
+        </div>
+      ) : customers.length === 0 ? (
+        <div className="text-center py-16 bg-white dark:bg-[#1c0707] rounded-3xl border border-dashed border-red-200 dark:border-red-950 p-8">
+          <Users className="w-12 h-12 mx-auto text-red-400/40 mb-3" />
+          <p className="text-base font-black text-[#450a0a] dark:text-[#fef2f2]">No se encontraron clientes</p>
+          <p className="text-xs font-medium text-red-900/50 dark:text-red-400/50 mt-1">
+            Comienza registrando a tus clientes para llevar un historial de sus pedidos.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {customers.map((c) => {
-            const cleanPhone = getCleanPhone(c.phone)
-            const fullName = `${c.first_name} ${c.last_name}`.trim()
+            const key = `${c.first_name} ${c.last_name || ''}`.trim().toLowerCase()
+            const stats = customerStatsMap[key] || { totalSpent: 0, ordersCount: 0 }
+            const isVIP = stats.ordersCount >= 3 || stats.totalSpent >= 30000
 
             return (
               <div
                 key={c.id}
-                className="bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950/60 hover:border-red-400 dark:hover:border-red-700 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
+                className="flex flex-col justify-between bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200/80 dark:border-red-950/60 p-5 shadow-xs hover:shadow-md transition-all space-y-4"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-amber-500 text-white font-black flex items-center justify-center text-sm shadow-xs">
-                        {c.first_name ? c.first_name.charAt(0).toUpperCase() : 'C'}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
+                        {c.first_name.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <h3 className="font-extrabold text-sm text-[#450a0a] dark:text-[#fef2f2] group-hover:text-red-600 transition-colors">
-                          {fullName}
+                      <div className="min-w-0">
+                        <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2] truncate">
+                          {c.first_name} {c.last_name || ''}
                         </h3>
-                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          Reg: {new Date(c.created_at).toLocaleDateString('es-CO')}
-                        </span>
+                        {isVIP && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-amber-600 dark:text-amber-400">
+                            <Sparkles className="w-2.5 h-2.5" /> Cliente VIP
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1">
                       <button
+                        onClick={() => openWhatsAppTemplates(c)}
+                        className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
+                        title="Plantillas WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleOpenEdit(c)}
-                        className="p-1.5 rounded-xl text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
-                        title="Editar cliente"
+                        className="p-2 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+                        title="Editar"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setCustomerToDelete(c)}
-                        className="p-1.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-                        title="Eliminar cliente"
+                        onClick={() => handleDeleteCustomer(c)}
+                        className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                        title="Eliminar"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -267,46 +318,43 @@ export default function Customers() {
                   </div>
 
                   {/* Datos de Contacto */}
-                  <div className="space-y-2 text-xs font-semibold">
-                    {c.phone ? (
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-[#fff5f2] dark:bg-[#140505] border border-red-100 dark:border-red-950">
-                        <div className="flex items-center gap-2 text-[#450a0a] dark:text-[#fef2f2]">
-                          <Phone className="w-3.5 h-3.5 text-red-500" />
-                          <span>{c.phone}</span>
-                        </div>
-                        {cleanPhone && (
-                          <a
-                            href={`https://wa.me/${cleanPhone.length === 10 ? '57' + cleanPhone : cleanPhone}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold shadow-xs transition-colors"
-                          >
-                            <MessageCircle className="w-3 h-3" />
-                            <span>WhatsApp</span>
-                          </a>
-                        )}
+                  <div className="mt-3 space-y-1.5 text-xs text-red-950/70 dark:text-red-200/70">
+                    {c.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-red-500" />
+                        <span className="font-bold">{c.phone}</span>
                       </div>
-                    ) : (
-                      <div className="text-[11px] text-red-400 italic">Sin teléfono registrado</div>
                     )}
-
                     {c.email && (
-                      <div className="flex items-center gap-2 p-2 rounded-xl bg-[#fff5f2] dark:bg-[#140505] border border-red-100 dark:border-red-950 text-[#450a0a] dark:text-[#fef2f2] truncate">
-                        <Mail className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span className="truncate">{c.email}</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <Mail className="w-3.5 h-3.5 text-red-500" />
+                        <span className="font-medium truncate">{c.email}</span>
                       </div>
                     )}
-
                     {c.notes && (
-                      <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 text-[11px] text-amber-900 dark:text-amber-200">
-                        <div className="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 mb-0.5">
-                          <FileText className="w-3 h-3" />
-                          <span>Notas:</span>
-                        </div>
-                        <p className="line-clamp-2">{c.notes}</p>
+                      <div className="p-2.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-[11px] text-[#450a0a] dark:text-[#fef2f2] italic">
+                        "{c.notes}"
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Métricas y Ficha 360 */}
+                <div className="pt-3 border-t border-red-100 dark:border-red-950 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Inversión Total</span>
+                    <p className="text-sm font-black text-red-600 dark:text-amber-400">
+                      ${stats.totalSpent.toLocaleString('es-CO')}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => openCustomer360(c)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-200 transition-colors cursor-pointer"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Ver Pedidos ({stats.ordersCount})</span>
+                  </button>
                 </div>
               </div>
             )
@@ -314,145 +362,234 @@ export default function Customers() {
         </div>
       )}
 
-      {/* Modal Crear / Editar */}
+      {/* Modal Ficha 360 / Timeline de Compras */}
+      <Modal
+        isOpen={is360ModalOpen}
+        onClose={() => setIs360ModalOpen(false)}
+        title={`Ficha del Cliente: ${selectedCustomer360?.first_name || ''} ${selectedCustomer360?.last_name || ''}`}
+      >
+        {selectedCustomer360 && (
+          <div className="space-y-4">
+            {/* Resumen */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-2xl bg-red-50 dark:bg-[#200808] border border-red-200 text-center">
+                <span className="text-[10px] font-bold uppercase text-gray-500">Total Comprado</span>
+                <p className="text-xl font-black text-red-600 dark:text-amber-400">
+                  $
+                  {(
+                    customerStatsMap[`${selectedCustomer360.first_name} ${selectedCustomer360.last_name || ''}`.trim().toLowerCase()]?.totalSpent || 0
+                  ).toLocaleString('es-CO')}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-[#200808] border border-amber-200 text-center">
+                <span className="text-[10px] font-bold uppercase text-gray-500">Total de Pedidos</span>
+                <p className="text-xl font-black text-amber-600 dark:text-amber-400">
+                  {customerStatsMap[`${selectedCustomer360.first_name} ${selectedCustomer360.last_name || ''}`.trim().toLowerCase()]?.ordersCount || 0}{' '}
+                  ventas
+                </p>
+              </div>
+            </div>
+
+            {/* Timeline de Pedidos */}
+            <div>
+              <h4 className="text-xs font-black uppercase text-red-950 dark:text-red-200 mb-2">
+                Historial de Compras
+              </h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {(
+                  customerStatsMap[`${selectedCustomer360.first_name} ${selectedCustomer360.last_name || ''}`.trim().toLowerCase()]?.salesList || []
+                ).length === 0 ? (
+                  <p className="text-xs text-gray-500 italic py-4 text-center">
+                    Aún no hay compras registradas a nombre de este cliente.
+                  </p>
+                ) : (
+                  (
+                    customerStatsMap[`${selectedCustomer360.first_name} ${selectedCustomer360.last_name || ''}`.trim().toLowerCase()]?.salesList || []
+                  ).map((s) => (
+                    <div
+                      key={s.id}
+                      className="p-3 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-red-500" />
+                          <span className="font-bold">
+                            {new Date(s.created_at).toLocaleString('es-CO', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-600 mt-1">
+                          {(s.items || []).map((it) => `${it.quantity}x ${it.product_name}`).join(', ')}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-black text-red-600 dark:text-amber-400 text-sm">
+                          ${s.total.toLocaleString('es-CO')}
+                        </span>
+                        <p className="text-[10px] uppercase text-gray-500">{s.payment_method}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-red-100 dark:border-red-950">
+              <button
+                onClick={() => setIs360ModalOpen(false)}
+                className="px-5 py-2 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Plantillas Rápidas WhatsApp */}
+      <Modal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        title={`Mensajes WhatsApp para ${whatsAppCustomer?.first_name || ''}`}
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600 dark:text-gray-300">
+            Selecciona una plantilla para abrir WhatsApp con el mensaje pre-cargado:
+          </p>
+
+          <button
+            onClick={() => sendWhatsAppMessage('greeting')}
+            className="w-full text-left p-3.5 rounded-2xl bg-emerald-50 dark:bg-[#1a0f0f] border border-emerald-200 dark:border-emerald-950 hover:bg-emerald-100/70 transition-colors cursor-pointer"
+          >
+            <h5 className="font-black text-xs text-emerald-800 dark:text-emerald-300">👋 Saludo & Fidelización</h5>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1">
+              "¡Hola! Te escribimos de Enchiladitos para agradecerte tu preferencia..."
+            </p>
+          </button>
+
+          <button
+            onClick={() => sendWhatsAppMessage('promo')}
+            className="w-full text-left p-3.5 rounded-2xl bg-amber-50 dark:bg-[#1a0f0f] border border-amber-200 dark:border-amber-950 hover:bg-amber-100/70 transition-colors cursor-pointer"
+          >
+            <h5 className="font-black text-xs text-amber-800 dark:text-amber-300">🎁 Cupón de Descuento 10%</h5>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1">
+              "¡Hola! Tienes un 10% de descuento en tu próximo pedido de gomitas..."
+            </p>
+          </button>
+
+          <button
+            onClick={() => sendWhatsAppMessage('new_flavors')}
+            className="w-full text-left p-3.5 rounded-2xl bg-red-50 dark:bg-[#1a0f0f] border border-red-200 dark:border-red-950 hover:bg-red-100/70 transition-colors cursor-pointer"
+          >
+            <h5 className="font-black text-xs text-red-800 dark:text-red-300">🔥 Aviso de Nuevo Lote de Productos</h5>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1">
+              "¡Hola! Acabamos de preparar un nuevo lote con el chamoy más fresco..."
+            </p>
+          </button>
+        </div>
+      </Modal>
+
+      {/* Modal Crear / Editar Cliente */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingCustomer ? 'Editar Información del Cliente' : 'Registrar Nuevo Cliente'}
+        title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
       >
         <form onSubmit={handleSaveCustomer} className="space-y-4">
           {modalError && (
-            <div className="p-3 rounded-2xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{modalError}</span>
-            </div>
+            <div className="p-3 rounded-2xl bg-red-100 text-red-700 text-xs font-bold">{modalError}</div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#450a0a] dark:text-red-300 uppercase tracking-wider mb-1">
-                Nombres *
+              <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                Nombre *
               </label>
               <input
                 type="text"
                 required
                 value={formData.first_name}
                 onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                placeholder="Ej. Carlos"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Ej. Juan"
+                className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block text-xs font-bold text-[#450a0a] dark:text-red-300 uppercase tracking-wider mb-1">
-                Apellidos
+              <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                Apellido
               </label>
               <input
                 type="text"
                 value={formData.last_name}
                 onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                placeholder="Ej. Gómez"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Ej. Pérez"
+                className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#450a0a] dark:text-red-300 uppercase tracking-wider mb-1">
-                Número de Teléfono / WhatsApp
+              <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                Teléfono / WhatsApp
               </label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="Ej. 3001234567"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block text-xs font-bold text-[#450a0a] dark:text-red-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
                 Correo Electrónico
               </label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="cliente@ejemplo.com"
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="juan@ejemplo.com"
+                className="w-full px-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#450a0a] dark:text-red-300 uppercase tracking-wider mb-1">
-              Notas / Preferencias (Opcional)
+            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
+              Notas & Preferencias (CRM)
             </label>
             <textarea
               rows={2}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Ej. Le gusta extra chamoy, cliente frecuente de gomitas..."
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950 text-xs font-medium text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Ej. Le gusta con extra tajín, prefiere sparkies de mora..."
+              className="w-full px-4 py-2 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-100 dark:border-red-950">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2.5 rounded-2xl border border-red-200 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
+              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-red-950/70 hover:bg-red-100 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-extrabold text-xs shadow-md disabled:opacity-50 cursor-pointer"
+              className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 text-white font-black text-xs shadow-md cursor-pointer disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : editingCustomer ? 'Actualizar Cliente' : 'Guardar Cliente'}
+              {saving ? 'Guardando...' : editingCustomer ? 'Actualizar Cliente' : 'Crear Cliente'}
             </button>
           </div>
         </form>
-      </Modal>
-
-      {/* Modal Confirmar Eliminar */}
-      <Modal
-        isOpen={!!customerToDelete}
-        onClose={() => setCustomerToDelete(null)}
-        title="Confirmar Eliminación"
-      >
-        <div className="space-y-4">
-          <p className="text-xs font-bold text-[#450a0a] dark:text-[#fef2f2]">
-            ¿Estás seguro de que deseas eliminar al cliente{' '}
-            <span className="text-red-600 underline">
-              {customerToDelete?.first_name} {customerToDelete?.last_name}
-            </span>
-            ?
-          </p>
-          <p className="text-[11px] text-red-500">
-            Esta acción eliminará la ficha del cliente en la base de datos.
-          </p>
-
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setCustomerToDelete(null)}
-              className="px-4 py-2 rounded-2xl border border-red-200 text-xs font-bold cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteCustomer}
-              disabled={deleting}
-              className="px-4 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
-            >
-              {deleting ? 'Eliminando...' : 'Sí, Eliminar'}
-            </button>
-          </div>
-        </div>
       </Modal>
     </div>
   )

@@ -27,9 +27,11 @@ func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
 
 	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`)
 	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Bebidas'`)
+	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INT DEFAULT 0`)
+	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_alert INT DEFAULT 5`)
+	_, _ = db.Exec(ctx, `ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT DEFAULT ''`)
 
 	_, _ = db.Exec(ctx, `ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL`)
-	_, _ = db.Exec(ctx, `ALTER TABLE comanda_items ALTER COLUMN product_id DROP NOT NULL`)
 
 	_, _ = db.Exec(ctx, `
 		DO $$ 
@@ -38,11 +40,6 @@ func NewProductHandler(db *pgxpool.Pool) *ProductHandler {
 				ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
 			END IF;
 			ALTER TABLE sale_items ADD CONSTRAINT sale_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
-
-			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'comanda_items_product_id_fkey') THEN
-				ALTER TABLE comanda_items DROP CONSTRAINT comanda_items_product_id_fkey;
-			END IF;
-			ALTER TABLE comanda_items ADD CONSTRAINT comanda_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL;
 		END $$;
 	`)
 
@@ -60,9 +57,11 @@ func (h *ProductHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var p models.Product
 	err = h.DB.QueryRow(r.Context(),
-		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at
+		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), 
+		        COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at
 		 FROM products WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+		&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "producto no encontrado", http.StatusNotFound)
@@ -80,12 +79,15 @@ func (h *ProductHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // PUT /products/{id}
 type updateProductRequest struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Category    string  `json:"category"`
-	ImageURL    string  `json:"image_url"`
-	Active      bool    `json:"active"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Price         float64 `json:"price"`
+	Category      string  `json:"category"`
+	ImageURL      string  `json:"image_url"`
+	Stock         int     `json:"stock"`
+	MinStockAlert int     `json:"min_stock_alert"`
+	Tags          string  `json:"tags"`
+	Active        bool    `json:"active"`
 }
 
 func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -107,17 +109,24 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Category == "" {
-		req.Category = "Bebidas"
+		req.Category = "General"
+	}
+	if req.MinStockAlert <= 0 {
+		req.MinStockAlert = 5
 	}
 
 	var p models.Product
 	err = h.DB.QueryRow(r.Context(),
 		`UPDATE products
-		 SET name = $1, description = $2, price = $3, category = $4, image_url = $5, active = $6, updated_at = now()
-		 WHERE id = $7
-		 RETURNING id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at`,
-		req.Name, req.Description, req.Price, req.Category, req.ImageURL, req.Active, id,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		 SET name = $1, description = $2, price = $3, category = $4, image_url = $5, 
+		     stock = $6, min_stock_alert = $7, tags = $8, active = $9, updated_at = now()
+		 WHERE id = $10
+		 RETURNING id, name, description, price, COALESCE(category, 'General'), COALESCE(image_url, ''), 
+		           COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at`,
+		req.Name, req.Description, req.Price, req.Category, req.ImageURL,
+		req.Stock, req.MinStockAlert, req.Tags, req.Active, id,
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+		&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "producto no encontrado", http.StatusNotFound)
@@ -126,6 +135,66 @@ func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("error actualizando producto: %v", err)
 		http.Error(w, "error actualizando producto", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}
+
+// PATCH /products/{id}/stock - Ajuste rápido de stock / merma
+type adjustStockRequest struct {
+	Delta  int    `json:"delta"`  // ej: +10 o -2
+	Stock  *int   `json:"stock"`  // o valor exacto
+	Reason string `json:"reason"` // motivo del ajuste/merma
+}
+
+func (h *ProductHandler) AdjustStock(w http.ResponseWriter, r *http.Request) {
+	idParam := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	var req adjustStockRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "cuerpo inválido", http.StatusBadRequest)
+		return
+	}
+
+	var p models.Product
+	var queryErr error
+
+	if req.Stock != nil {
+		queryErr = h.DB.QueryRow(r.Context(),
+			`UPDATE products
+			 SET stock = $1, updated_at = now()
+			 WHERE id = $2
+			 RETURNING id, name, description, price, COALESCE(category, 'General'), COALESCE(image_url, ''), 
+			           COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at`,
+			*req.Stock, id,
+		).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+			&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+	} else {
+		queryErr = h.DB.QueryRow(r.Context(),
+			`UPDATE products
+			 SET stock = GREATEST(0, stock + $1), updated_at = now()
+			 WHERE id = $2
+			 RETURNING id, name, description, price, COALESCE(category, 'General'), COALESCE(image_url, ''), 
+			           COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at`,
+			req.Delta, id,
+		).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+			&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+	}
+
+	if errors.Is(queryErr, pgx.ErrNoRows) {
+		http.Error(w, "producto no encontrado", http.StatusNotFound)
+		return
+	}
+	if queryErr != nil {
+		log.Printf("error ajustando stock: %v", queryErr)
+		http.Error(w, "error ajustando stock", http.StatusInternalServerError)
 		return
 	}
 
@@ -142,15 +211,12 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Eliminar cualquier restricción foránea previa que intente hacer SET NULL
+	// 1. Eliminar cualquier restricción foránea previa
 	_, _ = h.DB.Exec(r.Context(), `
 		DO $$ 
 		BEGIN 
 			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sale_items_product_id_fkey') THEN
 				ALTER TABLE sale_items DROP CONSTRAINT sale_items_product_id_fkey;
-			END IF;
-			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'comanda_items_product_id_fkey') THEN
-				ALTER TABLE comanda_items DROP CONSTRAINT comanda_items_product_id_fkey;
 			END IF;
 			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'product_ingredients_product_id_fkey') THEN
 				ALTER TABLE product_ingredients DROP CONSTRAINT product_ingredients_product_id_fkey;
@@ -158,9 +224,8 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		END $$;
 	`)
 
-	// 2. Desvincular tablas asociadas manteniendo intactas las ventas y comandas históricas
+	// 2. Desvincular tablas asociadas manteniendo intactas las ventas históricas
 	_, _ = h.DB.Exec(r.Context(), `UPDATE sale_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
-	_, _ = h.DB.Exec(r.Context(), `UPDATE comanda_items SET product_id = '00000000-0000-0000-0000-000000000000'::uuid WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_ingredients WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM recipes WHERE product_id = $1`, id)
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM product_recipes WHERE product_id = $1`, id)
@@ -183,9 +248,13 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT ''`)
 	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Bebidas'`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INT DEFAULT 0`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_alert INT DEFAULT 5`)
+	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT DEFAULT ''`)
 
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at
+		`SELECT id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), 
+		        COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at
 		 FROM products
 		 ORDER BY name`)
 	if err != nil {
@@ -197,11 +266,16 @@ func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+			&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			http.Error(w, "error leyendo productos", http.StatusInternalServerError)
 			return
 		}
 		products = append(products, p)
+	}
+
+	if products == nil {
+		products = []models.Product{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -210,11 +284,14 @@ func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // POST /products
 type createProductRequest struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Category    string  `json:"category"`
-	ImageURL    string  `json:"image_url"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Price         float64 `json:"price"`
+	Category      string  `json:"category"`
+	ImageURL      string  `json:"image_url"`
+	Stock         int     `json:"stock"`
+	MinStockAlert int     `json:"min_stock_alert"`
+	Tags          string  `json:"tags"`
 }
 
 func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -229,16 +306,21 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Category == "" {
-		req.Category = "Bebidas"
+		req.Category = "General"
+	}
+	if req.MinStockAlert <= 0 {
+		req.MinStockAlert = 5
 	}
 
 	var p models.Product
 	err := h.DB.QueryRow(r.Context(),
-		`INSERT INTO products (name, description, price, category, image_url)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, name, description, price, COALESCE(category, 'Bebidas'), COALESCE(image_url, ''), active, created_at, updated_at`,
-		req.Name, req.Description, req.Price, req.Category, req.ImageURL,
-	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		`INSERT INTO products (name, description, price, category, image_url, stock, min_stock_alert, tags)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, name, description, price, COALESCE(category, 'General'), COALESCE(image_url, ''), 
+		           COALESCE(stock, 0), COALESCE(min_stock_alert, 5), COALESCE(tags, ''), active, created_at, updated_at`,
+		req.Name, req.Description, req.Price, req.Category, req.ImageURL, req.Stock, req.MinStockAlert, req.Tags,
+	).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.ImageURL,
+		&p.Stock, &p.MinStockAlert, &p.Tags, &p.Active, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		log.Printf("error insertando producto: %v", err)
 		http.Error(w, "error creando producto", http.StatusInternalServerError)
