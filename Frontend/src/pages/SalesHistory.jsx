@@ -668,7 +668,7 @@ export default function SalesHistory() {
                 className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md whitespace-nowrap"
               >
                 <Send className="w-4 h-4 shrink-0" />
-                <span>Enviar por WhatsApp</span>
+                <span>WhatsApp</span>
               </button>
 
               <button
