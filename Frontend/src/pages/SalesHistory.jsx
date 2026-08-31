@@ -413,31 +413,24 @@ export default function SalesHistory() {
                       ${s.total.toLocaleString('es-CO')}
                     </td>
                     <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => openReceiptModal(s)}
-                          className="p-1.5 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
-                          title="Ver Recibo"
+                          className="p-2 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                          title="Ver Recibo / Imprimir"
                         >
                           <Printer className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEditModal(s)}
-                          className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+                          className="p-2 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
                           title="Editar Venta"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleSendWhatsApp(s)}
-                          className="p-1.5 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors cursor-pointer"
-                          title="Enviar Comprobante por WhatsApp"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                        <button
                           onClick={() => handleDeleteSale(s)}
-                          className="p-1.5 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                          className="p-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
                           title="Eliminar Venta"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -587,21 +580,35 @@ export default function SalesHistory() {
           </div>
 
           {/* Acciones */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-100 dark:border-red-950">
+          <div className="flex items-center justify-between pt-3 border-t border-red-100 dark:border-red-950">
             <button
               type="button"
-              onClick={() => setIsEditModalOpen(false)}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold text-red-950/70 hover:bg-red-100 cursor-pointer"
+              onClick={() => {
+                setIsEditModalOpen(false)
+                handleDeleteSale(editingSale)
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-black text-xs hover:bg-red-100 dark:hover:bg-red-900 cursor-pointer flex items-center gap-1.5"
             >
-              Cancelar
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminar Venta</span>
             </button>
-            <button
-              type="submit"
-              disabled={editSubmitting}
-              className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 text-white font-black text-xs shadow-md cursor-pointer disabled:opacity-50"
-            >
-              {editSubmitting ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-5 py-2.5 rounded-2xl text-xs font-bold text-red-950/70 hover:bg-red-100 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={editSubmitting}
+                className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 text-white font-black text-xs shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {editSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
