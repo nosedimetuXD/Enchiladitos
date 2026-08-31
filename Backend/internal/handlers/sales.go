@@ -525,6 +525,11 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Procesar nuevos items
+	deductStock := true
+	if req.DeductStock != nil {
+		deductStock = *req.DeductStock
+	}
+
 	var subtotal float64
 	type resolvedItem struct {
 		ProductID   uuid.UUID
@@ -589,11 +594,6 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	} else if paymentMethod == "transferencia" {
 		cashAmount = 0
 		transferAmount = total
-	}
-
-	deductStock := true
-	if req.DeductStock != nil {
-		deductStock = *req.DeductStock
 	}
 
 	// 4. Si la nueva versión descuenta stock, aplicarlo
