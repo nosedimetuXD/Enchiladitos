@@ -341,20 +341,20 @@ export default function Sales() {
   function handleSendWhatsAppReceipt() {
     if (!lastOrder) return
     const phone = lastOrder.customer_phone ? lastOrder.customer_phone.replace(/\D/g, '') : ''
-    let msg = `🌶️ *RECIBO DIGITAL - ENCHILADITOS* 🌶️\n`
+    let msg = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n`
     msg += `¡Hola ${lastOrder.customer_name}! Gracias por tu compra.\n\n`
-    msg += `📅 *Fecha:* ${new Date(lastOrder.created_at).toLocaleString('es-CO')}\n`
-    msg += `📋 *Detalle:* \n`
+    msg += `*Fecha:* ${new Date(lastOrder.created_at).toLocaleString('es-CO')}\n`
+    msg += `*Detalle:* \n`
     lastOrder.items.forEach((it) => {
       msg += ` • ${it.quantity}x ${it.product.name} - $${(it.product.price * it.quantity).toLocaleString('es-CO')}\n`
     })
-    msg += `\n💵 *Subtotal:* $${lastOrder.subtotal.toLocaleString('es-CO')}\n`
+    msg += `\n*Subtotal:* $${lastOrder.subtotal.toLocaleString('es-CO')}\n`
     if (lastOrder.discount_amount > 0) {
-      msg += `🎁 *Descuento:* -$${lastOrder.discount_amount.toLocaleString('es-CO')} (${lastOrder.discount_reason || 'Promo'})\n`
+      msg += `*Descuento:* -$${lastOrder.discount_amount.toLocaleString('es-CO')} (${lastOrder.discount_reason || 'Descuento'})\n`
     }
-    msg += `🔥 *TOTAL PAGADO:* $${lastOrder.total.toLocaleString('es-CO')}\n`
-    msg += `💳 *Método:* ${lastOrder.payment_method.toUpperCase()}\n\n`
-    msg += `_¡Sabor, Chamoy y Fuego! Esperamos que lo disfrutes._`
+    msg += `*TOTAL PAGADO:* $${lastOrder.total.toLocaleString('es-CO')}\n`
+    msg += `*Método de pago:* ${lastOrder.payment_method.toUpperCase()}\n\n`
+    msg += `_¡Sabor, Chamoy y Fuego!_`
 
     const url = phone
       ? `https://wa.me/${phone.startsWith('57') ? phone : '57' + phone}?text=${encodeURIComponent(msg)}`
@@ -898,13 +898,14 @@ export default function Sales() {
       </Modal>
 
       {/* Modal Recibo Oficial / Factura */}
-      <Modal isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)} title="Venta Realizada con Éxito 🎉">
+      <Modal isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)} title="Venta Realizada con Éxito">
         {lastOrder && (
           <div className="space-y-4">
             {/* Ticket Printable View */}
             <div id="printable-receipt" className="p-5 rounded-3xl bg-white border-2 border-dashed border-red-200 text-black space-y-3 font-mono text-xs">
               <div className="text-center pb-2 border-b border-gray-200">
-                <h2 className="font-black text-base text-red-600">🌶️ ENCHILADITOS 🌶️</h2>
+                <img src="/logo.png" alt="Enchiladitos Logo" className="w-12 h-12 mx-auto mb-1.5 object-contain" />
+                <h2 className="font-black text-sm uppercase tracking-wider text-black">ENCHILADITOS</h2>
                 <p className="text-[10px] text-gray-500">Sabor, Chamoy y Fuego</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {new Date(lastOrder.created_at).toLocaleString('es-CO')}

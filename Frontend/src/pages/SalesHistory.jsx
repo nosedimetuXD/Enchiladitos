@@ -231,19 +231,20 @@ export default function SalesHistory() {
   }
 
   function handleSendWhatsApp(sale) {
-    let msg = `🌶️ *COMPROBANTE DE VENTA - ENCHILADITOS* 🌶️\n`
+    let msg = `*ENCHILADITOS - COMPROBANTE DE COMPRA*\n`
     msg += `¡Hola ${sale.customer_name}!\n`
-    msg += `📅 *Fecha:* ${new Date(sale.created_at).toLocaleString('es-CO')}\n\n`
-    msg += `📋 *Productos:* \n`
+    msg += `*Fecha:* ${new Date(sale.created_at).toLocaleString('es-CO')}\n\n`
+    msg += `*Productos:* \n`
     ;(sale.items || []).forEach((it) => {
       msg += ` • ${it.quantity}x ${it.product_name} - $${(it.unit_price * it.quantity).toLocaleString('es-CO')}\n`
     })
-    msg += `\n💵 *Subtotal:* $${(sale.subtotal || sale.total).toLocaleString('es-CO')}\n`
+    msg += `\n*Subtotal:* $${(sale.subtotal || sale.total).toLocaleString('es-CO')}\n`
     if (sale.discount_amount > 0) {
-      msg += `🎁 *Descuento:* -$${sale.discount_amount.toLocaleString('es-CO')} (${sale.discount_reason || 'Promo'})\n`
+      msg += `*Descuento:* -$${sale.discount_amount.toLocaleString('es-CO')} (${sale.discount_reason || 'Descuento'})\n`
     }
-    msg += `🔥 *TOTAL PAGADO:* $${sale.total.toLocaleString('es-CO')}\n`
-    msg += `💳 *Método:* ${sale.payment_method.toUpperCase()}\n`
+    msg += `*TOTAL PAGADO:* $${sale.total.toLocaleString('es-CO')}\n`
+    msg += `*Método de pago:* ${sale.payment_method.toUpperCase()}\n\n`
+    msg += `_¡Sabor, Chamoy y Fuego!_`
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
     window.open(url, '_blank')
   }
@@ -625,7 +626,8 @@ export default function SalesHistory() {
           <div className="space-y-4">
             <div className="p-5 rounded-3xl bg-white border-2 border-dashed border-red-200 text-black space-y-3 font-mono text-xs">
               <div className="text-center pb-2 border-b border-gray-200">
-                <h2 className="font-black text-base text-red-600">🌶️ ENCHILADITOS 🌶️</h2>
+                <img src="/logo.png" alt="Enchiladitos Logo" className="w-12 h-12 mx-auto mb-1.5 object-contain" />
+                <h2 className="font-black text-sm uppercase tracking-wider text-black">ENCHILADITOS</h2>
                 <p className="text-[10px] text-gray-500">Sabor, Chamoy y Fuego</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {new Date(selectedSale.created_at).toLocaleString('es-CO')}

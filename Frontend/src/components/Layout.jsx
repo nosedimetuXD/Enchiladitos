@@ -323,13 +323,11 @@ export default function Layout() {
 
               {!isCollapsed && (
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] truncate group-hover:text-red-600 transition-colors">
-                    {user?.username || 'Dueño'}
+                  <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] truncate group-hover:text-red-600 transition-colors">
+                    {user?.username || 'Usuario'}
                   </span>
-                  <span className="inline-block mt-0.5">
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-[#140505] text-red-600 dark:text-amber-400 border border-red-200 dark:border-red-900 uppercase tracking-wider">
-                      ADMINISTRADOR
-                    </span>
+                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                    Mi Cuenta
                   </span>
                 </div>
               )}
