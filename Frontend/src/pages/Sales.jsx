@@ -921,7 +921,7 @@ export default function Sales() {
             {/* Ticket Printable View */}
             <div id="printable-receipt" className="p-5 rounded-3xl bg-white border-2 border-dashed border-red-200 text-black space-y-3 font-mono text-xs">
               <div className="text-center pb-2 border-b border-gray-200">
-                <img src="/logo.png" alt="Enchiladitos Logo" className="w-14 h-14 mx-auto mb-1.5 object-contain rounded-2xl shadow-xs" />
+                <img src="/logo.png" alt="Enchiladitos Logo" className="w-14 h-14 mx-auto mb-2.5 object-contain rounded-2xl shadow-xs" />
                 <p className="text-[11px] font-black text-red-700">Sabor, Chamoy y Fuego</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
                   {new Date(lastOrder.created_at).toLocaleString('es-CO')}

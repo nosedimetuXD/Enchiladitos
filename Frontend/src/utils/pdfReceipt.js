@@ -63,7 +63,7 @@ export async function createReceiptPDF(order) {
     format: [80, dynamicHeight]
   })
 
-  let y = 8
+  let y = 7
 
   // 1. Logo Oficial de Enchiladitos (Emblema redondeado)
   try {
@@ -71,16 +71,16 @@ export async function createReceiptPDF(order) {
     if (logoData) {
       // Dibujar logo centrado (22mm x 22mm)
       doc.addImage(logoData, 'PNG', 29, y, 22, 22)
-      y += 24
+      y += 27 // Separación adecuada respecto al texto inferior
     } else {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(14)
       doc.setTextColor(180, 20, 20)
       doc.text('ENCHILADITOS', 40, y + 4, { align: 'center' })
-      y += 10
+      y += 12
     }
   } catch (e) {
-    y += 5
+    y += 6
   }
 
   // 2. Lema y Fecha
@@ -88,20 +88,20 @@ export async function createReceiptPDF(order) {
   doc.setFontSize(8)
   doc.setTextColor(140, 20, 20)
   doc.text('Sabor, Chamoy y Fuego', 40, y, { align: 'center' })
-  y += 3.5
+  y += 4
 
   const dateStr = new Date(order.created_at || Date.now()).toLocaleString('es-CO')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
   doc.setTextColor(110, 110, 110)
   doc.text(dateStr, 40, y, { align: 'center' })
-  y += 5
+  y += 5.5
 
   // Línea divisoria
   doc.setDrawColor(210, 210, 210)
   doc.setLineWidth(0.3)
   doc.line(6, y, 74, y)
-  y += 4.5
+  y += 5
 
   // 3. Información del Cliente y Método de Pago
   doc.setFontSize(8)
