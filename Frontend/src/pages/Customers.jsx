@@ -594,7 +594,7 @@ export default function Customers() {
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-xs shadow-md cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Registrar Abono / Pago</span>
+                <span>Registrar Abono / Pago</span>
               </button>
 
               <button

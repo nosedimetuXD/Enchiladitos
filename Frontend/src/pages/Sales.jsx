@@ -665,7 +665,7 @@ export default function Sales() {
                   className="flex items-center gap-1.5 text-xs font-black text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                 >
                   <Tag className="w-3.5 h-3.5" />
-                  <span>+ Aplicar Descuento / Promoción</span>
+                  <span>Aplicar Descuento / Promoción</span>
                 </button>
               ) : (
                 <div className="p-3 rounded-2xl bg-white dark:bg-[#200808] border border-amber-300 dark:border-amber-900/60 space-y-2">
