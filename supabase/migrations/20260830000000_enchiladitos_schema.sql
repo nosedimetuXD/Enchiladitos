@@ -58,7 +58,23 @@ CREATE TABLE IF NOT EXISTS sales (
     discount_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
     discount_reason TEXT DEFAULT '',
     total NUMERIC(10,2) NOT NULL DEFAULT 0,
+    paid_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+    pending_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'paid',
+    customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
     deducted_stock BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 5.1. Tabla de Abonos / Pagos de Clientes (Créditos y Deudas)
+CREATE TABLE IF NOT EXISTS customer_payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    amount NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+    payment_method VARCHAR(50) NOT NULL DEFAULT 'efectivo',
+    bank_details TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    registered_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -13,6 +13,28 @@ type Customer struct {
 	Phone     string    `json:"phone"`
 	Email     string    `json:"email"`
 	Notes     string    `json:"notes"`
+	TotalDebt float64   `json:"total_debt,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type CustomerPayment struct {
+	ID             uuid.UUID  `json:"id"`
+	CustomerID     uuid.UUID  `json:"customer_id"`
+	Amount         float64    `json:"amount"`
+	PaymentMethod  string     `json:"payment_method"`
+	BankDetails    string     `json:"bank_details,omitempty"`
+	Notes          string     `json:"notes,omitempty"`
+	RegisteredBy   *uuid.UUID `json:"registered_by,omitempty"`
+	RegisteredName string     `json:"registered_name,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+type CustomerAccountSummary struct {
+	Customer       Customer          `json:"customer"`
+	TotalSales     float64           `json:"total_sales"`
+	TotalPaid      float64           `json:"total_paid"`
+	CurrentDebt    float64           `json:"current_debt"`
+	PendingSales   []Sale            `json:"pending_sales"`
+	PaymentHistory []CustomerPayment `json:"payment_history"`
 }
