@@ -657,25 +657,25 @@ export default function SalesHistory() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
               <button
                 onClick={() => downloadReceiptPDF(selectedSale)}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs cursor-pointer transition-colors"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs cursor-pointer transition-colors whitespace-nowrap"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 shrink-0" />
                 <span>Descargar PDF</span>
               </button>
 
               <button
                 onClick={() => shareReceiptPDFToWhatsApp(selectedSale)}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer transition-colors shadow-md whitespace-nowrap"
               >
-                <Send className="w-4 h-4" />
-                <span>Enviar a WhatsApp (PDF)</span>
+                <Send className="w-4 h-4 shrink-0" />
+                <span>Enviar por WhatsApp</span>
               </button>
 
               <button
                 onClick={() => window.print()}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs cursor-pointer transition-colors whitespace-nowrap"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 shrink-0" />
                 <span>Imprimir</span>
               </button>
             </div>
