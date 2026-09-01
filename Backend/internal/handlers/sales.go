@@ -43,6 +43,9 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS pending_amount NUMERIC(10,2) DEFAULT 0`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'paid'`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ALTER COLUMN sold_by DROP NOT NULL`)
+	_, _ = db.Exec(ctx, `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check`)
+	_, _ = db.Exec(ctx, `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_status_check`)
+	_, _ = db.Exec(ctx, `ALTER TABLE sales ALTER COLUMN payment_method TYPE VARCHAR(50)`)
 
 	// Retrocompatibilidad: si subtotal es 0 o paid_amount no está configurado, actualizar
 	_, _ = db.Exec(ctx, `UPDATE sales SET subtotal = total WHERE subtotal = 0 AND total > 0`)
@@ -301,12 +304,15 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	soldByVal := ctx.Value(custommw.ContextUserID)
-	var soldBy uuid.UUID
+	var soldBy *uuid.UUID
+	var soldByName string
 	if soldByVal != nil {
-		if id, ok := soldByVal.(uuid.UUID); ok {
-			soldBy = id
+		if id, ok := soldByVal.(uuid.UUID); ok && id != uuid.Nil {
+			soldBy = &id
 		} else if idStr, ok := soldByVal.(string); ok {
-			soldBy, _ = uuid.Parse(idStr)
+			if parsed, err := uuid.Parse(idStr); err == nil && parsed != uuid.Nil {
+				soldBy = &parsed
+			}
 		}
 	}
 
@@ -317,6 +323,21 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(ctx)
+
+	if soldBy != nil {
+		_ = tx.QueryRow(ctx, `SELECT COALESCE(username, 'Dueño') FROM users WHERE id = $1`, *soldBy).Scan(&soldByName)
+	}
+
+	var customerID *uuid.UUID
+	if req.CustomerID != nil && *req.CustomerID != uuid.Nil {
+		customerID = req.CustomerID
+		if customerName == "" || customerName == "Cliente General" {
+			var fn, ln string
+			if err := tx.QueryRow(ctx, `SELECT first_name, COALESCE(last_name, '') FROM customers WHERE id = $1`, *customerID).Scan(&fn, &ln); err == nil {
+				customerName = strings.TrimSpace(fn + " " + ln)
+			}
+		}
+	}
 
 	var subtotal float64
 	type resolvedItem struct {
@@ -377,19 +398,6 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		total = 0
 	}
 
-	cashAmount := req.CashAmount
-	transferAmount := req.TransferAmount
-	if paymentMethod == "efectivo" {
-		cashAmount = total
-		transferAmount = 0
-	} else if paymentMethod == "transferencia" {
-		cashAmount = 0
-		transferAmount = total
-	} else if paymentMethod == "credito" {
-		cashAmount = 0
-		transferAmount = 0
-	}
-
 	paidAmount := total
 	if req.PaidAmount != nil {
 		paidAmount = *req.PaidAmount
@@ -413,6 +421,19 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	cashAmount := req.CashAmount
+	transferAmount := req.TransferAmount
+	if paymentMethod == "efectivo" {
+		cashAmount = paidAmount
+		transferAmount = 0
+	} else if paymentMethod == "transferencia" {
+		cashAmount = 0
+		transferAmount = paidAmount
+	} else if paymentMethod == "credito" {
+		cashAmount = 0
+		transferAmount = 0
+	}
+
 	// Si se debe descontar stock, descontar directamente de la tabla products
 	if deductStock {
 		for _, item := range resolved {
@@ -427,11 +448,6 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var soldByName string
-	if soldBy != uuid.Nil {
-		_ = tx.QueryRow(ctx, `SELECT COALESCE(username, 'Dueño') FROM users WHERE id = $1`, soldBy).Scan(&soldByName)
-	}
-
 	var saleID uuid.UUID
 	var createdAt time.Time
 	err = tx.QueryRow(ctx,
@@ -440,7 +456,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		                    total, paid_amount, pending_amount, payment_status, deducted_stock, created_at) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
 		 RETURNING id, created_at`,
-		soldBy, soldByName, req.CustomerID, customerName, paymentMethod, cashAmount, transferAmount,
+		soldBy, soldByName, customerID, customerName, paymentMethod, cashAmount, transferAmount,
 		strings.TrimSpace(req.BankDetails), subtotal, discountPercent, discountAmount,
 		strings.TrimSpace(req.DiscountReason), total, paidAmount, pendingAmount, paymentStatus, deductStock, saleTime,
 	).Scan(&saleID, &createdAt)
@@ -624,19 +640,6 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		paymentMethod = "efectivo"
 	}
 
-	cashAmount := req.CashAmount
-	transferAmount := req.TransferAmount
-	if paymentMethod == "efectivo" {
-		cashAmount = total
-		transferAmount = 0
-	} else if paymentMethod == "transferencia" {
-		cashAmount = 0
-		transferAmount = total
-	} else if paymentMethod == "credito" {
-		cashAmount = 0
-		transferAmount = 0
-	}
-
 	paidAmount := total
 	if req.PaidAmount != nil {
 		paidAmount = *req.PaidAmount
@@ -660,6 +663,30 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	cashAmount := req.CashAmount
+	transferAmount := req.TransferAmount
+	if paymentMethod == "efectivo" {
+		cashAmount = paidAmount
+		transferAmount = 0
+	} else if paymentMethod == "transferencia" {
+		cashAmount = 0
+		transferAmount = paidAmount
+	} else if paymentMethod == "credito" {
+		cashAmount = 0
+		transferAmount = 0
+	}
+
+	var customerID *uuid.UUID
+	if req.CustomerID != nil && *req.CustomerID != uuid.Nil {
+		customerID = req.CustomerID
+		if customerName == "" || customerName == "Cliente General" {
+			var fn, ln string
+			if err := tx.QueryRow(ctx, `SELECT first_name, COALESCE(last_name, '') FROM customers WHERE id = $1`, *customerID).Scan(&fn, &ln); err == nil {
+				customerName = strings.TrimSpace(fn + " " + ln)
+			}
+		}
+	}
+
 	// 4. Si la nueva versión descuenta stock, aplicarlo
 	if deductStock {
 		for _, item := range resolved {
@@ -677,7 +704,7 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		     total = $11, paid_amount = $12, pending_amount = $13, payment_status = $14,
 		     deducted_stock = $15, created_at = $16
 		 WHERE id = $17`,
-		req.CustomerID, customerName, paymentMethod, cashAmount, transferAmount,
+		customerID, customerName, paymentMethod, cashAmount, transferAmount,
 		strings.TrimSpace(req.BankDetails), subtotal, discountPercent, discountAmount,
 		strings.TrimSpace(req.DiscountReason), total, paidAmount, pendingAmount, paymentStatus,
 		deductStock, saleTime, id)
