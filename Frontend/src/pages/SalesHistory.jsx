@@ -472,14 +472,23 @@ export default function SalesHistory() {
 
                   return (
                     <tr key={s.id} className="hover:bg-red-50/30 dark:hover:bg-red-950/20 transition-colors">
-                      <td className="p-4 font-bold text-[#450a0a] dark:text-[#fef2f2] whitespace-nowrap">
-                        {new Date(s.created_at).toLocaleString('es-CO', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                      <td className="p-4 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">
+                            {new Date(s.created_at).toLocaleDateString('es-CO', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className="font-bold text-[11px] text-red-900/60 dark:text-red-300/60">
+                            {new Date(s.created_at).toLocaleTimeString('es-CO', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Cliente con tooltip y truncate */}

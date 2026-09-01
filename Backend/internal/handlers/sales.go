@@ -800,8 +800,6 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, _ = tx.Exec(ctx, `DELETE FROM comanda_items WHERE comanda_id IN (SELECT id FROM comandas WHERE sale_id = $1)`, id)
-	_, _ = tx.Exec(ctx, `DELETE FROM comandas WHERE sale_id = $1`, id)
 	_, _ = tx.Exec(ctx, `DELETE FROM sale_items WHERE sale_id = $1`, id)
 
 	tag, err := tx.Exec(ctx, `DELETE FROM sales WHERE id = $1`, id)
