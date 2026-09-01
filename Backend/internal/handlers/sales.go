@@ -55,17 +55,15 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	_, _ = db.Exec(ctx, `UPDATE sale_items si SET product_name = p.name FROM products p WHERE si.product_id = p.id AND (si.product_name IS NULL OR si.product_name = '')`)
 
 	_, _ = db.Exec(ctx, `
+		DROP TABLE IF EXISTS comanda_items CASCADE;
+		DROP TABLE IF EXISTS comandas CASCADE;
+
 		DO $$ 
 		BEGIN 
 			IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sales_sold_by_fkey') THEN
 				ALTER TABLE sales DROP CONSTRAINT sales_sold_by_fkey;
 			END IF;
 			ALTER TABLE sales ADD CONSTRAINT sales_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL;
-
-			IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'comandas') THEN
-				ALTER TABLE comandas DROP CONSTRAINT IF EXISTS comandas_sale_id_fkey;
-				ALTER TABLE comandas ADD CONSTRAINT comandas_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE;
-			END IF;
 		END $$;
 	`)
 
