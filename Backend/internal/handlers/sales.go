@@ -781,7 +781,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("error consultando venta para eliminar: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error consultando venta para eliminar: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -815,7 +815,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando borrado: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error confirmando borrado: %v", err), http.StatusInternalServerError)
 		return
 	}
 
