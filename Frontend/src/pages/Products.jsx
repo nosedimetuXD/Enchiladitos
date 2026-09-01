@@ -70,6 +70,20 @@ export default function Products() {
 
   useEffect(() => {
     loadProducts()
+
+    function handleRevalidate() {
+      if (document.visibilityState === 'visible') {
+        loadProducts()
+      }
+    }
+
+    window.addEventListener('focus', handleRevalidate)
+    document.addEventListener('visibilitychange', handleRevalidate)
+
+    return () => {
+      window.removeEventListener('focus', handleRevalidate)
+      document.removeEventListener('visibilitychange', handleRevalidate)
+    }
   }, [])
 
   function openCreateModal() {
