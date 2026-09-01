@@ -57,6 +57,11 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	_, _ = db.Exec(ctx, `
 		DROP TABLE IF EXISTS comanda_items CASCADE;
 		DROP TABLE IF EXISTS comandas CASCADE;
+		DROP TABLE IF EXISTS waste_reports CASCADE;
+		DROP TABLE IF EXISTS tasks CASCADE;
+		DROP TABLE IF EXISTS product_ingredients CASCADE;
+		DROP TABLE IF EXISTS recipes CASCADE;
+		DROP TABLE IF EXISTS ingredients CASCADE;
 
 		DO $$ 
 		BEGIN 
