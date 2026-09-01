@@ -18,7 +18,10 @@ import {
   CreditCard,
   Tag,
   ArrowDownCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  ShoppingBag,
+  Coins,
+  Layers
 } from 'lucide-react'
 
 const EXPENSE_CATEGORIES = [
@@ -67,6 +70,9 @@ export default function Accounting() {
   const [incPaymentMethod, setIncPaymentMethod] = useState('efectivo')
   const [incDate, setIncDate] = useState('')
   const [incSubmitting, setIncSubmitting] = useState(false)
+
+  // Filtro de Ingresos (all | sale | customer_payment | manual)
+  const [incomeFilter, setIncomeFilter] = useState('all')
 
   async function loadData() {
     setLoading(true)
@@ -231,14 +237,15 @@ export default function Accounting() {
 
   // Exportar a CSV (Inspirado en Twenty)
   function exportAccountingCSV() {
-    let csv = 'Tipo,Fecha,Descripcion,Monto,Categoria,MetodoPago\n'
+    let csv = 'Tipo,Origen,Fecha,Descripcion,Monto,Categoria,MetodoPago\n'
     expenses.forEach((e) => {
       const d = new Date(e.created_at).toLocaleString('es-CO').replace(',', '')
-      csv += `"GASTO","${d}","${e.description}",${e.amount},"${e.category}","${e.payment_method}"\n`
+      csv += `"GASTO","Gasto Directo","${d}","${e.description}",${e.amount},"${e.category}","${e.payment_method}"\n`
     })
     incomes.forEach((i) => {
       const d = new Date(i.created_at).toLocaleString('es-CO').replace(',', '')
-      csv += `"INGRESO","${d}","${i.description}",${i.amount},"${i.category}","${i.payment_method}"\n`
+      const origin = i.type === 'sale' ? 'Venta POS' : i.type === 'customer_payment' ? 'Abono Deuda' : 'Ingreso Extra'
+      csv += `"INGRESO","${origin}","${d}","${i.description}",${i.amount},"${i.category}","${i.payment_method}"\n`
     })
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -254,6 +261,15 @@ export default function Accounting() {
   const totalGastosCalc = useMemo(() => expenses.reduce((acc, e) => acc + (e.amount || 0), 0), [expenses])
   const totalIngresosCalc = useMemo(() => (summary?.total_income || 0), [summary])
   const balanceNetoCalc = useMemo(() => totalIngresosCalc - totalGastosCalc, [totalIngresosCalc, totalGastosCalc])
+
+  const salesIncomesCount = useMemo(() => incomes.filter((i) => i.type === 'sale').length, [incomes])
+  const abonosIncomesCount = useMemo(() => incomes.filter((i) => i.type === 'customer_payment').length, [incomes])
+  const manualIncomesCount = useMemo(() => incomes.filter((i) => (i.type || 'manual') === 'manual').length, [incomes])
+
+  const filteredIncomes = useMemo(() => {
+    if (incomeFilter === 'all') return incomes
+    return incomes.filter((inc) => (inc.type || 'manual') === incomeFilter)
+  }, [incomes, incomeFilter])
 
   return (
     <div className="space-y-6">
@@ -368,7 +384,7 @@ export default function Accounting() {
                 : 'bg-red-50 dark:bg-[#200808] text-red-950 dark:text-red-200 hover:bg-red-100'
             }`}
           >
-            Ingresos Extra ({incomes.length})
+            Ingresos ({incomes.length})
           </button>
         </div>
 
@@ -409,12 +425,12 @@ export default function Accounting() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-red-200/60 dark:border-red-950/60 bg-red-50/40 dark:bg-[#200808] text-red-950/70 dark:text-red-300/70 font-black uppercase text-[10px] tracking-wider">
-                    <th className="p-4">Fecha</th>
+                    <th className="p-4 whitespace-nowrap">Fecha & Hora</th>
                     <th className="p-4">Descripción</th>
                     <th className="p-4">Categoría</th>
                     <th className="p-4">Pago</th>
-                    <th className="p-4 text-right">Monto</th>
-                    <th className="p-4 text-center">Acciones</th>
+                    <th className="p-4 text-right whitespace-nowrap">Monto</th>
+                    <th className="p-4 text-center whitespace-nowrap">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-red-100 dark:divide-red-950/50">
@@ -445,10 +461,10 @@ export default function Accounting() {
                         </span>
                       </td>
                       <td className="p-4 font-medium uppercase text-gray-500">{exp.payment_method}</td>
-                      <td className="p-4 text-right font-black text-red-600 dark:text-amber-400 text-sm">
+                      <td className="p-4 text-right font-black text-red-600 dark:text-amber-400 text-sm whitespace-nowrap">
                         -${Number(exp.amount).toLocaleString('es-CO')}
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => openEditExpense(exp)}
@@ -475,75 +491,161 @@ export default function Accounting() {
         </div>
       ) : (
         <div className="bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200/80 dark:border-red-950/60 overflow-hidden shadow-xs">
-          {incomes.length === 0 ? (
+          {/* Sub-filtros de Tipo de Ingreso */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-emerald-50/50 dark:bg-[#200808] border-b border-red-200/60 dark:border-red-950/60">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {[
+                { id: 'all', label: `Todos (${incomes.length})` },
+                { id: 'sale', label: `Ventas POS (${salesIncomesCount})` },
+                { id: 'customer_payment', label: `Abonos Deuda (${abonosIncomesCount})` },
+                { id: 'manual', label: `Ingresos Extras (${manualIncomesCount})` }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setIncomeFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    incomeFilter === f.id
+                      ? 'bg-emerald-600 text-white shadow-xs font-black'
+                      : 'bg-white dark:bg-[#1a0505] text-emerald-950 dark:text-emerald-300 hover:bg-emerald-100/60'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={openCreateIncome}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer shadow-xs ml-auto whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Registrar Ingreso Extra</span>
+            </button>
+          </div>
+
+          {filteredIncomes.length === 0 ? (
             <div className="text-center py-16 p-6">
               <TrendingUp className="w-12 h-12 mx-auto text-emerald-400/40 mb-3" />
-              <p className="text-base font-black text-[#450a0a] dark:text-[#fef2f2]">No hay ingresos extra registrados</p>
+              <p className="text-base font-black text-[#450a0a] dark:text-[#fef2f2]">
+                No hay ingresos registrados para este filtro o periodo
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-red-200/60 dark:border-red-950/60 bg-red-50/40 dark:bg-[#200808] text-red-950/70 dark:text-red-300/70 font-black uppercase text-[10px] tracking-wider">
-                    <th className="p-4">Fecha</th>
-                    <th className="p-4">Descripción</th>
-                    <th className="p-4">Categoría</th>
-                    <th className="p-4">Pago</th>
-                    <th className="p-4 text-right">Monto</th>
-                    <th className="p-4 text-center">Acciones</th>
+                    <th className="p-4 whitespace-nowrap">Fecha & Hora</th>
+                    <th className="p-4 whitespace-nowrap">Tipo / Origen</th>
+                    <th className="p-4">Descripción / Concepto</th>
+                    <th className="p-4">Método de Pago</th>
+                    <th className="p-4 text-right whitespace-nowrap">Monto Cobrado</th>
+                    <th className="p-4 text-center whitespace-nowrap">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-red-100 dark:divide-red-950/50">
-                  {incomes.map((inc) => (
-                    <tr key={inc.id} className="hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-colors">
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">
-                            {new Date(inc.created_at).toLocaleDateString('es-CO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                          <span className="font-bold text-[11px] text-emerald-800/60 dark:text-emerald-300/60">
-                            {new Date(inc.created_at).toLocaleTimeString('es-CO', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 font-black text-[#450a0a] dark:text-[#fef2f2]">{inc.description}</td>
-                      <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-xl bg-emerald-100/70 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-extrabold uppercase text-[10px]">
-                          {inc.category}
-                        </span>
-                      </td>
-                      <td className="p-4 font-medium uppercase text-gray-500">{inc.payment_method}</td>
-                      <td className="p-4 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm">
-                        +${Number(inc.amount).toLocaleString('es-CO')}
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => openEditIncome(inc)}
-                            className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
-                            title="Editar Ingreso"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteIncome(inc)}
-                            className="p-1.5 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 transition-colors cursor-pointer"
-                            title="Eliminar Ingreso"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredIncomes.map((inc) => {
+                    const isSale = inc.type === 'sale'
+                    const isAbono = inc.type === 'customer_payment'
+                    const isManual = !isSale && !isAbono
+
+                    return (
+                      <tr key={`${inc.type || 'inc'}-${inc.id}`} className="hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-colors">
+                        <td className="p-4 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="font-black text-xs text-[#450a0a] dark:text-[#fef2f2]">
+                              {new Date(inc.created_at).toLocaleDateString('es-CO', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                            <span className="font-bold text-[11px] text-emerald-800/60 dark:text-emerald-300/60">
+                              {new Date(inc.created_at).toLocaleTimeString('es-CO', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: true
+                              })}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Tipo / Origen Badge */}
+                        <td className="p-4 whitespace-nowrap">
+                          {isSale && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black text-[10px] uppercase">
+                              <ShoppingBag className="w-3 h-3 text-emerald-600" />
+                              <span>Venta POS</span>
+                            </span>
+                          )}
+                          {isAbono && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-black text-[10px] uppercase">
+                              <Coins className="w-3 h-3 text-blue-600" />
+                              <span>Abono Deuda</span>
+                            </span>
+                          )}
+                          {isManual && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black text-[10px] uppercase">
+                              <Plus className="w-3 h-3 text-amber-600" />
+                              <span>Ingreso Extra</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Descripción / Concepto */}
+                        <td className="p-4 font-black text-[#450a0a] dark:text-[#fef2f2]">
+                          <div>
+                            <p className="truncate max-w-[240px]" title={inc.description}>{inc.description}</p>
+                            {inc.category && inc.category !== 'Venta POS' && inc.category !== 'Abono Deuda' && (
+                              <span className="text-[10px] font-bold text-gray-500 uppercase">
+                                {inc.category}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Método de Pago */}
+                        <td className="p-4 font-medium uppercase text-gray-500 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span>{inc.payment_method}</span>
+                            {inc.bank_details && (
+                              <span className="text-[10px] lowercase text-gray-400">({inc.bank_details})</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Monto */}
+                        <td className="p-4 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm whitespace-nowrap">
+                          +${Number(inc.amount).toLocaleString('es-CO')}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="p-4 text-center whitespace-nowrap">
+                          {isManual ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openEditIncome(inc)}
+                                className="p-1.5 rounded-xl text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
+                                title="Editar Ingreso Extra"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteIncome(inc)}
+                                className="p-1.5 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                                title="Eliminar Ingreso Extra"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-gray-400 italic">
+                              {isSale ? 'POS' : 'CRM'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

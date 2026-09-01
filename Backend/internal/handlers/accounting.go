@@ -136,19 +136,25 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		ExpensesByCategory:   make(map[string]float64),
 	}
 
-	// 1. Ingresos por ventas
-	var cashSales, transferSales, totalSales float64
-	salesQuery := "SELECT COALESCE(SUM(s.total), 0), COUNT(s.id), COALESCE(SUM(s.cash_amount), 0), COALESCE(SUM(s.transfer_amount), 0) FROM sales s WHERE " + timeCondSales
-	_ = h.DB.QueryRow(r.Context(), salesQuery).Scan(&totalSales, &summary.SalesCount, &cashSales, &transferSales)
+	// 1. Ingresos por ventas (lo efectivamente cobrado en caja/bancos)
+	var cashSales, transferSales, totalSales, paidSales float64
+	salesQuery := "SELECT COALESCE(SUM(s.total), 0), COUNT(s.id), COALESCE(SUM(s.cash_amount), 0), COALESCE(SUM(s.transfer_amount), 0), COALESCE(SUM(s.paid_amount), 0) FROM sales s WHERE " + timeCondSales
+	_ = h.DB.QueryRow(r.Context(), salesQuery).Scan(&totalSales, &summary.SalesCount, &cashSales, &transferSales, &paidSales)
 
-	// 2. Ingresos manuales extraordinarios
-	var manualIncomes float64
-	incQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id) FROM incomes WHERE " + timeCondition
-	_ = h.DB.QueryRow(r.Context(), incQuery).Scan(&manualIncomes, &summary.IncomesCount)
+	// 2. Abonos de clientes a deudas (customer_payments)
+	var cashAbonos, transferAbonos, totalAbonos float64
+	var abonosCount int
+	abonosQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM customer_payments WHERE " + timeCondition
+	_ = h.DB.QueryRow(r.Context(), abonosQuery).Scan(&totalAbonos, &abonosCount, &cashAbonos, &transferAbonos)
 
-	summary.TotalIncome = totalSales + manualIncomes
-	summary.IncomeByPaymentMethod["efectivo"] = cashSales
-	summary.IncomeByPaymentMethod["transferencia"] = transferSales
+	// 3. Ingresos manuales extraordinarios
+	var cashManual, transferManual, manualIncomes float64
+	incQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM incomes WHERE " + timeCondition
+	_ = h.DB.QueryRow(r.Context(), incQuery).Scan(&manualIncomes, &summary.IncomesCount, &cashManual, &transferManual)
+
+	summary.TotalIncome = paidSales + totalAbonos + manualIncomes
+	summary.IncomeByPaymentMethod["efectivo"] = cashSales + cashAbonos + cashManual
+	summary.IncomeByPaymentMethod["transferencia"] = transferSales + transferAbonos + transferManual
 
 	if summary.SalesCount > 0 {
 		summary.AverageTicket = totalSales / float64(summary.SalesCount)
@@ -490,38 +496,110 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
 	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
 
-	var timeCondition string
+	var timeCondSales, timeCondAbonos, timeCondIncomes string
 
 	if startDate != "" && endDate != "" {
-		timeCondition = fmt.Sprintf("WHERE (i.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (i.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
+		timeCondSales = fmt.Sprintf("(s.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (s.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
+		timeCondAbonos = fmt.Sprintf("(cp.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (cp.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
+		timeCondIncomes = fmt.Sprintf("(i.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (i.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
 	} else {
 		switch period {
 		case "today":
-			timeCondition = "WHERE (i.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
+			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
 		case "week":
-			timeCondition = "WHERE (i.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
+			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
+			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
 		case "month":
-			timeCondition = "WHERE (i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
 		case "prev_month":
-			timeCondition = "WHERE (i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (i.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (s.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (cp.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
+			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (i.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
 		case "year":
-			timeCondition = "WHERE (i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
+			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
+			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
+			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
 		default:
-			timeCondition = ""
+			timeCondSales = "1=1"
+			timeCondAbonos = "1=1"
+			timeCondIncomes = "1=1"
 		}
 	}
 
-	query := fmt.Sprintf(`SELECT i.id, i.description, i.amount, i.category, i.payment_method, i.registered_by, 
-		        COALESCE(u.username, 'Dueño'), i.created_at 
-		 FROM incomes i
-		 LEFT JOIN users u ON i.registered_by = u.id
-		 %s
-		 ORDER BY i.created_at DESC`, timeCondition)
+	query := fmt.Sprintf(`
+		SELECT id, type, description, amount, category, payment_method, bank_details, customer_name, registered_by, registerer_name, created_at
+		FROM (
+			-- 1. Ventas POS con valor efectivamente cobrado
+			SELECT 
+				s.id,
+				'sale'::text as type,
+				CASE 
+					WHEN TRIM(s.customer_name) != '' AND LOWER(s.customer_name) != 'cliente general' 
+					THEN 'Venta POS - ' || s.customer_name 
+					ELSE 'Venta POS - Cliente General' 
+				END as description,
+				s.paid_amount as amount,
+				'Venta POS'::text as category,
+				s.payment_method,
+				COALESCE(s.bank_details, '') as bank_details,
+				COALESCE(s.customer_name, 'Cliente General') as customer_name,
+				s.sold_by as registered_by,
+				COALESCE(s.sold_by_name, 'Dueño') as registerer_name,
+				s.created_at
+			FROM sales s
+			WHERE s.paid_amount > 0 AND %s
+
+			UNION ALL
+
+			-- 2. Abonos de clientes a deudas
+			SELECT 
+				cp.id,
+				'customer_payment'::text as type,
+				'Abono a Deuda - ' || COALESCE(NULLIF(TRIM(c.first_name || ' ' || COALESCE(c.last_name, '')), ''), 'Cliente') as description,
+				cp.amount,
+				'Abono Deuda'::text as category,
+				cp.payment_method,
+				COALESCE(cp.bank_details, '') as bank_details,
+				COALESCE(NULLIF(TRIM(c.first_name || ' ' || COALESCE(c.last_name, '')), ''), 'Cliente') as customer_name,
+				cp.registered_by,
+				COALESCE(u.username, 'Dueño') as registerer_name,
+				cp.created_at
+			FROM customer_payments cp
+			LEFT JOIN customers c ON cp.customer_id = c.id
+			LEFT JOIN users u ON cp.registered_by = u.id
+			WHERE %s
+
+			UNION ALL
+
+			-- 3. Ingresos manuales extraordinarios
+			SELECT 
+				i.id,
+				'manual'::text as type,
+				i.description,
+				i.amount,
+				i.category,
+				i.payment_method,
+				''::text as bank_details,
+				''::text as customer_name,
+				i.registered_by,
+				COALESCE(u.username, 'Dueño') as registerer_name,
+				i.created_at
+			FROM incomes i
+			LEFT JOIN users u ON i.registered_by = u.id
+			WHERE %s
+		) all_incomes
+		ORDER BY created_at DESC
+	`, timeCondSales, timeCondAbonos, timeCondIncomes)
 
 	rows, err := h.DB.Query(r.Context(), query)
 	if err != nil {
-		log.Printf("error consultando ingresos manuales: %v", err)
-		http.Error(w, "error consultando ingresos", http.StatusInternalServerError)
+		log.Printf("error consultando ingresos consolidados: %v", err)
+		http.Error(w, fmt.Sprintf("error consultando ingresos: %v", err), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -529,10 +607,10 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 	var incomes []models.Income
 	for rows.Next() {
 		var inc models.Income
-		if err := rows.Scan(&inc.ID, &inc.Description, &inc.Amount, &inc.Category, &inc.PaymentMethod,
-			&inc.RegisteredBy, &inc.RegistererName, &inc.CreatedAt); err != nil {
-			log.Printf("error leyendo ingresos: %v", err)
-			http.Error(w, "error leyendo ingresos", http.StatusInternalServerError)
+		if err := rows.Scan(&inc.ID, &inc.Type, &inc.Description, &inc.Amount, &inc.Category, &inc.PaymentMethod,
+			&inc.BankDetails, &inc.CustomerName, &inc.RegisteredBy, &inc.RegistererName, &inc.CreatedAt); err != nil {
+			log.Printf("error leyendo ingresos consolidados: %v", err)
+			http.Error(w, fmt.Sprintf("error leyendo ingresos: %v", err), http.StatusInternalServerError)
 			return
 		}
 		incomes = append(incomes, inc)
