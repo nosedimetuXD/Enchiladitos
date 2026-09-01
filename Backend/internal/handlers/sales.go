@@ -322,7 +322,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
 		log.Printf("error iniciando transacción: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error iniciando transacción: %v", err), http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -365,7 +365,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Printf("error consultando producto: %v", err)
-			http.Error(w, "error interno", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("error consultando producto: %v", err), http.StatusInternalServerError)
 			return
 		}
 
@@ -445,7 +445,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 				item.Quantity, item.ProductID)
 			if err != nil {
 				log.Printf("error descontando stock: %v", err)
-				http.Error(w, "error descontando stock", http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("error descontando stock: %v", err), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -465,7 +465,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	).Scan(&saleID, &createdAt)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error creando venta: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -476,14 +476,14 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 			saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice)
 		if err != nil {
 			log.Printf("error creando item de venta: %v", err)
-			http.Error(w, "error interno", http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("error creando item de venta: %v", err), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando venta: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error confirmando venta: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -729,7 +729,7 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando edición de venta: %v", err)
-		http.Error(w, "error interno", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error confirmando edición de venta: %v", err), http.StatusInternalServerError)
 		return
 	}
 
