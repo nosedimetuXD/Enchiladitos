@@ -75,12 +75,12 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	var rawCond string
 
 	if startDate != "" && endDate != "" {
-		rawCond = fmt.Sprintf("s.created_at >= '%s 00:00:00' AND s.created_at <= '%s 23:59:59'", startDate, endDate)
+		rawCond = fmt.Sprintf("(s.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (s.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
 	} else if yearParam != "" && monthParam != "" {
 		y, _ := strconv.Atoi(yearParam)
 		m, _ := strconv.Atoi(monthParam)
 		if y > 2000 && m >= 1 && m <= 12 {
-			rawCond = fmt.Sprintf("EXTRACT(YEAR FROM s.created_at) = %d AND EXTRACT(MONTH FROM s.created_at) = %d", y, m)
+			rawCond = fmt.Sprintf("EXTRACT(YEAR FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d", y, m)
 		}
 	}
 
@@ -89,13 +89,13 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		case "today":
 			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
 		case "week":
-			rawCond = "s.created_at >= (now() - INTERVAL '7 days')"
+			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
 		case "month":
-			rawCond = "s.created_at >= date_trunc('month', now())"
+			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
 		case "prev_month":
-			rawCond = "s.created_at >= date_trunc('month', now() - INTERVAL '1 month') AND s.created_at < date_trunc('month', now())"
+			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (s.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
 		case "year":
-			rawCond = "s.created_at >= date_trunc('year', now())"
+			rawCond = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
 		default: // "all"
 			rawCond = ""
 		}
