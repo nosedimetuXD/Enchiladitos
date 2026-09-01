@@ -86,6 +86,20 @@ export default function SalesHistory() {
 
   useEffect(() => {
     loadData()
+
+    function handleRevalidate() {
+      if (document.visibilityState === 'visible') {
+        loadData()
+      }
+    }
+
+    window.addEventListener('focus', handleRevalidate)
+    document.addEventListener('visibilitychange', handleRevalidate)
+
+    return () => {
+      window.removeEventListener('focus', handleRevalidate)
+      document.removeEventListener('visibilitychange', handleRevalidate)
+    }
   }, [period, startDate, endDate])
 
   function openReceiptModal(sale) {

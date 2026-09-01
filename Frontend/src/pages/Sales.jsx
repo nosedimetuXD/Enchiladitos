@@ -81,11 +81,13 @@ export default function Sales() {
     try {
       const [prodsData, custData] = await Promise.all([
         api.get('/products'),
-        api.get('/customers').catch(() => [])
+        api.get('/customers')
       ])
       const activeProds = Array.isArray(prodsData) ? prodsData : []
       setProducts(activeProds)
-      setCustomersList(Array.isArray(custData) ? custData : [])
+      if (Array.isArray(custData)) {
+        setCustomersList(custData)
+      }
 
       const cats = ['Todos', ...new Set(activeProds.map((p) => p.category || 'Otros').filter(Boolean))]
       setCategories(cats)
@@ -98,6 +100,32 @@ export default function Sales() {
 
   useEffect(() => {
     loadData()
+
+    function handleRevalidate() {
+      if (document.visibilityState === 'visible') {
+        api.get('/products').then((prods) => {
+          if (Array.isArray(prods)) {
+            setProducts(prods)
+            const cats = ['Todos', ...new Set(prods.map((p) => p.category || 'Otros').filter(Boolean))]
+            setCategories(cats)
+          }
+        }).catch(() => {})
+
+        api.get('/customers').then((custs) => {
+          if (Array.isArray(custs)) {
+            setCustomersList(custs)
+          }
+        }).catch(() => {})
+      }
+    }
+
+    window.addEventListener('focus', handleRevalidate)
+    document.addEventListener('visibilitychange', handleRevalidate)
+
+    return () => {
+      window.removeEventListener('focus', handleRevalidate)
+      document.removeEventListener('visibilitychange', handleRevalidate)
+    }
   }, [])
 
   function addToCart(product) {
@@ -215,6 +243,13 @@ export default function Sales() {
     setTransferAmount('0')
     setBankPayments([{ bank: 'Bre-B/Llave', amount: String(cartTotal) }])
     setCheckoutError('')
+
+    // Refrescar clientes de fondo para tener la lista más reciente disponible
+    api.get('/customers').then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setCustomersList(data)
+      }
+    }).catch(() => {})
 
     if (hasOutOfStockItems) {
       setDeductStock(false)

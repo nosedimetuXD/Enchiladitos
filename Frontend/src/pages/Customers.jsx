@@ -91,6 +91,20 @@ export default function Customers() {
 
   useEffect(() => {
     loadData(searchQuery)
+
+    function handleRevalidate() {
+      if (document.visibilityState === 'visible') {
+        loadData(searchQuery)
+      }
+    }
+
+    window.addEventListener('focus', handleRevalidate)
+    document.addEventListener('visibilitychange', handleRevalidate)
+
+    return () => {
+      window.removeEventListener('focus', handleRevalidate)
+      document.removeEventListener('visibilitychange', handleRevalidate)
+    }
   }, [searchQuery])
 
   async function openCustomer360(customer) {
