@@ -7,25 +7,28 @@ import (
 )
 
 type Expense struct {
-	ID             uuid.UUID `json:"id"`
-	Description    string    `json:"description"`
-	Amount         float64   `json:"amount"`
-	Category       string    `json:"category"`
-	PaymentMethod  string    `json:"payment_method"`
-	RegisteredBy   uuid.UUID `json:"registered_by"`
-	RegistererName string    `json:"registerer_name,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             uuid.UUID  `json:"id"`
+	Description    string     `json:"description"`
+	Amount         float64    `json:"amount"`
+	Category       string     `json:"category"`
+	PaymentMethod  string     `json:"payment_method"`
+	RegisteredBy   *uuid.UUID `json:"registered_by,omitempty"`
+	RegistererName string     `json:"registerer_name,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type Income struct {
-	ID             uuid.UUID `json:"id"`
-	Description    string    `json:"description"`
-	Amount         float64   `json:"amount"`
-	Category       string    `json:"category"`
-	PaymentMethod  string    `json:"payment_method"`
-	RegisteredBy   uuid.UUID `json:"registered_by"`
-	RegistererName string    `json:"registerer_name,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             uuid.UUID  `json:"id"`
+	Type           string     `json:"type"` // "sale", "customer_payment", "manual"
+	Description    string     `json:"description"`
+	Amount         float64    `json:"amount"`
+	Category       string     `json:"category"`
+	PaymentMethod  string     `json:"payment_method"`
+	BankDetails    string     `json:"bank_details,omitempty"`
+	CustomerName   string     `json:"customer_name,omitempty"`
+	RegisteredBy   *uuid.UUID `json:"registered_by,omitempty"`
+	RegistererName string     `json:"registerer_name,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type CustomerStat struct {
