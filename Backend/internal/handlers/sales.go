@@ -61,6 +61,11 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 				ALTER TABLE sales DROP CONSTRAINT sales_sold_by_fkey;
 			END IF;
 			ALTER TABLE sales ADD CONSTRAINT sales_sold_by_fkey FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL;
+
+			IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'comandas') THEN
+				ALTER TABLE comandas DROP CONSTRAINT IF EXISTS comandas_sale_id_fkey;
+				ALTER TABLE comandas ADD CONSTRAINT comandas_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE;
+			END IF;
 		END $$;
 	`)
 
@@ -792,12 +797,14 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	_, _ = tx.Exec(ctx, `DELETE FROM comanda_items WHERE comanda_id IN (SELECT id FROM comandas WHERE sale_id = $1)`, id)
+	_, _ = tx.Exec(ctx, `DELETE FROM comandas WHERE sale_id = $1`, id)
 	_, _ = tx.Exec(ctx, `DELETE FROM sale_items WHERE sale_id = $1`, id)
 
 	tag, err := tx.Exec(ctx, `DELETE FROM sales WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando venta: %v", err)
-		http.Error(w, "error eliminando venta", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error eliminando venta: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
