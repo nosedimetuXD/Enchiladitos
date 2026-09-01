@@ -47,6 +47,8 @@ func NewAccountingHandler(db *pgxpool.Pool, hub *events.Hub) *AccountingHandler 
 			registered_by UUID REFERENCES users(id) ON DELETE SET NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		);
+		ALTER TABLE incomes ALTER COLUMN registered_by DROP NOT NULL;
+		ALTER TABLE expenses ALTER COLUMN registered_by DROP NOT NULL;
 	`)
 
 	return &AccountingHandler{DB: db, Hub: hub}
@@ -347,12 +349,14 @@ func (h *AccountingHandler) CreateExpense(w http.ResponseWriter, r *http.Request
 
 	ctx := r.Context()
 	userVal := ctx.Value(custommw.ContextUserID)
-	var registeredBy uuid.UUID
+	var registeredBy *uuid.UUID
 	if userVal != nil {
-		if id, ok := userVal.(uuid.UUID); ok {
-			registeredBy = id
+		if id, ok := userVal.(uuid.UUID); ok && id != uuid.Nil {
+			registeredBy = &id
 		} else if idStr, ok := userVal.(string); ok {
-			registeredBy, _ = uuid.Parse(idStr)
+			if id, err := uuid.Parse(idStr); err == nil && id != uuid.Nil {
+				registeredBy = &id
+			}
 		}
 	}
 
@@ -365,7 +369,7 @@ func (h *AccountingHandler) CreateExpense(w http.ResponseWriter, r *http.Request
 	).Scan(&expID, &createdAt)
 	if err != nil {
 		log.Printf("error creando gasto: %v", err)
-		http.Error(w, "error registrando gasto", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error registrando gasto: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -427,7 +431,7 @@ func (h *AccountingHandler) UpdateExpense(w http.ResponseWriter, r *http.Request
 	)
 	if err != nil {
 		log.Printf("error actualizando gasto: %v", err)
-		http.Error(w, "error actualizando gasto", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error actualizando gasto: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -455,7 +459,7 @@ func (h *AccountingHandler) DeleteExpense(w http.ResponseWriter, r *http.Request
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM expenses WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando gasto: %v", err)
-		http.Error(w, "error eliminando gasto", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error eliminando gasto: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -564,12 +568,14 @@ func (h *AccountingHandler) CreateIncome(w http.ResponseWriter, r *http.Request)
 
 	ctx := r.Context()
 	userVal := ctx.Value(custommw.ContextUserID)
-	var registeredBy uuid.UUID
+	var registeredBy *uuid.UUID
 	if userVal != nil {
-		if id, ok := userVal.(uuid.UUID); ok {
-			registeredBy = id
+		if id, ok := userVal.(uuid.UUID); ok && id != uuid.Nil {
+			registeredBy = &id
 		} else if idStr, ok := userVal.(string); ok {
-			registeredBy, _ = uuid.Parse(idStr)
+			if id, err := uuid.Parse(idStr); err == nil && id != uuid.Nil {
+				registeredBy = &id
+			}
 		}
 	}
 
@@ -582,7 +588,7 @@ func (h *AccountingHandler) CreateIncome(w http.ResponseWriter, r *http.Request)
 	).Scan(&incID, &createdAt)
 	if err != nil {
 		log.Printf("error creando ingreso manual: %v", err)
-		http.Error(w, "error registrando ingreso", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error registrando ingreso: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -644,7 +650,7 @@ func (h *AccountingHandler) UpdateIncome(w http.ResponseWriter, r *http.Request)
 	)
 	if err != nil {
 		log.Printf("error actualizando ingreso: %v", err)
-		http.Error(w, "error actualizando ingreso", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error actualizando ingreso: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -672,7 +678,7 @@ func (h *AccountingHandler) DeleteIncome(w http.ResponseWriter, r *http.Request)
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM incomes WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando ingreso: %v", err)
-		http.Error(w, "error eliminando ingreso", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error eliminando ingreso: %v", err), http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
