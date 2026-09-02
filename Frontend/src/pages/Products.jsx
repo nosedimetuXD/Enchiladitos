@@ -21,7 +21,7 @@ import {
   Sparkles
 } from 'lucide-react'
 
-const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1582293041079-7814c2f12063?w=600&auto=format&fit=crop&q=80'
+const DEFAULT_PRODUCT_IMAGE = '/default-product.png'
 
 export default function Products() {
   const [products, setProducts] = useState([])
@@ -393,6 +393,9 @@ export default function Products() {
                     <img
                       src={prod.image_url || DEFAULT_PRODUCT_IMAGE}
                       alt={prod.name}
+                      onError={(e) => {
+                        e.target.src = DEFAULT_PRODUCT_IMAGE
+                      }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />

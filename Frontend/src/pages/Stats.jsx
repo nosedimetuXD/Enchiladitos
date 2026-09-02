@@ -11,20 +11,63 @@ import {
   Flame,
   CreditCard,
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  Calendar,
+  CalendarRange,
+  CalendarDays,
+  Filter,
+  ArrowRight,
+  Check
 } from 'lucide-react'
+
+const MONTH_NAMES = [
+  { num: 1, name: 'Enero' },
+  { num: 2, name: 'Febrero' },
+  { num: 3, name: 'Marzo' },
+  { num: 4, name: 'Abril' },
+  { num: 5, name: 'Mayo' },
+  { num: 6, name: 'Junio' },
+  { num: 7, name: 'Julio' },
+  { num: 8, name: 'Agosto' },
+  { num: 9, name: 'Septiembre' },
+  { num: 10, name: 'Octubre' },
+  { num: 11, name: 'Noviembre' },
+  { num: 12, name: 'Diciembre' }
+]
+
+const AVAILABLE_YEARS = [2024, 2025, 2026, 2027, 2028]
 
 export default function Stats() {
   const [summary, setSummary] = useState(null)
-  const [period, setPeriod] = useState('month')
+  const [period, setPeriod] = useState('month') // 'today' | 'week' | 'month' | 'prev_month' | 'year' | 'all' | 'custom' | 'month_year'
+  
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const [startDate, setStartDate] = useState(todayStr)
+  const [endDate, setEndDate] = useState(todayStr)
+
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
+
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  async function loadStats(p = period) {
+  async function loadStats(p = period, sDate = startDate, eDate = endDate, y = selectedYear, m = selectedMonth) {
     setLoading(true)
     setPageError('')
     try {
-      const data = await api.get(`/accounting/summary?period=${p}`)
+      let url = `/accounting/summary?period=${p}`
+      if (p === 'custom') {
+        if (!sDate || !eDate) {
+          setLoading(false)
+          return
+        }
+        url = `/accounting/summary?start_date=${sDate}&end_date=${eDate}`
+      } else if (p === 'month_year') {
+        url = `/accounting/summary?year=${y}&month_num=${m}`
+      }
+      const data = await api.get(url)
       setSummary(data)
     } catch (err) {
       setPageError('No se pudieron cargar las estadísticas')
@@ -34,8 +77,23 @@ export default function Stats() {
   }
 
   useEffect(() => {
-    loadStats(period)
+    if (period !== 'custom' && period !== 'month_year') {
+      loadStats(period)
+    } else if (period === 'month_year') {
+      loadStats('month_year', startDate, endDate, selectedYear, selectedMonth)
+    }
   }, [period])
+
+  function handleApplyCustomRange(e) {
+    e?.preventDefault?.()
+    if (!startDate || !endDate) return
+    loadStats('custom', startDate, endDate, selectedYear, selectedMonth)
+  }
+
+  function handleApplyMonthYear(e) {
+    e?.preventDefault?.()
+    loadStats('month_year', startDate, endDate, selectedYear, selectedMonth)
+  }
 
   const mStats = summary?.monthly_stats || {}
   const totalIncome = summary?.total_income || 0
@@ -43,46 +101,194 @@ export default function Stats() {
   const netBalance = summary?.net_balance || 0
   const avgTicket = summary?.average_ticket || (summary?.sales_count > 0 ? totalIncome / summary.sales_count : 0)
 
+  // Etiqueta descriptiva del periodo actual
+  function getPeriodLabel() {
+    if (period === 'today') return 'Hoy'
+    if (period === 'week') return 'Últimos 7 Días'
+    if (period === 'month') return 'Este Mes en Curso'
+    if (period === 'prev_month') return 'Mes Anterior'
+    if (period === 'year') return `Año ${currentYear}`
+    if (period === 'all') return 'Histórico Total'
+    if (period === 'month_year') {
+      const mName = MONTH_NAMES.find((m) => m.num === Number(selectedMonth))?.name || `Mes ${selectedMonth}`
+      return `${mName} ${selectedYear}`
+    }
+    if (period === 'custom') {
+      return `${startDate} al ${endDate}`
+    }
+    return ''
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
-              <BarChart3 className="w-5 h-5" />
-            </span>
-            <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
-              Estadísticas Ejecutivas
-            </h1>
+      <div className="flex flex-col gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+                <BarChart3 className="w-5 h-5" />
+              </span>
+              <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
+                Estadísticas Ejecutivas
+              </h1>
+            </div>
+            <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
+              Rendimiento del negocio, productos más vendidos, clientes frecuentes y canales de cobro.
+            </p>
           </div>
-          <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
-            Rendimiento del negocio, productos más vendidos, clientes destacados y métodos de cobro.
-          </p>
+
+          {/* Badge del Filtro Activo */}
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-red-50 dark:bg-red-950/80 text-red-950 dark:text-red-200 text-xs font-black border border-red-200/70 dark:border-red-900/50">
+              <Calendar className="w-3.5 h-3.5 text-red-600 dark:text-amber-400" />
+              <span>{getPeriodLabel()}</span>
+            </span>
+          </div>
         </div>
 
-        {/* Selector de Periodo */}
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+        {/* Barra de Filtros Principales */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-red-100 dark:border-red-950/60">
           {[
             { id: 'today', label: 'Hoy' },
             { id: 'week', label: '7 Días' },
             { id: 'month', label: 'Este Mes' },
+            { id: 'prev_month', label: 'Mes Anterior' },
             { id: 'year', label: 'Este Año' },
-            { id: 'all', label: 'Histórico Total' }
-          ].map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPeriod(p.id)}
-              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
-                period === p.id
-                  ? 'bg-red-600 text-white shadow-xs'
-                  : 'bg-red-50/70 dark:bg-[#200808] text-red-950/70 dark:text-red-200/70 hover:bg-red-100/70'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+            { id: 'all', label: 'Histórico Total' },
+            { id: 'month_year', label: '📅 Elegir Mes y Año', icon: CalendarDays },
+            { id: 'custom', label: '📆 Rango de Fechas', icon: CalendarRange }
+          ].map((p) => {
+            const Icon = p.icon
+            const isSelected = period === p.id
+            return (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setPeriod(p.id)
+                  if (p.id === 'custom') {
+                    // Cargar si ya hay fechas
+                    loadStats('custom', startDate, endDate, selectedYear, selectedMonth)
+                  } else if (p.id === 'month_year') {
+                    loadStats('month_year', startDate, endDate, selectedYear, selectedMonth)
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-black whitespace-nowrap cursor-pointer transition-all ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xs scale-[1.02]'
+                    : 'bg-red-50/70 dark:bg-[#200808] text-red-950/70 dark:text-red-200/70 hover:bg-red-100/70'
+                }`}
+              >
+                {Icon && <Icon className="w-3.5 h-3.5" />}
+                <span>{p.label}</span>
+              </button>
+            )
+          })}
         </div>
+
+        {/* Panel Interactivo: Selector de Mes y Año Específico */}
+        {period === 'month_year' && (
+          <form
+            onSubmit={handleApplyMonthYear}
+            className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 animate-in fade-in duration-200"
+          >
+            <div className="flex items-center gap-2 text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">
+              <CalendarDays className="w-4 h-4 text-red-600 dark:text-amber-400" />
+              <span>Consultar Mes Específico:</span>
+            </div>
+
+            {/* Selector de Mes */}
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-bold text-red-900/60 dark:text-red-300/60">Mes:</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => {
+                  const m = Number(e.target.value)
+                  setSelectedMonth(m)
+                  loadStats('month_year', startDate, endDate, selectedYear, m)
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1a0505] border border-red-200/70 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer shadow-2xs focus:outline-none"
+              >
+                {MONTH_NAMES.map((m) => (
+                  <option key={m.num} value={m.num}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selector de Año */}
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-bold text-red-900/60 dark:text-red-300/60">Año:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  const y = Number(e.target.value)
+                  setSelectedYear(y)
+                  loadStats('month_year', startDate, endDate, y, selectedMonth)
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1a0505] border border-red-200/70 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer shadow-2xs focus:outline-none"
+              >
+                {AVAILABLE_YEARS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs cursor-pointer shadow-xs ml-auto transition-all"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Ver Estadísticas del Mes</span>
+            </button>
+          </form>
+        )}
+
+        {/* Panel Interactivo: Selector de Rango de Fechas */}
+        {period === 'custom' && (
+          <form
+            onSubmit={handleApplyCustomRange}
+            className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 animate-in fade-in duration-200"
+          >
+            <div className="flex items-center gap-2 text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">
+              <CalendarRange className="w-4 h-4 text-red-600 dark:text-amber-400" />
+              <span>Rango Personalizado:</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-bold text-red-900/60 dark:text-red-300/60">Desde:</label>
+              <input
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1a0505] border border-red-200/70 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer shadow-2xs focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-bold text-red-900/60 dark:text-red-300/60">Hasta:</label>
+              <input
+                type="date"
+                required
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#1a0505] border border-red-200/70 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] cursor-pointer shadow-2xs focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs cursor-pointer shadow-xs ml-auto transition-all"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filtrar Fechas</span>
+            </button>
+          </form>
+        )}
       </div>
 
       {loading ? (
