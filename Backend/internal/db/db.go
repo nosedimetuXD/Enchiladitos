@@ -10,6 +10,9 @@ import (
 
 func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		dbURL = os.Getenv("DATABASE_URL")
+	}
 	config, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		return nil, err
