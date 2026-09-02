@@ -156,8 +156,8 @@ export default function Stats() {
             { id: 'prev_month', label: 'Mes Anterior' },
             { id: 'year', label: 'Este Año' },
             { id: 'all', label: 'Histórico Total' },
-            { id: 'month_year', label: '📅 Elegir Mes y Año', icon: CalendarDays },
-            { id: 'custom', label: '📆 Rango de Fechas', icon: CalendarRange }
+            { id: 'month_year', label: 'Elegir Mes y Año', icon: CalendarDays },
+            { id: 'custom', label: 'Rango de Fechas', icon: CalendarRange }
           ].map((p) => {
             const Icon = p.icon
             const isSelected = period === p.id
