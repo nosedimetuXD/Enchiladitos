@@ -19,6 +19,8 @@
 .env.local
 *.env
 seed.sql
+*.sql.bak
+supabase_backup_*.sql
 
 # Directorio de dependencias vendor (si lo llegas a usar)
 vendor/
