@@ -85,6 +85,37 @@ func parseAccountingTime(dateStr string, explicitTime *time.Time) time.Time {
 	return time.Now()
 }
 
+func getTimeCondition(col string, period, startDate, endDate, yearParam, monthParam string) string {
+	if startDate != "" && endDate != "" {
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (%s AT TIME ZONE 'America/Bogota')::date <= '%s'::date", col, startDate, col, endDate)
+	}
+	if yearParam != "" {
+		y, _ := strconv.Atoi(yearParam)
+		if monthParam != "" {
+			m, _ := strconv.Atoi(monthParam)
+			if y > 2000 && m >= 1 && m <= 12 {
+				return fmt.Sprintf("EXTRACT(YEAR FROM (%s AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (%s AT TIME ZONE 'America/Bogota')) = %d", col, y, col, m)
+			}
+		} else if y > 2000 {
+			return fmt.Sprintf("EXTRACT(YEAR FROM (%s AT TIME ZONE 'America/Bogota')) = %d", col, y)
+		}
+	}
+	switch period {
+	case "today":
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date", col)
+	case "week":
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')", col)
+	case "month":
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')", col)
+	case "prev_month":
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (%s AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')", col, col)
+	case "year":
+		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')", col)
+	default:
+		return "1=1"
+	}
+}
+
 // GET /accounting/summary?period=today|week|month|all&start_date=...&end_date=...&year=...&month_num=...
 func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
@@ -93,43 +124,8 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	var timeCondition string
-	var timeCondSales string
-
-	if startDate != "" && endDate != "" {
-		timeCondition = fmt.Sprintf("(created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-		timeCondSales = fmt.Sprintf("(s.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (s.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-	} else if yearParam != "" && monthParam != "" {
-		y, _ := strconv.Atoi(yearParam)
-		m, _ := strconv.Atoi(monthParam)
-		if y > 2000 && m >= 1 && m <= 12 {
-			timeCondition = fmt.Sprintf("EXTRACT(YEAR FROM (created_at AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (created_at AT TIME ZONE 'America/Bogota')) = %d", y, m)
-			timeCondSales = fmt.Sprintf("EXTRACT(YEAR FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d", y, m)
-		}
-	}
-
-	if timeCondition == "" {
-		switch period {
-		case "today":
-			timeCondition = "(created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-		case "week":
-			timeCondition = "(created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-		case "month":
-			timeCondition = "(created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "prev_month":
-			timeCondition = "(created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (s.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "year":
-			timeCondition = "(created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-		default: // "all"
-			timeCondition = "1=1"
-			timeCondSales = "1=1"
-		}
-	}
+	timeCondition := getTimeCondition("created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
 
 	summary := models.AccountingSummary{
 		IncomeByPaymentMethod: make(map[string]float64),
@@ -266,33 +262,16 @@ func (h *AccountingHandler) ListExpenses(w http.ResponseWriter, r *http.Request)
 	period := r.URL.Query().Get("period")
 	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
 	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
+	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	var timeCondition string
-
-	if startDate != "" && endDate != "" {
-		timeCondition = fmt.Sprintf("WHERE (e.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (e.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-	} else {
-		switch period {
-		case "today":
-			timeCondition = "WHERE (e.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-		case "week":
-			timeCondition = "WHERE (e.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-		case "month":
-			timeCondition = "WHERE (e.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "prev_month":
-			timeCondition = "WHERE (e.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (e.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "year":
-			timeCondition = "WHERE (e.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-		default:
-			timeCondition = ""
-		}
-	}
+	timeCondition := getTimeCondition("e.created_at", period, startDate, endDate, yearParam, monthParam)
 
 	query := fmt.Sprintf(`SELECT e.id, e.description, e.amount, e.category, e.payment_method, e.registered_by, 
 		        COALESCE(u.username, 'Dueño'), e.created_at 
 		 FROM expenses e
 		 LEFT JOIN users u ON e.registered_by = u.id
-		 %s
+		 WHERE %s
 		 ORDER BY e.created_at DESC`, timeCondition)
 
 	rows, err := h.DB.Query(r.Context(), query)
@@ -495,41 +474,12 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 	period := r.URL.Query().Get("period")
 	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
 	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
+	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	var timeCondSales, timeCondAbonos, timeCondIncomes string
-
-	if startDate != "" && endDate != "" {
-		timeCondSales = fmt.Sprintf("(s.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (s.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-		timeCondAbonos = fmt.Sprintf("(cp.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (cp.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-		timeCondIncomes = fmt.Sprintf("(i.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (i.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
-	} else {
-		switch period {
-		case "today":
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date"
-		case "week":
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')"
-		case "month":
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "prev_month":
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (s.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (cp.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (i.created_at AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')"
-		case "year":
-			timeCondSales = "(s.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-			timeCondAbonos = "(cp.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-			timeCondIncomes = "(i.created_at AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')"
-		default:
-			timeCondSales = "1=1"
-			timeCondAbonos = "1=1"
-			timeCondIncomes = "1=1"
-		}
-	}
+	timeCondSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondAbonos := getTimeCondition("cp.created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondIncomes := getTimeCondition("i.created_at", period, startDate, endDate, yearParam, monthParam)
 
 	query := fmt.Sprintf(`
 		SELECT id, type, description, amount, category, payment_method, bank_details, customer_name, registered_by, registerer_name, created_at
