@@ -46,7 +46,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var passwordHash string
 	err := h.DB.QueryRow(r.Context(),
 		`SELECT id, username, role, COALESCE(avatar_url, ''), password_hash, created_at
-		 FROM users WHERE username = $1`, req.Username,
+		 FROM users WHERE LOWER(username) = LOWER($1)`, req.Username,
 	).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &passwordHash, &user.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
