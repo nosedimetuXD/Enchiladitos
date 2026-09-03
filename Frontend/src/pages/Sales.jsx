@@ -27,7 +27,9 @@ import {
   Boxes,
   Sparkles,
   Receipt,
-  BadgeDollarSign
+  BadgeDollarSign,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 
@@ -55,6 +57,7 @@ export default function Sales() {
 
   // Carrito de compras
   const [cartItems, setCartItems] = useState([])
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
 
   // Modal de cobro & Modalidad de Pago
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
@@ -191,6 +194,10 @@ export default function Sales() {
   const cartTotal = useMemo(() => {
     return Math.max(0, cartSubtotal - discountCalculated.amount)
   }, [cartSubtotal, discountCalculated])
+
+  const totalCartCount = useMemo(() => {
+    return cartItems.reduce((acc, it) => acc + it.quantity, 0)
+  }, [cartItems])
 
   // Verificación estricta de stock disponible
   const hasOutOfStockItems = useMemo(() => {
@@ -461,9 +468,9 @@ export default function Sales() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-6rem)]">
+    <div className="relative flex flex-col lg:grid lg:grid-cols-3 gap-6 h-[calc(100vh-6rem)] pb-16 lg:pb-0">
       {/* Columna Izquierda: Catálogo de Productos (2/3) */}
-      <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
+      <div className="lg:col-span-2 flex-1 flex flex-col gap-4 overflow-hidden h-full">
         {/* Header & Filtros */}
         <div className="bg-white dark:bg-[#1c0707] p-4 rounded-3xl border border-red-200/70 dark:border-red-950/60 flex flex-col sm:flex-row gap-3 items-center justify-between shadow-xs">
           <div className="relative flex-1 w-full">
@@ -595,8 +602,56 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* Columna Derecha: Carrito de Compras & Descuentos (1/3) */}
-      <div className="flex flex-col bg-white dark:bg-[#1c0707] rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs overflow-hidden">
+      {/* BACKDROP MÓVIL CUANDO EL CARRITO ESTÁ EXPANDIDO */}
+      {isMobileCartOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-40 transition-opacity animate-in fade-in"
+          onClick={() => setIsMobileCartOpen(false)}
+        />
+      )}
+
+      {/* BARRA FLOTANTE FIJA INFERIOR EN MÓVIL (CUANDO EL DRAWER ESTÁ MINIMIZADO) */}
+      <div className="lg:hidden fixed bottom-3 left-3 right-3 z-30 bg-[#1c0707] border border-red-900/60 text-white rounded-3xl p-3 shadow-2xl flex items-center justify-between">
+        <button
+          onClick={() => setIsMobileCartOpen(true)}
+          className="flex items-center gap-3 flex-1 text-left cursor-pointer focus:outline-none"
+        >
+          <div className="relative p-2.5 bg-gradient-to-r from-red-600 to-amber-600 rounded-2xl text-white shadow-xs">
+            <ShoppingBag className="w-5 h-5" />
+            {totalCartCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full border border-red-900">
+                {totalCartCount}
+              </span>
+            )}
+          </div>
+          <div>
+            <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
+              <span>{cartItems.length > 0 ? `Orden (${cartItems.length} tipos)` : 'Ver Orden'}</span>
+              <ChevronUp className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-base font-black text-white block leading-tight">
+              ${cartTotal.toLocaleString('es-CO')}
+            </span>
+          </div>
+        </button>
+
+        {cartItems.length > 0 && (
+          <button
+            onClick={openCheckout}
+            className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white text-xs font-black rounded-2xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Cobrar</span>
+          </button>
+        )}
+      </div>
+
+      {/* Columna Derecha: Carrito de Compras & Descuentos (1/3) / DRAWER EN MÓVIL */}
+      <div
+        className={`fixed lg:static bottom-0 left-0 right-0 z-50 lg:z-auto w-full flex flex-col bg-white dark:bg-[#1c0707] rounded-t-3xl lg:rounded-3xl border-t lg:border border-red-200/80 dark:border-red-950/60 shadow-2xl lg:shadow-xs overflow-hidden max-h-[85vh] lg:max-h-full transition-transform duration-300 ease-out ${
+          isMobileCartOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'
+        }`}
+      >
         {/* Header Carrito */}
         <div className="p-4 border-b border-red-200/60 dark:border-red-950/60 flex items-center justify-between bg-red-50/30 dark:bg-[#200808]">
           <div className="flex items-center gap-2">
@@ -606,19 +661,30 @@ export default function Sales() {
             <div>
               <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Orden en Curso</h3>
               <span className="text-[10px] font-bold text-red-900/60 dark:text-red-300/60">
-                {cartItems.reduce((acc, it) => acc + it.quantity, 0)} artículos
+                {totalCartCount} artículos
               </span>
             </div>
           </div>
 
-          {cartItems.length > 0 && (
+          <div className="flex items-center gap-2">
+            {cartItems.length > 0 && (
+              <button
+                onClick={clearCart}
+                className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase tracking-wider cursor-pointer"
+              >
+                Vaciar
+              </button>
+            )}
+
+            {/* Botón Minimizar en Móvil */}
             <button
-              onClick={clearCart}
-              className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase tracking-wider cursor-pointer"
+              onClick={() => setIsMobileCartOpen(false)}
+              className="lg:hidden p-1.5 text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950/60 rounded-xl transition-colors cursor-pointer"
+              title="Minimizar orden"
             >
-              Vaciar
+              <ChevronDown className="w-5 h-5" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Lista de Items en Carrito */}
