@@ -905,7 +905,7 @@ export default function Sales() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-black text-amber-900 dark:text-amber-300">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>⚠️ Recordatorio de Saldo Pendiente</span>
+                    <span>Recordatorio de Saldo Pendiente</span>
                   </div>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-600 text-white shadow-xs">
                     Debe ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')}
@@ -925,7 +925,7 @@ export default function Sales() {
                   </div>
                 ) : (
                   <div className="pt-1.5 border-t border-amber-200/80 dark:border-amber-900/60 text-[10px] text-amber-900/80 dark:text-amber-300/80">
-                    💡 Esta venta será pagada completa, pero el saldo anterior de ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')} seguirá pendiente.
+                    Esta venta será pagada completa, pero el saldo anterior de ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')} seguirá pendiente.
                   </div>
                 )}
               </div>
