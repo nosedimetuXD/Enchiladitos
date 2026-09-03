@@ -48,6 +48,11 @@ export default function Sales() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
 
+  const selectedCustomerObj = useMemo(() => {
+    if (!selectedCustomerId) return null
+    return customersList.find((c) => c.id === selectedCustomerId) || null
+  }, [selectedCustomerId, customersList])
+
   // Carrito de compras
   const [cartItems, setCartItems] = useState([])
 
@@ -893,6 +898,38 @@ export default function Sales() {
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
               />
             </div>
+
+            {/* Recordatorio de Deuda / Saldo Pendiente del Cliente Seleccionado */}
+            {selectedCustomerObj && Number(selectedCustomerObj.total_debt) > 0 && (
+              <div className="mt-2.5 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-red-50 dark:from-[#2a0e0e] dark:to-[#220707] border-2 border-amber-400 dark:border-amber-600/80 text-amber-950 dark:text-amber-200 text-xs font-bold space-y-2 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-black text-amber-900 dark:text-amber-300">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>⚠️ Recordatorio de Saldo Pendiente</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-600 text-white shadow-xs">
+                    Debe ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')}
+                  </span>
+                </div>
+
+                <p className="text-[11px] leading-relaxed text-amber-950/90 dark:text-amber-200/90">
+                  El cliente <strong>{selectedCustomerObj.first_name} {selectedCustomerObj.last_name || ''}</strong> tiene un saldo pendiente de <strong className="text-red-600 dark:text-red-400 text-xs">${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')}</strong>.
+                </p>
+
+                {effectivePendingAmount > 0 ? (
+                  <div className="pt-2 border-t border-amber-200/80 dark:border-amber-900/60 flex justify-between items-center text-[11px]">
+                    <span className="text-amber-900 dark:text-amber-300 font-extrabold">Deuda acumulada total con esta venta:</span>
+                    <span className="font-black text-xs text-red-600 dark:text-red-400">
+                      ${(Number(selectedCustomerObj.total_debt) + effectivePendingAmount).toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="pt-1.5 border-t border-amber-200/80 dark:border-amber-900/60 text-[10px] text-amber-900/80 dark:text-amber-300/80">
+                    💡 Esta venta será pagada completa, pero el saldo anterior de ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')} seguirá pendiente.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Método de Pago (Solo si hay dinero que cobrar hoy) */}
