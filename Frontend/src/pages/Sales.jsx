@@ -31,7 +31,8 @@ import {
   ChevronUp,
   ChevronDown,
   X,
-  Phone
+  Phone,
+  Gift
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 
@@ -90,6 +91,7 @@ export default function Sales() {
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
   const [showDiscountInput, setShowDiscountInput] = useState(false)
+  const [redeemStampReward, setRedeemStampReward] = useState(false)
 
   // Modal de Recibo Oficial / Éxito
   const [lastOrder, setLastOrder] = useState(null)
@@ -202,6 +204,27 @@ export default function Sales() {
     setCustomerPhone('')
     setCustomerQuery('')
     setIsCustomerDropdownOpen(false)
+    if (redeemStampReward) {
+      setRedeemStampReward(false)
+      setDiscountValue('')
+      setDiscountReason('')
+      setShowDiscountInput(false)
+    }
+  }
+
+  function handleApplyStampReward() {
+    setRedeemStampReward(true)
+    setDiscountType('percent')
+    setDiscountValue('50')
+    setDiscountReason('Recompensa 7 Sellos (50% OFF)')
+    setShowDiscountInput(true)
+  }
+
+  function handleCancelStampReward() {
+    setRedeemStampReward(false)
+    setDiscountValue('')
+    setDiscountReason('')
+    setShowDiscountInput(false)
   }
 
   function handleUseCustomCustomerName(name) {
@@ -210,6 +233,12 @@ export default function Sales() {
     setCustomerPhone('')
     setCustomerQuery(name.trim())
     setIsCustomerDropdownOpen(false)
+    if (redeemStampReward) {
+      setRedeemStampReward(false)
+      setDiscountValue('')
+      setDiscountReason('')
+      setShowDiscountInput(false)
+    }
   }
 
   function addToCart(product) {
@@ -252,6 +281,7 @@ export default function Sales() {
     setDiscountValue('')
     setDiscountReason('')
     setShowDiscountInput(false)
+    setRedeemStampReward(false)
   }
 
   // Cálculos del Carrito
@@ -486,6 +516,7 @@ export default function Sales() {
         discount_percent: discountCalculated.percent,
         discount_amount: discountCalculated.amount,
         discount_reason: discountReason.trim(),
+        redeem_stamp_reward: redeemStampReward,
         paid_amount: effectivePaidAmount,
         pending_amount: effectivePendingAmount,
         deduct_stock: true,
@@ -1145,6 +1176,89 @@ export default function Sales() {
                   <div className="pt-1.5 border-t border-amber-200/80 dark:border-amber-900/60 text-[10px] text-amber-900/80 dark:text-amber-300/80">
                     Esta venta será pagada completa, pero el saldo anterior de ${Number(selectedCustomerObj.total_debt).toLocaleString('es-CO')} seguirá pendiente.
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Sistema de Sellos de Fidelidad del Cliente Seleccionado */}
+            {selectedCustomerObj && (
+              <div className="mt-2.5 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-[#2a0e0e] dark:to-[#220707] border border-amber-300 dark:border-amber-900/70 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-amber-600 dark:text-amber-400 fill-current" />
+                    <span className="text-xs font-black text-amber-950 dark:text-amber-200">
+                      Programa de Sellos
+                    </span>
+                  </div>
+
+                  {selectedCustomerObj.stamps_info?.has_reward_unlocked ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-600 text-white shadow-xs">
+                      {selectedCustomerObj.stamps_info.available_rewards > 1
+                        ? `${selectedCustomerObj.stamps_info.available_rewards} Premios Listos (50% OFF)`
+                        : '50% OFF Disponible'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-900/80 dark:text-amber-300/80">
+                      {selectedCustomerObj.stamps_info?.current_cycle_stamps || 0}/7 sellos
+                    </span>
+                  )}
+                </div>
+
+                {/* Casillas de Sellos */}
+                <div className="grid grid-cols-7 gap-1.5">
+                  {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                    const hasReward = (selectedCustomerObj.stamps_info?.available_rewards || 0) > 0
+                    const cycleStamps = selectedCustomerObj.stamps_info?.current_cycle_stamps || 0
+                    const isStamped = (hasReward && cycleStamps === 0) ? true : cycleStamps >= num
+
+                    return (
+                      <div
+                        key={num}
+                        className={`h-7 rounded-xl flex items-center justify-center font-black text-[10px] transition-all border ${
+                          isStamped
+                            ? 'bg-gradient-to-br from-amber-500 to-red-600 text-white border-amber-400 shadow-xs'
+                            : 'bg-white/80 dark:bg-[#140505] text-red-950/40 dark:text-red-300/40 border-dashed border-amber-200 dark:border-red-950'
+                        }`}
+                        title={isStamped ? `Sello #${num} acumulado` : `Sello #${num}: $10.000 COP`}
+                      >
+                        {isStamped ? <Flame className="w-3.5 h-3.5 fill-current" /> : num}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Botón de Canje de 50% de Descuento o Progreso */}
+                {selectedCustomerObj.stamps_info?.has_reward_unlocked ? (
+                  <div className="pt-1">
+                    {!redeemStampReward ? (
+                      <button
+                        type="button"
+                        onClick={handleApplyStampReward}
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+                      >
+                        <Gift className="w-4 h-4" />
+                        <span>Canjear Recompensa 50% de Descuento (7 Sellos)</span>
+                      </button>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-black text-emerald-800 dark:text-emerald-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Recompensa 50% OFF Aplicada (-${discountCalculated.amount.toLocaleString('es-CO')})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelStampReward}
+                          className="text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                        >
+                          Cancelar Canje
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-amber-900/70 dark:text-amber-300/70 font-medium text-center">
+                    Faltan ${Number(selectedCustomerObj.stamps_info?.amount_to_next_stamp || 10000).toLocaleString('es-CO')} para el sello #{((selectedCustomerObj.stamps_info?.current_cycle_stamps || 0) + 1)} ($10.000 COP por sello)
+                  </p>
                 )}
               </div>
             )}

@@ -28,7 +28,10 @@ import {
   CreditCard,
   Building2,
   CheckCircle2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Flame,
+  Gift,
+  Award
 } from 'lucide-react'
 import { exportCustomersToExcel, exportCustomersToCSV } from '../utils/csvExport'
 
@@ -321,6 +324,7 @@ export default function Customers() {
       const debt = c.total_debt || 0
       if (debtFilter === 'with_debt' && debt <= 0) return false
       if (debtFilter === 'clean' && debt > 0) return false
+      if (debtFilter === 'with_reward' && !c.stamps_info?.has_reward_unlocked) return false
       return true
     })
   }, [customers, debtFilter])
@@ -328,6 +332,7 @@ export default function Customers() {
   // KPIs Generales
   const totalCartera = useMemo(() => customers.reduce((acc, c) => acc + (c.total_debt || 0), 0), [customers])
   const clientesConDeudaCount = useMemo(() => customers.filter((c) => (c.total_debt || 0) > 0).length, [customers])
+  const clientesConPremioCount = useMemo(() => customers.filter((c) => c.stamps_info?.has_reward_unlocked).length, [customers])
 
   // Exportacion de Clientes (Excel & CSV)
   function handleExportExcel() {
@@ -352,7 +357,7 @@ export default function Customers() {
             </h1>
           </div>
           <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
-            Control de cuentas por cobrar, abonos en orden FIFO, historial de compras y contacto por WhatsApp.
+            Control de cuentas por cobrar, abonos en orden FIFO, historial de compras, sellos de fidelidad y contacto por WhatsApp.
           </p>
         </div>
 
@@ -387,8 +392,8 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* KPI Cards de Cartera */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* KPI Cards de Cartera y Fidelidad */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/70 dark:border-red-950/60 shadow-xs flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-red-50 dark:bg-red-950 text-red-600 dark:text-amber-400">
             <Users className="w-6 h-6" />
@@ -409,7 +414,7 @@ export default function Customers() {
           </div>
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-900/70 dark:text-rose-300/70">
-              Total Cartera (Deudas Activas)
+              Total Cartera (Deudas)
             </span>
             <h3 className="text-xl font-black text-rose-600 dark:text-rose-400">
               ${totalCartera.toLocaleString('es-CO')}
@@ -423,10 +428,24 @@ export default function Customers() {
           </div>
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-900/60 dark:text-amber-300/60">
-              Clientes con Deuda Pendiente
+              Con Deuda Activa
             </span>
             <h3 className="text-xl font-black text-amber-600 dark:text-amber-400">
               {clientesConDeudaCount}
+            </h3>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-emerald-200/70 dark:border-emerald-950/60 shadow-xs flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+            <Gift className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900/60 dark:text-emerald-300/60">
+              Premios 50% Listos
+            </span>
+            <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+              {clientesConPremioCount}
             </h3>
           </div>
         </div>
@@ -445,12 +464,13 @@ export default function Customers() {
           />
         </div>
 
-        {/* Filtros de Deuda */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+        {/* Filtros de Deuda y Fidelidad */}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
           {[
             { id: 'all', label: 'Todos' },
             { id: 'with_debt', label: 'Con Deuda' },
-            { id: 'clean', label: 'Al Día' }
+            { id: 'clean', label: 'Al Día' },
+            { id: 'with_reward', label: `Premio 50% (${clientesConPremioCount})` }
           ].map((f) => (
             <button
               key={f.id}
@@ -553,12 +573,70 @@ export default function Customers() {
                       </div>
                     )}
                   </div>
+
+                  {/* Tarjeta de Sellos de Fidelidad */}
+                  <div className="mt-3.5 p-3 rounded-2xl bg-amber-50/50 dark:bg-[#200808]/70 border border-amber-200/80 dark:border-amber-950/80">
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span className="text-[11px] font-black uppercase text-amber-950 dark:text-amber-200">
+                          {c.stamps_info?.has_reward_unlocked
+                            ? (c.stamps_info?.current_cycle_stamps > 0 ? `Premio Listo (+${c.stamps_info.current_cycle_stamps}/7)` : '7/7 Sellos')
+                            : `Sellos: ${c.stamps_info?.current_cycle_stamps || 0}/7`}
+                        </span>
+                      </div>
+
+                      {c.stamps_info?.has_reward_unlocked ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-600 text-white shadow-xs">
+                          {c.stamps_info.available_rewards > 1
+                            ? `${c.stamps_info.available_rewards} Premios (50% OFF)`
+                            : '50% OFF Listo'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-amber-900/60 dark:text-amber-300/60">
+                          Faltan ${Number(c.stamps_info?.amount_to_next_stamp || 10000).toLocaleString('es-CO')}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 7 Casillas de Sellos Visuales */}
+                    <div className="grid grid-cols-7 gap-1.5 py-0.5">
+                      {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                        const hasReward = (c.stamps_info?.available_rewards || 0) > 0
+                        const cycleStamps = c.stamps_info?.current_cycle_stamps || 0
+                        const isStamped = (hasReward && cycleStamps === 0) ? true : cycleStamps >= num
+
+                        return (
+                          <div
+                            key={num}
+                            className={`h-7 rounded-xl flex items-center justify-center font-black text-[10px] transition-all border ${
+                              isStamped
+                                ? 'bg-gradient-to-br from-amber-500 to-red-600 text-white border-amber-400 shadow-xs'
+                                : 'bg-white/80 dark:bg-[#140505] text-red-950/40 dark:text-red-300/40 border-dashed border-amber-200 dark:border-red-950'
+                            }`}
+                            title={isStamped ? `Sello #${num} obtenido` : `Sello #${num}: $10.000 COP pagados`}
+                          >
+                            {isStamped ? (
+                              <Flame className="w-3.5 h-3.5 fill-current" />
+                            ) : (
+                              <span>{num}</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-amber-900/70 dark:text-amber-300/70 font-medium pt-1 border-t border-amber-200/50 dark:border-amber-950/50">
+                      <span>Pagado elegible: ${Number(c.stamps_info?.total_paid_eligible || 0).toLocaleString('es-CO')}</span>
+                      <span>Premio: 50% OFF</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Botón Ver Estado de Cuenta / Ficha 360 */}
                 <div className="pt-3.5 mt-3 border-t border-red-100 dark:border-red-950 flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase text-gray-500">
-                    Ficha & Crédito
+                    Ficha & Fidelidad
                   </span>
 
                   <button
@@ -607,6 +685,32 @@ export default function Customers() {
               </div>
             </div>
 
+            {/* Banner Resumen de Sellos en Ficha 360 */}
+            <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-[#200808] border border-amber-200 dark:border-amber-950 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 shrink-0">
+                  <Flame className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-amber-950 dark:text-amber-200">
+                    Fidelidad: {accountSummary?.stamps_info?.available_rewards > 0 ? `${accountSummary.stamps_info.available_rewards} Premio(s) de 50% OFF Disponible(s)` : `${accountSummary?.stamps_info?.current_cycle_stamps || 0}/7 Sellos`}
+                  </p>
+                  <p className="text-[10px] text-amber-900/70 dark:text-amber-300/70">
+                    {accountSummary?.stamps_info?.has_reward_unlocked
+                      ? 'Descuento del 50% listo para redimir en el POS de Ventas'
+                      : `Faltan $${Number(accountSummary?.stamps_info?.amount_to_next_stamp || 10000).toLocaleString('es-CO')} para el próximo sello`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('stamps')}
+                className="px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-600 hover:to-red-700 text-white cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                Ver Tarjeta
+              </button>
+            </div>
+
             {/* Acciones Rápidas */}
             <div className="flex items-center gap-2">
               <button
@@ -628,15 +732,16 @@ export default function Customers() {
             </div>
 
             {/* Pestañas de Vista */}
-            <div className="flex items-center gap-1 border-b border-red-100 dark:border-red-950 pb-2">
+            <div className="flex items-center gap-1 border-b border-red-100 dark:border-red-950 pb-2 overflow-x-auto">
               {[
-                { id: 'account', label: `Facturas con Deuda (${(accountSummary?.pending_sales || []).length})` },
-                { id: 'payments', label: `Historial de Abonos (${(accountSummary?.payment_history || []).length})` }
+                { id: 'account', label: `Facturas Deuda (${(accountSummary?.pending_sales || []).length})` },
+                { id: 'payments', label: `Abonos (${(accountSummary?.payment_history || []).length})` },
+                { id: 'stamps', label: `Sellos & Premios (${accountSummary?.stamps_info?.available_rewards > 0 ? '¡50% OFF!' : `${accountSummary?.stamps_info?.current_cycle_stamps || 0}/7`})` }
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'bg-red-600 text-white'
                       : 'bg-red-50 dark:bg-[#200808] text-red-950/70 dark:text-red-200/70'
@@ -739,6 +844,86 @@ export default function Customers() {
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {/* Contenido Pestaña 3: Sellos & Premios */}
+            {activeTab === 'stamps' && (
+              <div className="space-y-4 py-1">
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-amber-500/10 via-red-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-900/60 text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <Award className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    <h4 className="text-base font-black text-[#450a0a] dark:text-[#fef2f2]">
+                      Tarjeta de Sellos Enchiladitos
+                    </h4>
+                  </div>
+                  <p className="text-xs text-red-950/70 dark:text-red-200/70 max-w-md mx-auto">
+                    Cada $10.000 COP pagados en compras a partir del 07/09/2026 equivalen a 1 sello. Al acumular 7 sellos, desbloquea 50% de descuento.
+                  </p>
+
+                  {/* 7 Casillas Grandes */}
+                  <div className="grid grid-cols-7 gap-2 max-w-md mx-auto py-2">
+                    {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+                      const hasReward = (accountSummary?.stamps_info?.available_rewards || 0) > 0
+                      const cycleStamps = accountSummary?.stamps_info?.current_cycle_stamps || 0
+                      const isStamped = (hasReward && cycleStamps === 0) ? true : cycleStamps >= num
+
+                      return (
+                        <div
+                          key={num}
+                          className={`h-11 rounded-2xl flex flex-col items-center justify-center font-black transition-all border ${
+                            isStamped
+                              ? 'bg-gradient-to-br from-amber-500 to-red-600 text-white border-amber-400 shadow-md scale-105'
+                              : 'bg-white/90 dark:bg-[#140505] text-red-950/40 dark:text-red-300/40 border-dashed border-amber-300 dark:border-red-950'
+                          }`}
+                        >
+                          {isStamped ? (
+                            <Flame className="w-5 h-5 fill-current" />
+                          ) : (
+                            <span className="text-xs">{num}</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {accountSummary?.stamps_info?.has_reward_unlocked && (
+                    <div className="p-3 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 font-black text-xs flex items-center justify-center gap-2">
+                      <Gift className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        ¡{accountSummary.stamps_info.available_rewards} Recompensa(s) de 50% OFF listas para canjear en el POS!
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Métricas de Fidelidad */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div className="p-3 rounded-2xl bg-red-50/60 dark:bg-[#200808] border border-red-200">
+                    <span className="text-[9px] font-black uppercase text-gray-500">Pagado desde 07/09</span>
+                    <p className="font-black text-[#450a0a] dark:text-[#fef2f2] mt-0.5">
+                      ${Number(accountSummary?.stamps_info?.total_paid_eligible || 0).toLocaleString('es-CO')}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-amber-50/60 dark:bg-[#200808] border border-amber-200">
+                    <span className="text-[9px] font-black uppercase text-amber-700">Sellos Ganados</span>
+                    <p className="font-black text-amber-600 mt-0.5">
+                      {accountSummary?.stamps_info?.total_stamps_earned || 0}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-[#200808] border border-emerald-200">
+                    <span className="text-[9px] font-black uppercase text-emerald-700">Premios Ganados</span>
+                    <p className="font-black text-emerald-600 mt-0.5">
+                      {accountSummary?.stamps_info?.total_rewards_earned || 0}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-purple-50/60 dark:bg-[#200808] border border-purple-200">
+                    <span className="text-[9px] font-black uppercase text-purple-700">Premios Canjeados</span>
+                    <p className="font-black text-purple-600 mt-0.5">
+                      {accountSummary?.stamps_info?.rewards_redeemed || 0}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -23,7 +23,9 @@ import {
   BadgeAlert,
   Wallet,
   Coins,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Flame,
+  Gift
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 import { exportSalesToExcel, exportSalesToCSV } from '../utils/csvExport'
@@ -492,8 +494,14 @@ export default function SalesHistory() {
                       </td>
 
                       {/* Cliente con tooltip y truncate */}
-                      <td className="p-4 font-black text-[#450a0a] dark:text-[#fef2f2] max-w-[140px] truncate" title={s.customer_name}>
-                        {s.customer_name}
+                      <td className="p-4 font-black text-[#450a0a] dark:text-[#fef2f2] max-w-[140px]" title={s.customer_name}>
+                        <div className="truncate">{s.customer_name}</div>
+                        {s.stamp_reward_redeemed && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-gradient-to-r from-amber-500 to-red-500 text-white shadow-2xs">
+                            <Flame className="w-2.5 h-2.5 fill-current" />
+                            <span>Premio 50%</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Productos con tooltip y truncate */}
@@ -763,6 +771,12 @@ export default function SalesHistory() {
                   <span>Subtotal:</span>
                   <span>${(selectedSale.subtotal || selectedSale.total).toLocaleString('es-CO')}</span>
                 </div>
+                {selectedSale.stamp_reward_redeemed && (
+                  <div className="flex justify-between text-amber-600 font-bold">
+                    <span>Recompensa Fidelidad:</span>
+                    <span>50% OFF (7 Sellos Canjeados)</span>
+                  </div>
+                )}
                 {selectedSale.discount_amount > 0 && (
                   <div className="flex justify-between text-red-600 font-bold">
                     <span>Descuento ({selectedSale.discount_reason || 'Promo'}):</span>

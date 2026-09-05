@@ -42,6 +42,7 @@ func NewSaleHandler(db *pgxpool.Pool, hub *events.Hub) *SaleHandler {
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2) DEFAULT 0`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS pending_amount NUMERIC(10,2) DEFAULT 0`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'paid'`)
+	_, _ = db.Exec(ctx, `ALTER TABLE sales ADD COLUMN IF NOT EXISTS stamp_reward_redeemed BOOLEAN DEFAULT FALSE`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales ALTER COLUMN sold_by DROP NOT NULL`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check`)
 	_, _ = db.Exec(ctx, `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_status_check`)
@@ -120,10 +121,10 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	query := fmt.Sprintf(`SELECT s.id, COALESCE(s.sold_by, '00000000-0000-0000-0000-000000000000'::uuid), 
 		        COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Dueño'), s.customer_id, COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0),
+		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0), 
 		        COALESCE(s.discount_amount, 0), COALESCE(s.discount_reason, ''), s.total, 
-		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'),
-		        COALESCE(s.deducted_stock, true), s.created_at,
+		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'), 
+		        COALESCE(s.deducted_stock, true), COALESCE(s.stamp_reward_redeemed, false), s.created_at, 
 		        COALESCE(
 		          (SELECT json_agg(json_build_object(
 		             'product_id', si.product_id,
@@ -154,7 +155,7 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 			&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails,
 			&s.Subtotal, &s.DiscountPercent, &s.DiscountAmount, &s.DiscountReason,
 			&s.Total, &s.PaidAmount, &s.PendingAmount, &s.PaymentStatus,
-			&s.DeductedStock, &s.CreatedAt, &itemsJSON); err != nil {
+			&s.DeductedStock, &s.StampRewardRedeemed, &s.CreatedAt, &itemsJSON); err != nil {
 			log.Printf("error leyendo ventas: %v", err)
 			http.Error(w, "error leyendo ventas", http.StatusInternalServerError)
 			return
@@ -186,10 +187,10 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		`SELECT s.id, COALESCE(s.sold_by, '00000000-0000-0000-0000-000000000000'::uuid), 
 		        COALESCE(u.username, 'Dueño'), s.customer_id, COALESCE(s.customer_name, 'Cliente General'), 
 		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0),
+		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0), 
 		        COALESCE(s.discount_amount, 0), COALESCE(s.discount_reason, ''), s.total, 
-		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'),
-		        COALESCE(s.deducted_stock, true), s.created_at 
+		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'), 
+		        COALESCE(s.deducted_stock, true), COALESCE(s.stamp_reward_redeemed, false), s.created_at 
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
 		 WHERE s.id = $1`, id,
@@ -197,7 +198,7 @@ func (h *SaleHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&s.PaymentMethod, &s.CashAmount, &s.TransferAmount, &s.BankDetails,
 		&s.Subtotal, &s.DiscountPercent, &s.DiscountAmount, &s.DiscountReason,
 		&s.Total, &s.PaidAmount, &s.PendingAmount, &s.PaymentStatus,
-		&s.DeductedStock, &s.CreatedAt)
+		&s.DeductedStock, &s.StampRewardRedeemed, &s.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "venta no encontrada", http.StatusNotFound)
@@ -251,10 +252,11 @@ type saleRequest struct {
 	DiscountPercent float64           `json:"discount_percent"`
 	DiscountAmount  float64           `json:"discount_amount"`
 	DiscountReason  string            `json:"discount_reason"`
-	PaidAmount      *float64          `json:"paid_amount"`
-	DeductStock     *bool             `json:"deduct_stock"`
-	CustomDate      *string           `json:"custom_date"`
-	Items           []saleItemRequest `json:"items"`
+	PaidAmount         *float64          `json:"paid_amount"`
+	DeductStock        *bool             `json:"deduct_stock"`
+	RedeemStampReward  bool              `json:"redeem_stamp_reward"`
+	CustomDate         *string           `json:"custom_date"`
+	Items              []saleItemRequest `json:"items"`
 }
 
 func parseSaleTime(req saleRequest) time.Time {
@@ -393,6 +395,44 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	var stampRewardRedeemed bool
+	discountReason := strings.TrimSpace(req.DiscountReason)
+
+	if req.RedeemStampReward {
+		if customerID == nil || *customerID == uuid.Nil {
+			http.Error(w, "Se requiere seleccionar un cliente registrado para canjear la recompensa de sellos", http.StatusBadRequest)
+			return
+		}
+
+		var totalPaidEligible float64
+		var rewardsRedeemed int
+		err := tx.QueryRow(ctx,
+			`SELECT COALESCE((SELECT SUM(s.paid_amount) FROM sales s WHERE s.customer_id = $1 AND (s.created_at AT TIME ZONE 'America/Bogota')::date >= '2026-09-07'::date), 0),
+			        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.customer_id = $1 AND s.stamp_reward_redeemed = TRUE), 0)`,
+			*customerID,
+		).Scan(&totalPaidEligible, &rewardsRedeemed)
+		if err != nil {
+			log.Printf("error verificando sellos del cliente: %v", err)
+			http.Error(w, "error verificando sellos del cliente", http.StatusInternalServerError)
+			return
+		}
+
+		totalStamps := int(math.Floor(totalPaidEligible / 10000.0))
+		totalRewards := totalStamps / 7
+		availableRewards := totalRewards - rewardsRedeemed
+		if availableRewards <= 0 {
+			http.Error(w, "El cliente no cuenta con recompensas de sellos disponibles para canjear", http.StatusBadRequest)
+			return
+		}
+
+		stampRewardRedeemed = true
+		req.DiscountPercent = 50.0
+		req.DiscountAmount = (subtotal * 50.0) / 100.0
+		if discountReason == "" {
+			discountReason = "Recompensa 7 Sellos (50% OFF)"
+		}
+	}
+
 	discountPercent := req.DiscountPercent
 	discountAmount := req.DiscountAmount
 	if discountPercent > 0 && discountAmount == 0 {
@@ -459,12 +499,12 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(ctx,
 		`INSERT INTO sales (sold_by, sold_by_name, customer_id, customer_name, payment_method, cash_amount, transfer_amount, 
 		                    bank_details, subtotal, discount_percent, discount_amount, discount_reason, 
-		                    total, paid_amount, pending_amount, payment_status, deducted_stock, created_at) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
+		                    total, paid_amount, pending_amount, payment_status, deducted_stock, stamp_reward_redeemed, created_at) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
 		 RETURNING id, created_at`,
 		soldBy, soldByName, customerID, customerName, paymentMethod, cashAmount, transferAmount,
 		strings.TrimSpace(req.BankDetails), subtotal, discountPercent, discountAmount,
-		strings.TrimSpace(req.DiscountReason), total, paidAmount, pendingAmount, paymentStatus, deductStock, saleTime,
+		discountReason, total, paidAmount, pendingAmount, paymentStatus, deductStock, stampRewardRedeemed, saleTime,
 	).Scan(&saleID, &createdAt)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)
@@ -492,16 +532,17 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if h.Hub != nil {
 		h.Hub.Publish("sale_created", map[string]interface{}{
-			"id":             saleID,
-			"customer_id":    req.CustomerID,
-			"customer_name":  customerName,
-			"payment_method": paymentMethod,
-			"subtotal":       subtotal,
-			"total":          total,
-			"paid_amount":    paidAmount,
-			"pending_amount": pendingAmount,
-			"payment_status": paymentStatus,
-			"created_at":     createdAt,
+			"id":                    saleID,
+			"customer_id":           req.CustomerID,
+			"customer_name":         customerName,
+			"payment_method":        paymentMethod,
+			"subtotal":              subtotal,
+			"total":                 total,
+			"paid_amount":           paidAmount,
+			"pending_amount":        pendingAmount,
+			"payment_status":        paymentStatus,
+			"stamp_reward_redeemed": stampRewardRedeemed,
+			"created_at":            createdAt,
 		})
 		h.Hub.Publish("inventory_updated", map[string]interface{}{"action": "sale_created"})
 	}
@@ -509,16 +550,17 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":             saleID,
-		"customer_id":    req.CustomerID,
-		"customer_name":  customerName,
-		"payment_method": paymentMethod,
-		"subtotal":       subtotal,
-		"total":          total,
-		"paid_amount":    paidAmount,
-		"pending_amount": pendingAmount,
-		"payment_status": paymentStatus,
-		"created_at":     createdAt,
+		"id":                    saleID,
+		"customer_id":           req.CustomerID,
+		"customer_name":         customerName,
+		"payment_method":        paymentMethod,
+		"subtotal":              subtotal,
+		"total":                 total,
+		"paid_amount":           paidAmount,
+		"pending_amount":        pendingAmount,
+		"payment_status":        paymentStatus,
+		"stamp_reward_redeemed": stampRewardRedeemed,
+		"created_at":            createdAt,
 	})
 }
 
@@ -558,7 +600,8 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Obtener datos actuales de la venta
 	var oldDeductedStock bool
-	err = tx.QueryRow(ctx, `SELECT COALESCE(deducted_stock, true) FROM sales WHERE id = $1`, id).Scan(&oldDeductedStock)
+	var oldStampRewardRedeemed bool
+	err = tx.QueryRow(ctx, `SELECT COALESCE(deducted_stock, true), COALESCE(stamp_reward_redeemed, false) FROM sales WHERE id = $1`, id).Scan(&oldDeductedStock, &oldStampRewardRedeemed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "venta no encontrada", http.StatusNotFound)
 		return
@@ -703,17 +746,19 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Actualizar registro principal
+	stampRewardRedeemed := oldStampRewardRedeemed || req.RedeemStampReward
+
 	_, err = tx.Exec(ctx,
 		`UPDATE sales 
 		 SET customer_id = $1, customer_name = $2, payment_method = $3, cash_amount = $4, transfer_amount = $5,
 		     bank_details = $6, subtotal = $7, discount_percent = $8, discount_amount = $9, discount_reason = $10,
 		     total = $11, paid_amount = $12, pending_amount = $13, payment_status = $14,
-		     deducted_stock = $15, created_at = $16
-		 WHERE id = $17`,
+		     deducted_stock = $15, stamp_reward_redeemed = $16, created_at = $17
+		 WHERE id = $18`,
 		customerID, customerName, paymentMethod, cashAmount, transferAmount,
 		strings.TrimSpace(req.BankDetails), subtotal, discountPercent, discountAmount,
 		strings.TrimSpace(req.DiscountReason), total, paidAmount, pendingAmount, paymentStatus,
-		deductStock, saleTime, id)
+		deductStock, stampRewardRedeemed, saleTime, id)
 
 	if err != nil {
 		log.Printf("error actualizando venta: %v", err)

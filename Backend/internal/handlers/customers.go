@@ -60,6 +60,40 @@ func NewCustomerHandler(db *pgxpool.Pool, hub *events.Hub) *CustomerHandler {
 	return &CustomerHandler{DB: db, Hub: hub}
 }
 
+func CalculateStampsInfo(totalPaidEligible float64, rewardsRedeemed int) models.CustomerStampsInfo {
+	totalStamps := int(math.Floor(totalPaidEligible / 10000.0))
+	totalRewards := totalStamps / 7
+	availableRewards := totalRewards - rewardsRedeemed
+	if availableRewards < 0 {
+		availableRewards = 0
+	}
+
+	currentCycleStamps := totalStamps % 7
+	progressPercent := (float64(currentCycleStamps) / 7.0) * 100.0
+
+	amountPaidInCurrentStamp := math.Mod(totalPaidEligible, 10000.0)
+	amountToNextStamp := 10000.0 - amountPaidInCurrentStamp
+	if amountToNextStamp == 10000.0 && totalPaidEligible > 0 && amountPaidInCurrentStamp == 0 {
+		amountToNextStamp = 10000.0
+	}
+
+	nextRewardTarget := float64(totalRewards+1) * 70000.0
+	amountToNextReward := math.Max(0, nextRewardTarget-totalPaidEligible)
+
+	return models.CustomerStampsInfo{
+		TotalPaidEligible:  totalPaidEligible,
+		TotalStampsEarned:  totalStamps,
+		TotalRewardsEarned: totalRewards,
+		RewardsRedeemed:    rewardsRedeemed,
+		AvailableRewards:   availableRewards,
+		HasRewardUnlocked:  availableRewards > 0,
+		CurrentCycleStamps: currentCycleStamps,
+		ProgressPercent:    math.Round(progressPercent*10) / 10,
+		AmountToNextStamp:  amountToNextStamp,
+		AmountToNextReward: amountToNextReward,
+	}
+}
+
 // GET /customers
 func (h *CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
@@ -68,7 +102,9 @@ func (h *CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	baseQuery := `SELECT c.id, c.first_name, COALESCE(c.last_name, ''), COALESCE(c.phone, ''), COALESCE(c.email, ''), COALESCE(c.notes, ''), c.created_at, c.updated_at,
-	                     COALESCE((SELECT SUM(s.pending_amount) FROM sales s WHERE s.customer_id = c.id), 0) AS total_debt
+	                     COALESCE((SELECT SUM(s.pending_amount) FROM sales s WHERE s.customer_id = c.id), 0) AS total_debt,
+	                     COALESCE((SELECT SUM(s.paid_amount) FROM sales s WHERE s.customer_id = c.id AND (s.created_at AT TIME ZONE 'America/Bogota')::date >= '2026-09-07'::date), 0) AS total_paid_eligible,
+	                     COALESCE((SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id AND s.stamp_reward_redeemed = TRUE), 0) AS rewards_redeemed
 	              FROM customers c`
 
 	if search != "" {
@@ -91,11 +127,15 @@ func (h *CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 	var customers []models.Customer
 	for rows.Next() {
 		var c models.Customer
-		if err := rows.Scan(&c.ID, &c.FirstName, &c.LastName, &c.Phone, &c.Email, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.TotalDebt); err != nil {
+		var totalPaidEligible float64
+		var rewardsRedeemed int
+		if err := rows.Scan(&c.ID, &c.FirstName, &c.LastName, &c.Phone, &c.Email, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.TotalDebt, &totalPaidEligible, &rewardsRedeemed); err != nil {
 			log.Printf("error leyendo cliente: %v", err)
 			http.Error(w, "error leyendo cliente", http.StatusInternalServerError)
 			return
 		}
+		stampsInfo := CalculateStampsInfo(totalPaidEligible, rewardsRedeemed)
+		c.StampsInfo = &stampsInfo
 		customers = append(customers, c)
 	}
 
@@ -116,12 +156,16 @@ func (h *CustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var c models.Customer
+	var totalPaidEligible float64
+	var rewardsRedeemed int
 	err = h.DB.QueryRow(r.Context(),
 		`SELECT c.id, c.first_name, COALESCE(c.last_name, ''), COALESCE(c.phone, ''), COALESCE(c.email, ''), COALESCE(c.notes, ''), c.created_at, c.updated_at,
-		        COALESCE((SELECT SUM(s.pending_amount) FROM sales s WHERE s.customer_id = c.id), 0) AS total_debt
+		        COALESCE((SELECT SUM(s.pending_amount) FROM sales s WHERE s.customer_id = c.id), 0) AS total_debt,
+		        COALESCE((SELECT SUM(s.paid_amount) FROM sales s WHERE s.customer_id = c.id AND (s.created_at AT TIME ZONE 'America/Bogota')::date >= '2026-09-07'::date), 0) AS total_paid_eligible,
+		        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id AND s.stamp_reward_redeemed = TRUE), 0) AS rewards_redeemed
 		 FROM customers c
 		 WHERE c.id = $1`, id,
-	).Scan(&c.ID, &c.FirstName, &c.LastName, &c.Phone, &c.Email, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.TotalDebt)
+	).Scan(&c.ID, &c.FirstName, &c.LastName, &c.Phone, &c.Email, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.TotalDebt, &totalPaidEligible, &rewardsRedeemed)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "cliente no encontrado", http.StatusNotFound)
@@ -132,6 +176,9 @@ func (h *CustomerHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
+
+	stampsInfo := CalculateStampsInfo(totalPaidEligible, rewardsRedeemed)
+	c.StampsInfo = &stampsInfo
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(c)
@@ -173,6 +220,9 @@ func (h *CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
+
+	initStamps := CalculateStampsInfo(0, 0)
+	c.StampsInfo = &initStamps
 
 	if h.Hub != nil {
 		h.Hub.Publish("customer_created", c)
@@ -222,6 +272,19 @@ func (h *CustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
+
+	var totalDebt, totalPaidEligible float64
+	var rewardsRedeemed int
+	_ = h.DB.QueryRow(r.Context(),
+		`SELECT COALESCE((SELECT SUM(s.pending_amount) FROM sales s WHERE s.customer_id = $1), 0),
+		        COALESCE((SELECT SUM(s.paid_amount) FROM sales s WHERE s.customer_id = $1 AND (s.created_at AT TIME ZONE 'America/Bogota')::date >= '2026-09-07'::date), 0),
+		        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.customer_id = $1 AND s.stamp_reward_redeemed = TRUE), 0)`,
+		id,
+	).Scan(&totalDebt, &totalPaidEligible, &rewardsRedeemed)
+
+	c.TotalDebt = totalDebt
+	upStamps := CalculateStampsInfo(totalPaidEligible, rewardsRedeemed)
+	c.StampsInfo = &upStamps
 
 	if h.Hub != nil {
 		h.Hub.Publish("customer_updated", c)
@@ -360,11 +423,23 @@ func (h *CustomerHandler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	c.TotalDebt = currentDebt
 
+	var totalPaidEligible float64
+	var rewardsRedeemed int
+	_ = h.DB.QueryRow(ctx,
+		`SELECT COALESCE((SELECT SUM(s.paid_amount) FROM sales s WHERE s.customer_id = $1 AND (s.created_at AT TIME ZONE 'America/Bogota')::date >= '2026-09-07'::date), 0),
+		        COALESCE((SELECT COUNT(*) FROM sales s WHERE s.customer_id = $1 AND s.stamp_reward_redeemed = TRUE), 0)`,
+		id,
+	).Scan(&totalPaidEligible, &rewardsRedeemed)
+
+	stampsInfo := CalculateStampsInfo(totalPaidEligible, rewardsRedeemed)
+	c.StampsInfo = &stampsInfo
+
 	summary := models.CustomerAccountSummary{
 		Customer:       c,
 		TotalSales:     totalSales,
 		TotalPaid:      totalPaid,
 		CurrentDebt:    currentDebt,
+		StampsInfo:     stampsInfo,
 		PendingSales:   pendingSales,
 		PaymentHistory: paymentHistory,
 	}

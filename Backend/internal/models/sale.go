@@ -30,8 +30,9 @@ type Sale struct {
 	Total           float64    `json:"total"`
 	PaidAmount      float64    `json:"paid_amount"`
 	PendingAmount   float64    `json:"pending_amount"`
-	PaymentStatus   string     `json:"payment_status"` // 'paid', 'pending', 'partial'
-	DeductedStock   bool       `json:"deducted_stock"`
-	CreatedAt       time.Time  `json:"created_at"`
-	Items           []SaleItem `json:"items,omitempty"`
+	PaymentStatus       string     `json:"payment_status"` // 'paid', 'pending', 'partial'
+	DeductedStock       bool       `json:"deducted_stock"`
+	StampRewardRedeemed bool       `json:"stamp_reward_redeemed"`
+	CreatedAt           time.Time  `json:"created_at"`
+	Items               []SaleItem `json:"items,omitempty"`
 }
