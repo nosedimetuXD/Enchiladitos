@@ -21,8 +21,10 @@ import {
   ArrowUpCircle,
   ShoppingBag,
   Coins,
-  Layers
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react'
+import { exportAccountingToExcel, exportAccountingToCSV } from '../utils/csvExport'
 
 const EXPENSE_CATEGORIES = [
   { id: 'materia_prima', label: 'Materia Prima / Productos' },
@@ -235,27 +237,13 @@ export default function Accounting() {
     }
   }
 
-  // Exportar a CSV (Inspirado en Twenty)
-  function exportAccountingCSV() {
-    let csv = 'Tipo,Origen,Fecha,Descripcion,Monto,Categoria,MetodoPago\n'
-    expenses.forEach((e) => {
-      const d = new Date(e.created_at).toLocaleString('es-CO').replace(',', '')
-      csv += `"GASTO","Gasto Directo","${d}","${e.description}",${e.amount},"${e.category}","${e.payment_method}"\n`
-    })
-    incomes.forEach((i) => {
-      const d = new Date(i.created_at).toLocaleString('es-CO').replace(',', '')
-      const origin = i.type === 'sale' ? 'Venta POS' : i.type === 'customer_payment' ? 'Abono Deuda' : 'Ingreso Extra'
-      csv += `"INGRESO","${origin}","${d}","${i.description}",${i.amount},"${i.category}","${i.payment_method}"\n`
-    })
+  // Exportacion de Contabilidad (Excel & CSV)
+  function handleExportExcel() {
+    exportAccountingToExcel(expenses, incomes, `Contabilidad_Enchiladitos_${period}_${new Date().toISOString().slice(0, 10)}.xls`)
+  }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `Contabilidad_Enchiladitos_${period}_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  function handleExportCSV() {
+    exportAccountingToCSV(expenses, incomes, `Contabilidad_Enchiladitos_${period}_${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   const totalGastosCalc = useMemo(() => expenses.reduce((acc, e) => acc + (e.amount || 0), 0), [expenses])
@@ -291,8 +279,17 @@ export default function Accounting() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={exportAccountingCSV}
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-emerald-700 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer shadow-xs"
+            title="Descargar en formato Excel (.xls)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar Excel</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+            title="Descargar en formato CSV"
           >
             <Download className="w-4 h-4" />
             <span>Exportar CSV</span>
@@ -594,7 +591,13 @@ export default function Accounting() {
                         {/* Descripción / Concepto */}
                         <td className="p-4 font-black text-[#450a0a] dark:text-[#fef2f2]">
                           <div>
-                            <p className="truncate max-w-[240px]" title={inc.description}>{inc.description}</p>
+                            <p className="truncate max-w-[240px]" title={inc.description}>
+                              {inc.type === 'sale'
+                                ? (inc.customer_name || (inc.description || '').replace(/^Venta POS - /i, '') || 'Cliente General')
+                                : (inc.type === 'customer_payment'
+                                  ? ((inc.description || '').replace(/^(Abono a Deuda|Abono Deuda) - /i, '') || inc.customer_name || 'Cliente')
+                                  : (inc.description || ''))}
+                            </p>
                             {inc.category && inc.category !== 'Venta POS' && inc.category !== 'Abono Deuda' && (
                               <span className="text-[10px] font-bold text-gray-500 uppercase">
                                 {inc.category}

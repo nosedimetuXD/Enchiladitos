@@ -488,11 +488,7 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 			SELECT 
 				s.id,
 				'sale'::text as type,
-				CASE 
-					WHEN TRIM(s.customer_name) != '' AND LOWER(s.customer_name) != 'cliente general' 
-					THEN 'Venta POS - ' || s.customer_name 
-					ELSE 'Venta POS - Cliente General' 
-				END as description,
+				COALESCE(NULLIF(TRIM(s.customer_name), ''), 'Cliente General') as description,
 				s.paid_amount as amount,
 				'Venta POS'::text as category,
 				s.payment_method,
@@ -510,7 +506,7 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 			SELECT 
 				cp.id,
 				'customer_payment'::text as type,
-				'Abono a Deuda - ' || COALESCE(NULLIF(TRIM(c.first_name || ' ' || COALESCE(c.last_name, '')), ''), 'Cliente') as description,
+				COALESCE(NULLIF(TRIM(c.first_name || ' ' || COALESCE(c.last_name, '')), ''), 'Cliente') as description,
 				cp.amount,
 				'Abono Deuda'::text as category,
 				cp.payment_method,

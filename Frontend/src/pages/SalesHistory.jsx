@@ -22,9 +22,11 @@ import {
   Package,
   BadgeAlert,
   Wallet,
-  Coins
+  Coins,
+  FileSpreadsheet
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
+import { exportSalesToExcel, exportSalesToCSV } from '../utils/csvExport'
 
 const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
 
@@ -264,27 +266,13 @@ export default function SalesHistory() {
   const totalPorCobrar = useMemo(() => filteredSales.reduce((acc, s) => acc + (s.pending_amount || 0), 0), [filteredSales])
   const ticketPromedio = useMemo(() => (filteredSales.length > 0 ? totalFacturado / filteredSales.length : 0), [filteredSales, totalFacturado])
 
-  // Exportar a CSV
-  function exportToCSV() {
-    if (filteredSales.length === 0) return
-    let csv = 'ID,Fecha,Cliente,Productos,Subtotal,Descuento,Total,Cobrado,Pendiente,Estado,Metodo,Detalles\n'
-    filteredSales.forEach((s) => {
-      const itemsStr = (s.items || []).map((it) => `${it.quantity}x ${it.product_name}`).join('; ')
-      const dateStr = new Date(s.created_at).toLocaleString('es-CO').replace(',', '')
-      const paid = s.paid_amount !== undefined ? s.paid_amount : s.total
-      const pending = s.pending_amount || 0
-      const status = pending === 0 ? 'PAGADO' : (paid > 0 ? 'PARCIAL' : 'PENDIENTE')
-      csv += `"${s.id}","${dateStr}","${s.customer_name}","${itemsStr}",${s.subtotal || s.total},${s.discount_amount || 0},${s.total},${paid},${pending},"${status}","${s.payment_method}","${s.bank_details || ''}"\n`
-    })
+  // Exportacion de Ventas (Excel & CSV)
+  function handleExportExcel() {
+    exportSalesToExcel(filteredSales, `Ventas_Enchiladitos_${new Date().toISOString().slice(0, 10)}.xls`)
+  }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `Ventas_Enchiladitos_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  function handleExportCSV() {
+    exportSalesToCSV(filteredSales, `Ventas_Enchiladitos_${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
@@ -301,17 +289,28 @@ export default function SalesHistory() {
             </h1>
           </div>
           <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
-            Control de cobros reales, saldos pendientes a crédito, reimpresión oficial y exportación CSV.
+            Control de cobros reales, saldos pendientes a crédito, reimpresión oficial y exportación.
           </p>
         </div>
 
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
-        >
-          <Download className="w-4 h-4" />
-          <span>Exportar a CSV</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-emerald-700 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer shadow-xs"
+            title="Descargar ventas en formato Excel (.xls)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar Excel</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+            title="Descargar ventas en formato CSV"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards de Conciliación de Caja */}

@@ -27,8 +27,10 @@ import {
   BadgeAlert,
   CreditCard,
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  FileSpreadsheet
 } from 'lucide-react'
+import { exportCustomersToExcel, exportCustomersToCSV } from '../utils/csvExport'
 
 const COMMON_BANKS = ['Bre-B/Llave', 'Nequi', 'Daviplata', 'Bancolombia', 'Nu', 'Davivienda', 'BBVA', 'Banco de Bogotá']
 
@@ -327,22 +329,13 @@ export default function Customers() {
   const totalCartera = useMemo(() => customers.reduce((acc, c) => acc + (c.total_debt || 0), 0), [customers])
   const clientesConDeudaCount = useMemo(() => customers.filter((c) => (c.total_debt || 0) > 0).length, [customers])
 
-  // Exportar a CSV
-  function exportCustomersCSV() {
-    if (customers.length === 0) return
-    let csv = 'ID,Nombre,Apellido,Telefono,Email,DeudaActual,Notas\n'
-    customers.forEach((c) => {
-      csv += `"${c.id}","${c.first_name}","${c.last_name || ''}","${c.phone || ''}","${c.email || ''}",${c.total_debt || 0},"${(c.notes || '').replace(/"/g, '""')}"\n`
-    })
+  // Exportacion de Clientes (Excel & CSV)
+  function handleExportExcel() {
+    exportCustomersToExcel(customers, `Clientes_Enchiladitos_${new Date().toISOString().slice(0, 10)}.xls`)
+  }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `Clientes_Enchiladitos_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  function handleExportCSV() {
+    exportCustomersToCSV(customers, `Clientes_Enchiladitos_${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
@@ -365,8 +358,17 @@ export default function Customers() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={exportCustomersCSV}
-            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-emerald-700 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer shadow-xs"
+            title="Descargar clientes en formato Excel (.xls)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Exportar Excel</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+            title="Descargar clientes en formato CSV"
           >
             <Download className="w-4 h-4" />
             <span>Exportar CSV</span>
