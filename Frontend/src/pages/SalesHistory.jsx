@@ -293,22 +293,23 @@ export default function SalesHistory() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="inline-flex items-center p-1 bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 rounded-2xl shadow-xs">
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-emerald-700 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-xl transition-all cursor-pointer whitespace-nowrap"
             title="Descargar ventas en formato Excel (.xls)"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Exportar Excel</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Excel</span>
           </button>
+          <div className="h-3.5 w-px bg-red-200 dark:bg-red-950 mx-0.5" />
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-[#200808] border border-red-200 dark:border-red-950 text-red-700 dark:text-amber-400 font-bold text-xs hover:bg-red-50 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-700 dark:text-amber-400 hover:bg-red-50 dark:hover:bg-[#2e0b0b] rounded-xl transition-all cursor-pointer whitespace-nowrap"
             title="Descargar ventas en formato CSV"
           >
-            <Download className="w-4 h-4" />
-            <span>Exportar CSV</span>
+            <Download className="w-3.5 h-3.5 text-red-700 dark:text-amber-400" />
+            <span>CSV</span>
           </button>
         </div>
       </div>
