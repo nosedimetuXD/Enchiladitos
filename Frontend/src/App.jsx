@@ -8,6 +8,7 @@ import Customers from './pages/Customers'
 import Accounting from './pages/Accounting'
 import Stats from './pages/Stats'
 import Profile from './pages/Profile'
+import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }) {
@@ -29,7 +30,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        {/* Punto de Venta es la página principal */}
+        {/* Punto de Venta es la pagina principal */}
         <Route index element={<Sales />} />
         <Route path="sales/history" element={<SalesHistory />} />
         <Route path="customers" element={<Customers />} />
@@ -37,10 +38,10 @@ function AppRoutes() {
         <Route path="accounting" element={<Accounting />} />
         <Route path="stats" element={<Stats />} />
         <Route path="profile" element={<Profile />} />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
+
+      {/* Pagina 404 */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
