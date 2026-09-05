@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
 import confetti from 'canvas-confetti'
@@ -29,7 +29,9 @@ import {
   Receipt,
   BadgeDollarSign,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  X,
+  Phone
 } from 'lucide-react'
 import { downloadReceiptPDF, shareReceiptPDFToWhatsApp, printReceiptPDF } from '../utils/pdfReceipt'
 
@@ -44,16 +46,29 @@ export default function Sales() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Clientes
+  // Clientes y Autocompletado estilo Google
   const [customersList, setCustomersList] = useState([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false)
+  const customerDropdownRef = useRef(null)
 
   const selectedCustomerObj = useMemo(() => {
     if (!selectedCustomerId) return null
     return customersList.find((c) => c.id === selectedCustomerId) || null
   }, [selectedCustomerId, customersList])
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase()
+    if (!q) return customersList.slice(0, 8)
+    return customersList.filter((c) => {
+      const fullName = `${c.first_name} ${c.last_name || ''}`.toLowerCase()
+      const phone = (c.phone || '').toLowerCase()
+      return fullName.includes(q) || phone.includes(q)
+    }).slice(0, 10)
+  }, [customerQuery, customersList])
 
   // Carrito de compras
   const [cartItems, setCartItems] = useState([])
@@ -67,9 +82,6 @@ export default function Sales() {
   const [cashAmount, setCashAmount] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
   const [bankPayments, setBankPayments] = useState([{ bank: 'Bre-B/Llave', amount: '' }])
-  const [deductStock, setDeductStock] = useState(true)
-  const [isPastDate, setIsPastDate] = useState(false)
-  const [customSaleDate, setCustomSaleDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
 
@@ -136,10 +148,77 @@ export default function Sales() {
     }
   }, [])
 
+  // Listener para cerrar el menú desplegable al hacer clic por fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target)) {
+        setIsCustomerDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  // Función para resaltar coincidencias de texto
+  function highlightMatches(text, query) {
+    if (!text) return ''
+    if (!query || !query.trim()) return text
+    const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(`(${escaped})`, 'gi')
+    const parts = text.split(regex)
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <strong key={i} className="font-black text-red-600 dark:text-red-400">
+          {part}
+        </strong>
+      ) : (
+        part
+      )
+    )
+  }
+
+  function handleSelectCustomer(customer) {
+    if (!customer) {
+      setSelectedCustomerId('')
+      setCustomerName('')
+      setCustomerPhone('')
+      setCustomerQuery('')
+      setIsCustomerDropdownOpen(false)
+      return
+    }
+    setSelectedCustomerId(customer.id)
+    const fullName = `${customer.first_name} ${customer.last_name || ''}`.trim()
+    setCustomerName(fullName)
+    setCustomerPhone(customer.phone || '')
+    setCustomerQuery(fullName)
+    setIsCustomerDropdownOpen(false)
+  }
+
+  function handleClearCustomer() {
+    setSelectedCustomerId('')
+    setCustomerName('')
+    setCustomerPhone('')
+    setCustomerQuery('')
+    setIsCustomerDropdownOpen(false)
+  }
+
+  function handleUseCustomCustomerName(name) {
+    setSelectedCustomerId('')
+    setCustomerName(name.trim())
+    setCustomerPhone('')
+    setCustomerQuery(name.trim())
+    setIsCustomerDropdownOpen(false)
+  }
+
   function addToCart(product) {
+    const currentStock = product.stock ?? 0
+    if (currentStock <= 0) return
     setCartItems((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
+        if (existing.quantity >= currentStock) return prev
         return prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         )
@@ -153,7 +232,9 @@ export default function Sales() {
       prev
         .map((item) => {
           if (item.product.id === productId) {
+            const maxStock = item.product.stock ?? 0
             const nextQty = item.quantity + delta
+            if (delta > 0 && nextQty > maxStock) return item
             return nextQty > 0 ? { ...item, quantity: nextQty } : null
           }
           return item
@@ -245,9 +326,15 @@ export default function Sales() {
 
   function openCheckout() {
     if (cartItems.length === 0) return
+    if (hasOutOfStockItems) {
+      setCheckoutError(`No se puede cobrar: Los productos (${outOfStockNames}) no tienen suficiente stock disponible.`)
+      return
+    }
     setCustomerName('')
     setCustomerPhone('')
     setSelectedCustomerId('')
+    setCustomerQuery('')
+    setIsCustomerDropdownOpen(false)
     setSaleType('total')
     setPartialPaidAmount('')
     setPaymentMethod('efectivo')
@@ -263,17 +350,6 @@ export default function Sales() {
       }
     }).catch(() => {})
 
-    if (hasOutOfStockItems) {
-      setDeductStock(false)
-      setIsPastDate(true)
-    } else {
-      setDeductStock(true)
-      setIsPastDate(false)
-    }
-
-    const now = new Date()
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
-    setCustomSaleDate(now.toISOString().slice(0, 16))
     setIsCheckoutOpen(true)
   }
 
@@ -287,7 +363,6 @@ export default function Sales() {
     } else if (method === 'transferencia') {
       setCashAmount('0')
       setTransferAmount(String(targetAmount))
-      setBankPayments([{ bank: 'Bre-B/Llave', amount: String(targetAmount) }])
     } else if (method === 'mixto') {
       const half = Math.round(targetAmount / 2)
       setCashAmount(String(half))
@@ -360,9 +435,9 @@ export default function Sales() {
     setCheckoutError('')
 
     try {
-      if (hasOutOfStockItems && deductStock) {
+      if (hasOutOfStockItems) {
         throw new Error(
-          `Los productos (${outOfStockNames}) no tienen suficiente stock disponible. No puedes descontar inventario de productos agotados. Desmarca la opción de descontar stock para registrarla como Venta Pasada.`
+          `Los productos (${outOfStockNames}) no tienen suficiente stock disponible. No se permite realizar ventas sin existencias suficientes.`
         )
       }
 
@@ -413,8 +488,7 @@ export default function Sales() {
         discount_reason: discountReason.trim(),
         paid_amount: effectivePaidAmount,
         pending_amount: effectivePendingAmount,
-        deduct_stock: deductStock,
-        custom_date: isPastDate ? customSaleDate : undefined,
+        deduct_stock: true,
         items: cartItems.map((it) => ({
           product_id: it.product.id,
           quantity: it.quantity,
@@ -447,7 +521,7 @@ export default function Sales() {
         cash_amount: cashVal,
         change: paymentMethod === 'efectivo' && saleType !== 'credito' ? Math.max(0, cashVal - effectivePaidAmount) : 0,
         bank_details: bankDetailsString,
-        created_at: isPastDate ? new Date(customSaleDate) : new Date()
+        created_at: new Date()
       })
 
       setIsCheckoutOpen(false)
@@ -524,15 +598,15 @@ export default function Sales() {
                 return (
                   <div
                     key={prod.id}
-                    onClick={() => addToCart(prod)}
-                    className={`group relative flex flex-col justify-between bg-white dark:bg-[#1c0707] rounded-3xl border transition-all duration-200 overflow-hidden cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 select-none ${
-                      inCart
-                        ? 'border-red-600 ring-2 ring-red-500/20'
-                        : isOutOfStock
-                        ? 'border-zinc-300 dark:border-zinc-800'
+                    onClick={() => !isOutOfStock && addToCart(prod)}
+                    className={`group relative flex flex-col justify-between bg-white dark:bg-[#1c0707] rounded-3xl border transition-all duration-200 overflow-hidden select-none ${
+                      isOutOfStock
+                        ? 'opacity-60 cursor-not-allowed border-zinc-300 dark:border-zinc-800'
+                        : inCart
+                        ? 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-red-600 ring-2 ring-red-500/20'
                         : isLowStock
-                        ? 'border-amber-300 dark:border-amber-900/60'
-                        : 'border-red-200/80 dark:border-red-950/60'
+                        ? 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-amber-300 dark:border-amber-900/60'
+                        : 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-red-200/80 dark:border-red-950/60'
                     }`}
                   >
                     {/* Badge de Stock */}
@@ -638,7 +712,8 @@ export default function Sales() {
         {cartItems.length > 0 && (
           <button
             onClick={openCheckout}
-            className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white text-xs font-black rounded-2xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+            disabled={hasOutOfStockItems}
+            className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white text-xs font-black rounded-2xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Cobrar</span>
@@ -756,9 +831,9 @@ export default function Sales() {
           <div className="p-4 border-t border-red-200/60 dark:border-red-950/60 bg-red-50/50 dark:bg-[#180606] space-y-3">
             {/* Aviso si hay productos agotados */}
             {hasOutOfStockItems && (
-              <div className="p-2.5 rounded-xl bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-[11px] font-bold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Hay productos sin stock. Se procesará como <strong>Venta Pasada</strong>.</span>
+              <div className="p-2.5 rounded-xl bg-red-100/90 dark:bg-red-950/80 border border-red-300 dark:border-red-900 text-red-900 dark:text-red-200 text-[11px] font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>No se puede cobrar: Hay productos sin stock suficiente.</span>
               </div>
             )}
 
@@ -846,7 +921,8 @@ export default function Sales() {
             {/* Botón Cobrar */}
             <button
               onClick={openCheckout}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={hasOutOfStockItems}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-red-600 via-red-500 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle2 className="w-5 h-5" />
               <span>Cobrar ${cartTotal.toLocaleString('es-CO')}</span>
@@ -862,18 +938,7 @@ export default function Sales() {
             <div className="p-3 rounded-2xl bg-red-100 text-red-700 text-xs font-bold">{checkoutError}</div>
           )}
 
-          {/* Banner de Aviso si hay productos agotados */}
-          {hasOutOfStockItems && (
-            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-[#200808] border border-amber-300 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 text-xs font-bold space-y-1">
-              <div className="flex items-center gap-1.5 font-black text-amber-700 dark:text-amber-300">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Producto sin stock disponible</span>
-              </div>
-              <p className="text-[11px] leading-relaxed">
-                {outOfStockNames} no tienen existencias suficientes. Esta venta se guardará obligatoriamente como <strong>Venta Pasada (sin descontar stock)</strong>.
-              </p>
-            </div>
-          )}
+
 
           {/* Modalidad de Pago: Completo, Abono Parcial o Crédito Total */}
           <div>
@@ -937,33 +1002,120 @@ export default function Sales() {
             </div>
           )}
 
-          {/* Selección de Cliente */}
-          <div>
-            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200 mb-1">
-              Cliente {effectivePendingAmount > 0 ? <span className="text-red-600">*(Obligatorio por deuda)</span> : '(Opcional)'}
+          {/* Selección de Cliente con Autocompletado estilo Google / Gmail */}
+          <div ref={customerDropdownRef} className="relative space-y-1">
+            <label className="block text-xs font-black uppercase text-red-950 dark:text-red-200">
+              Cliente {effectivePendingAmount > 0 ? <span className="text-red-600">*(Obligatorio por saldo deudor)</span> : '(Opcional)'}
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <select
-                value={selectedCustomerId}
-                onChange={handleCustomerSelect}
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
-              >
-                <option value="">Seleccionar del directorio de clientes...</option>
-                {customersList.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.first_name} {c.last_name || ''} {c.phone ? `(${c.phone})` : ''} {c.total_debt > 0 ? `[Debe $${Number(c.total_debt).toLocaleString('es-CO')}]` : ''}
-                  </option>
-                ))}
-              </select>
 
+            {/* Input de búsqueda interactivo */}
+            <div className="relative flex items-center">
+              <div className="absolute left-3.5 text-red-400 dark:text-red-500 pointer-events-none">
+                <Search className="w-4 h-4" />
+              </div>
               <input
                 type="text"
-                placeholder="O escribe nombre del cliente..."
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none"
+                value={customerQuery}
+                onFocus={() => setIsCustomerDropdownOpen(true)}
+                onChange={(e) => {
+                  setCustomerQuery(e.target.value)
+                  setCustomerName(e.target.value)
+                  if (selectedCustomerId) {
+                    setSelectedCustomerId('')
+                    setCustomerPhone('')
+                  }
+                  setIsCustomerDropdownOpen(true)
+                }}
+                placeholder="Escribe el nombre o iniciales del cliente..."
+                className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all placeholder:text-red-900/40 dark:placeholder:text-red-300/40"
               />
+              {(customerQuery || selectedCustomerId) && (
+                <button
+                  type="button"
+                  onClick={handleClearCustomer}
+                  className="absolute right-3 p-1 rounded-full text-red-400 hover:text-red-600 hover:bg-red-100/60 dark:hover:bg-red-950/60 transition-colors cursor-pointer"
+                  title="Limpiar cliente"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+
+            {/* Menú Desplegable Flotante de Resultados */}
+            {isCustomerDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-[#1a0606] rounded-2xl border border-red-200 dark:border-red-900/80 shadow-2xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+                {filteredCustomers.length > 0 ? (
+                  <div className="py-1 divide-y divide-red-100/60 dark:divide-red-950/60">
+                    {filteredCustomers.map((c) => {
+                      const fullName = `${c.first_name} ${c.last_name || ''}`.trim()
+                      const initials = `${c.first_name?.[0] || ''}${c.last_name?.[0] || ''}`.toUpperCase()
+                      const hasDebt = Number(c.total_debt) > 0
+                      const isSelected = selectedCustomerId === c.id
+
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => handleSelectCustomer(c)}
+                          className={`flex items-center justify-between px-3 py-2.5 text-xs cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-red-500/15 dark:bg-red-950/60'
+                              : 'hover:bg-red-50/80 dark:hover:bg-[#250a0a]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                            {/* Avatar con Iniciales */}
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-amber-500 text-white font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs">
+                              {initials || <UserCheck className="w-4 h-4" />}
+                            </div>
+
+                            {/* Nombre y teléfono */}
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-[#450a0a] dark:text-[#fef2f2] truncate">
+                                {highlightMatches(fullName, customerQuery)}
+                              </p>
+                              {c.phone && (
+                                <p className="text-[10px] text-red-900/60 dark:text-red-300/60 flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-red-400 shrink-0" />
+                                  <span>{highlightMatches(c.phone, customerQuery)}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Estado / Badge de Deuda */}
+                          <div className="shrink-0">
+                            {hasDebt ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900">
+                                Debe ${Number(c.total_debt).toLocaleString('es-CO')}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                                Al día
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-3 text-center text-xs text-red-900/60 dark:text-red-300/60">
+                    No se encontraron clientes registrados con esas iniciales.
+                  </div>
+                )}
+
+                {/* Opción de usar el texto escrito como cliente ocasional */}
+                {customerQuery.trim() && !customersList.some(c => `${c.first_name} ${c.last_name || ''}`.trim().toLowerCase() === customerQuery.trim().toLowerCase()) && (
+                  <div
+                    onClick={() => handleUseCustomCustomerName(customerQuery)}
+                    className="p-2.5 bg-red-50/50 dark:bg-[#200808] hover:bg-red-100/70 dark:hover:bg-red-950/80 border-t border-red-200/60 dark:border-red-950 flex items-center gap-2 text-xs font-black text-red-600 dark:text-amber-400 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Usar &quot;{customerQuery.trim()}&quot; como cliente para esta venta</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Recordatorio de Deuda / Saldo Pendiente del Cliente Seleccionado */}
             {selectedCustomerObj && Number(selectedCustomerObj.total_debt) > 0 && (
@@ -1105,59 +1257,7 @@ export default function Sales() {
             </>
           )}
 
-          {/* Opciones Avanzadas: Descuento de Stock & Fecha Pasada */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1c0707] border border-red-200 dark:border-red-950 space-y-3">
-            {/* Toggle de Descontar Stock */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-red-600 dark:text-amber-400" />
-                <div>
-                  <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2] block">
-                    Descontar del inventario de stock
-                  </span>
-                  {hasOutOfStockItems && (
-                    <span className="text-[10px] text-amber-600 font-bold">
-                      Desactivado por falta de stock
-                    </span>
-                  )}
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                disabled={hasOutOfStockItems}
-                checked={deductStock}
-                onChange={(e) => setDeductStock(e.target.checked)}
-                className="w-4 h-4 rounded text-red-600 focus:ring-red-500 cursor-pointer disabled:opacity-50"
-              />
-            </div>
 
-            {/* Toggle de Registrar Fecha Pasada */}
-            <div className="flex items-center justify-between pt-2 border-t border-red-100 dark:border-red-950">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-amber-600" />
-                <span className="text-xs font-black text-[#450a0a] dark:text-[#fef2f2]">
-                  Registrar venta en fecha/hora pasada
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={isPastDate}
-                onChange={(e) => setIsPastDate(e.target.checked)}
-                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
-              />
-            </div>
-
-            {isPastDate && (
-              <div className="pt-2">
-                <input
-                  type="datetime-local"
-                  value={customSaleDate}
-                  onChange={(e) => setCustomSaleDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200 text-xs font-bold focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
 
           {/* Acciones */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-100 dark:border-red-950">

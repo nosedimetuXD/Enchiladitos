@@ -374,8 +374,8 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if deductStock && currentStock < item.Quantity {
-			http.Error(w, fmt.Sprintf("El producto '%s' está agotado o no cuenta con suficiente stock (Disponible: %d, Solicitado: %d). Solo se permite registrarla si se marca como venta pasada (sin descontar stock).", name, currentStock, item.Quantity), http.StatusBadRequest)
+		if currentStock < item.Quantity {
+			http.Error(w, fmt.Sprintf("El producto '%s' no cuenta con suficiente stock disponible (Disponible: %d, Solicitado: %d). No se permite la venta sin stock.", name, currentStock, item.Quantity), http.StatusBadRequest)
 			return
 		}
 
@@ -442,17 +442,15 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		transferAmount = 0
 	}
 
-	// Si se debe descontar stock, descontar directamente de la tabla products
-	if deductStock {
-		for _, item := range resolved {
-			_, err := tx.Exec(ctx,
-				`UPDATE products SET stock = GREATEST(0, stock - $1), updated_at = now() WHERE id = $2`,
-				item.Quantity, item.ProductID)
-			if err != nil {
-				log.Printf("error descontando stock: %v", err)
-				http.Error(w, fmt.Sprintf("error descontando stock: %v", err), http.StatusInternalServerError)
-				return
-			}
+	// Descontar inventario directamente de la tabla products
+	for _, item := range resolved {
+		_, err := tx.Exec(ctx,
+			`UPDATE products SET stock = GREATEST(0, stock - $1), updated_at = now() WHERE id = $2`,
+			item.Quantity, item.ProductID)
+		if err != nil {
+			log.Printf("error descontando stock: %v", err)
+			http.Error(w, fmt.Sprintf("error descontando stock: %v", err), http.StatusInternalServerError)
+			return
 		}
 	}
 
