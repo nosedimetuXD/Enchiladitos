@@ -614,16 +614,29 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Si la venta anterior descontó stock, devolverlo primero
 	if oldDeductedStock {
-		oldRows, err := tx.Query(ctx, `SELECT product_id, quantity FROM sale_items WHERE sale_id = $1`, id)
+		type itemStockRevert struct {
+			ProductID uuid.UUID
+			Quantity  int
+		}
+		var oldItems []itemStockRevert
+		oldRows, err := tx.Query(ctx, `SELECT product_id, quantity FROM sale_items WHERE sale_id = $1 AND product_id IS NOT NULL`, id)
 		if err == nil {
 			for oldRows.Next() {
 				var pID *uuid.UUID
 				var qty int
 				if err := oldRows.Scan(&pID, &qty); err == nil && pID != nil && *pID != uuid.Nil {
-					_, _ = tx.Exec(ctx, `UPDATE products SET stock = stock + $1 WHERE id = $2`, qty, *pID)
+					oldItems = append(oldItems, itemStockRevert{ProductID: *pID, Quantity: qty})
 				}
 			}
 			oldRows.Close()
+
+			for _, it := range oldItems {
+				if _, err := tx.Exec(ctx, `UPDATE products SET stock = stock + $1, updated_at = now() WHERE id = $2`, it.Quantity, it.ProductID); err != nil {
+					log.Printf("error revirtiendo stock producto %v en edicion: %v", it.ProductID, err)
+				}
+			}
+		} else {
+			log.Printf("error consultando sale_items previos para revertir stock: %v", err)
 		}
 	}
 
@@ -830,16 +843,32 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	// Devolver stock si fue descontado
 	if deductedStock {
-		rows, err := tx.Query(ctx, `SELECT product_id, quantity FROM sale_items WHERE sale_id = $1`, id)
-		if err == nil {
-			for rows.Next() {
-				var pID *uuid.UUID
-				var qty int
-				if err := rows.Scan(&pID, &qty); err == nil && pID != nil && *pID != uuid.Nil {
-					_, _ = tx.Exec(ctx, `UPDATE products SET stock = stock + $1 WHERE id = $2`, qty, *pID)
-				}
+		type itemStockRevert struct {
+			ProductID uuid.UUID
+			Quantity  int
+		}
+		var itemsToRevert []itemStockRevert
+		rows, err := tx.Query(ctx, `SELECT product_id, quantity FROM sale_items WHERE sale_id = $1 AND product_id IS NOT NULL`, id)
+		if err != nil {
+			log.Printf("error consultando sale_items para revertir stock: %v", err)
+			http.Error(w, fmt.Sprintf("error consultando items de venta: %v", err), http.StatusInternalServerError)
+			return
+		}
+		for rows.Next() {
+			var pID *uuid.UUID
+			var qty int
+			if err := rows.Scan(&pID, &qty); err == nil && pID != nil && *pID != uuid.Nil {
+				itemsToRevert = append(itemsToRevert, itemStockRevert{ProductID: *pID, Quantity: qty})
 			}
-			rows.Close()
+		}
+		rows.Close()
+
+		for _, it := range itemsToRevert {
+			if _, err := tx.Exec(ctx, `UPDATE products SET stock = stock + $1, updated_at = now() WHERE id = $2`, it.Quantity, it.ProductID); err != nil {
+				log.Printf("error revirtiendo stock producto %v: %v", it.ProductID, err)
+				http.Error(w, fmt.Sprintf("error revirtiendo stock: %v", err), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
