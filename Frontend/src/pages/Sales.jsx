@@ -426,7 +426,14 @@ export default function Sales() {
   }
 
   function handleRemoveBank(index) {
-    setBankPayments(bankPayments.filter((_, i) => i !== index))
+    const updated = bankPayments.filter((_, i) => i !== index)
+    setBankPayments(updated)
+    const sum = updated.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
+    setTransferAmount(String(sum))
+    if (paymentMethod === 'mixto') {
+      const remaining = Math.max(0, effectivePaidAmount - sum)
+      setCashAmount(String(remaining))
+    }
   }
 
   function handleBankChange(index, field, value) {
@@ -440,6 +447,18 @@ export default function Sales() {
       if (paymentMethod === 'mixto') {
         const remaining = Math.max(0, effectivePaidAmount - sum)
         setCashAmount(String(remaining))
+      }
+    }
+  }
+
+  function handleCashChange(value) {
+    setCashAmount(value)
+    if (paymentMethod === 'mixto') {
+      const numCash = Number(value) || 0
+      const remaining = Math.max(0, effectivePaidAmount - numCash)
+      setTransferAmount(String(remaining))
+      if (bankPayments.length === 1) {
+        setBankPayments([{ ...bankPayments[0], amount: String(remaining) }])
       }
     }
   }
@@ -1323,9 +1342,36 @@ export default function Sales() {
 
               {(paymentMethod === 'transferencia' || paymentMethod === 'mixto') && (
                 <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-3">
-                  <label className="block text-xs font-bold text-red-950 dark:text-red-200">
-                    Desglose de Transferencia / Bancos
-                  </label>
+                  {paymentMethod === 'mixto' && (
+                    <div className="pb-3 border-b border-red-200/60 dark:border-red-950 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                          Abono en Efectivo ($)
+                        </label>
+                        <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                          Efectivo: ${Number(cashAmount || 0).toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        value={cashAmount}
+                        onChange={(e) => handleCashChange(e.target.value)}
+                        placeholder="Monto en efectivo"
+                        className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-950 dark:text-red-200">
+                      Desglose de Transferencia / Bancos
+                    </label>
+                    {paymentMethod === 'mixto' && (
+                      <span className="text-[11px] font-black text-amber-600 dark:text-amber-400">
+                        Transferencias: ${Number(transferAmount || 0).toLocaleString('es-CO')}
+                      </span>
+                    )}
+                  </div>
 
                   {bankPayments.map((bp, idx) => (
                     <div key={idx} className="flex items-center gap-2">
@@ -1366,6 +1412,30 @@ export default function Sales() {
                   >
                     + Añadir otro banco (pago dividido)
                   </button>
+
+                  {paymentMethod === 'mixto' && (
+                    <div className="pt-2 border-t border-red-200/60 dark:border-red-950 space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-red-950/80 dark:text-red-300">
+                          Total Cubierto (Efectivo + Bancos):
+                        </span>
+                        <span
+                          className={`font-black ${
+                            Number(cashAmount || 0) + Number(transferAmount || 0) >= effectivePaidAmount
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          ${(Number(cashAmount || 0) + Number(transferAmount || 0)).toLocaleString('es-CO')} / ${effectivePaidAmount.toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      {Number(cashAmount || 0) + Number(transferAmount || 0) < effectivePaidAmount && (
+                        <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 text-right">
+                          Faltan ${(effectivePaidAmount - (Number(cashAmount || 0) + Number(transferAmount || 0))).toLocaleString('es-CO')} para cubrir el total a pagar.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </>
