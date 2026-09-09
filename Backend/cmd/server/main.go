@@ -26,8 +26,15 @@ import (
 func allowedOrigins() []string {
 	raw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
 	if raw == "" {
-		log.Println("ALLOWED_ORIGINS no configurada, usando origen de desarrollo por defecto (http://localhost:5173)")
-		return []string{"http://localhost:5173"}
+		log.Println("ALLOWED_ORIGINS no configurada, usando origenes por defecto")
+		return []string{
+			"https://enchiladitos.vercel.app",
+			"https://enchiladitos-test.vercel.app",
+			"http://localhost:5173",
+			"http://localhost:3000",
+			"http://127.0.0.1:5173",
+			"http://127.0.0.1:3000",
+		}
 	}
 	parts := strings.Split(raw, ",")
 	origins := make([]string, 0, len(parts))
