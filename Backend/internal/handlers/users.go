@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -18,6 +20,28 @@ import (
 	custommw "github.com/NosedimetuXD/cafeteria/internal/middleware"
 	"github.com/NosedimetuXD/cafeteria/internal/models"
 )
+
+// validatePasswordStrength exige una longitud mínima mayor y una mezcla de letras y
+// números/símbolos, en vez de aceptar cualquier cadena de 8 caracteres (p. ej. "12345678").
+func validatePasswordStrength(pw string) error {
+	const minLen = 10
+	if len(pw) < minLen {
+		return fmt.Errorf("la contraseña debe tener al menos %d caracteres", minLen)
+	}
+	hasLetter, hasOther := false, false
+	for _, r := range pw {
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case unicode.IsDigit(r) || unicode.IsPunct(r) || unicode.IsSymbol(r):
+			hasOther = true
+		}
+	}
+	if !hasLetter || !hasOther {
+		return fmt.Errorf("la contraseña debe combinar letras con números o símbolos")
+	}
+	return nil
+}
 
 type UserHandler struct {
 	DB *pgxpool.Pool
@@ -104,8 +128,8 @@ func (h *UserHandler) UpdateSelf(w http.ResponseWriter, r *http.Request) {
 	var queryErr error
 
 	if strings.TrimSpace(req.Password) != "" {
-		if len(req.Password) < 8 {
-			http.Error(w, "la contraseña debe tener al menos 8 caracteres", http.StatusBadRequest)
+		if err := validatePasswordStrength(req.Password); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
