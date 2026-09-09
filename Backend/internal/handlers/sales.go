@@ -84,15 +84,21 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
+	if err := validateDateRange(startDate, endDate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	var rawCond string
+	var condArgs []any
 
 	if startDate != "" && endDate != "" {
-		rawCond = fmt.Sprintf("(s.created_at AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (s.created_at AT TIME ZONE 'America/Bogota')::date <= '%s'::date", startDate, endDate)
+		rawCond, condArgs = getTimeCondition("s.created_at", "", startDate, endDate, "", "")
 	} else if yearParam != "" && monthParam != "" {
 		y, _ := strconv.Atoi(yearParam)
 		m, _ := strconv.Atoi(monthParam)
 		if y > 2000 && m >= 1 && m <= 12 {
-			rawCond = fmt.Sprintf("EXTRACT(YEAR FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (s.created_at AT TIME ZONE 'America/Bogota')) = %d", y, m)
+			rawCond, _ = getTimeCondition("s.created_at", "", "", "", yearParam, monthParam)
 		}
 	}
 
@@ -118,13 +124,13 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		timeCondition = "WHERE " + rawCond
 	}
 
-	query := fmt.Sprintf(`SELECT s.id, COALESCE(s.sold_by, '00000000-0000-0000-0000-000000000000'::uuid), 
-		        COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Dueño'), s.customer_id, COALESCE(s.customer_name, 'Cliente General'), 
-		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0), 
-		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0), 
-		        COALESCE(s.discount_amount, 0), COALESCE(s.discount_reason, ''), s.total, 
-		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'), 
-		        COALESCE(s.deducted_stock, true), COALESCE(s.stamp_reward_redeemed, false), s.created_at, 
+	query := bindPlaceholders(fmt.Sprintf(`SELECT s.id, COALESCE(s.sold_by, '00000000-0000-0000-0000-000000000000'::uuid),
+		        COALESCE(NULLIF(s.sold_by_name, ''), u.username, 'Dueño'), s.customer_id, COALESCE(s.customer_name, 'Cliente General'),
+		        COALESCE(s.payment_method, 'efectivo'), COALESCE(s.cash_amount, 0), COALESCE(s.transfer_amount, 0),
+		        COALESCE(s.bank_details, ''), COALESCE(s.subtotal, s.total), COALESCE(s.discount_percent, 0),
+		        COALESCE(s.discount_amount, 0), COALESCE(s.discount_reason, ''), s.total,
+		        COALESCE(s.paid_amount, s.total), COALESCE(s.pending_amount, 0), COALESCE(s.payment_status, 'paid'),
+		        COALESCE(s.deducted_stock, true), COALESCE(s.stamp_reward_redeemed, false), s.created_at,
 		        COALESCE(
 		          (SELECT json_agg(json_build_object(
 		             'product_id', si.product_id,
@@ -137,9 +143,9 @@ func (h *SaleHandler) List(w http.ResponseWriter, r *http.Request) {
 		 FROM sales s
 		 LEFT JOIN users u ON s.sold_by = u.id
 		 %s
-		 ORDER BY s.created_at DESC`, timeCondition)
+		 ORDER BY s.created_at DESC`, timeCondition))
 
-	rows, err := h.DB.Query(r.Context(), query)
+	rows, err := h.DB.Query(r.Context(), query, condArgs...)
 	if err != nil {
 		log.Printf("error consultando ventas: %v", err)
 		http.Error(w, "error consultando ventas", http.StatusInternalServerError)
@@ -329,7 +335,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	tx, err := h.DB.Begin(ctx)
 	if err != nil {
 		log.Printf("error iniciando transacción: %v", err)
-		http.Error(w, fmt.Sprintf("error iniciando transacción: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error iniciando transacción", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(ctx)
@@ -372,7 +378,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Printf("error consultando producto: %v", err)
-			http.Error(w, fmt.Sprintf("error consultando producto: %v", err), http.StatusInternalServerError)
+			http.Error(w, "error consultando producto", http.StatusInternalServerError)
 			return
 		}
 
@@ -489,7 +495,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 			item.Quantity, item.ProductID)
 		if err != nil {
 			log.Printf("error descontando stock: %v", err)
-			http.Error(w, fmt.Sprintf("error descontando stock: %v", err), http.StatusInternalServerError)
+			http.Error(w, "error descontando stock", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -508,7 +514,7 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	).Scan(&saleID, &createdAt)
 	if err != nil {
 		log.Printf("error creando venta: %v", err)
-		http.Error(w, fmt.Sprintf("error creando venta: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error creando venta", http.StatusInternalServerError)
 		return
 	}
 
@@ -519,14 +525,14 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 			saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice)
 		if err != nil {
 			log.Printf("error creando item de venta: %v", err)
-			http.Error(w, fmt.Sprintf("error creando item de venta: %v", err), http.StatusInternalServerError)
+			http.Error(w, "error creando item de venta", http.StatusInternalServerError)
 			return
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando venta: %v", err)
-		http.Error(w, fmt.Sprintf("error confirmando venta: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error confirmando venta", http.StatusInternalServerError)
 		return
 	}
 
@@ -790,7 +796,7 @@ func (h *SaleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando edición de venta: %v", err)
-		http.Error(w, fmt.Sprintf("error confirmando edición de venta: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error confirmando edición de venta", http.StatusInternalServerError)
 		return
 	}
 
@@ -837,7 +843,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("error consultando venta para eliminar: %v", err)
-		http.Error(w, fmt.Sprintf("error consultando venta para eliminar: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error consultando venta para eliminar", http.StatusInternalServerError)
 		return
 	}
 
@@ -851,7 +857,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		rows, err := tx.Query(ctx, `SELECT product_id, quantity FROM sale_items WHERE sale_id = $1 AND product_id IS NOT NULL`, id)
 		if err != nil {
 			log.Printf("error consultando sale_items para revertir stock: %v", err)
-			http.Error(w, fmt.Sprintf("error consultando items de venta: %v", err), http.StatusInternalServerError)
+			http.Error(w, "error consultando items de venta", http.StatusInternalServerError)
 			return
 		}
 		for rows.Next() {
@@ -866,7 +872,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		for _, it := range itemsToRevert {
 			if _, err := tx.Exec(ctx, `UPDATE products SET stock = stock + $1, updated_at = now() WHERE id = $2`, it.Quantity, it.ProductID); err != nil {
 				log.Printf("error revirtiendo stock producto %v: %v", it.ProductID, err)
-				http.Error(w, fmt.Sprintf("error revirtiendo stock: %v", err), http.StatusInternalServerError)
+				http.Error(w, "error revirtiendo stock", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -877,7 +883,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	tag, err := tx.Exec(ctx, `DELETE FROM sales WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando venta: %v", err)
-		http.Error(w, fmt.Sprintf("error eliminando venta: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error eliminando venta", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -887,7 +893,7 @@ func (h *SaleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Printf("error confirmando borrado: %v", err)
-		http.Error(w, fmt.Sprintf("error confirmando borrado: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error confirmando borrado", http.StatusInternalServerError)
 		return
 	}
 
