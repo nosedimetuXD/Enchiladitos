@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import MetricLineChart from '../components/MetricLineChart'
 import { compressAndReadFile } from '../utils/imageUtils'
 import {
   Flame,
@@ -245,6 +246,16 @@ export default function Products() {
   const totalStockValue = useMemo(() => products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0), [products])
   const lowStockCount = useMemo(() => products.filter((p) => (p.stock || 0) <= (p.min_stock_alert || 5)).length, [products])
 
+  // Datos para MetricLineChart del inventario
+  const productsTrendData = useMemo(() => {
+    const sorted = [...products].sort((a, b) => ((b.stock || 0) * (b.price || 0)) - ((a.stock || 0) * (a.price || 0)))
+    return sorted.slice(0, 8).map((p) => ({
+      label: p.name.length > 7 ? p.name.substring(0, 7) + '..' : p.name,
+      value: (p.stock || 0) * (p.price || 0),
+      secondaryValue: p.price || 0
+    }))
+  }, [products])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -273,39 +284,119 @@ export default function Products() {
         </button>
       </div>
 
-      {/* Tarjetas resumen de Inventario */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-[#1a0606] p-3.5 sm:p-4 rounded-xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-3.5 shadow-xs">
-          <div className="p-2.5 rounded-xl bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-amber-400">
-            <Boxes className="w-5 h-5" />
+      {/* Unified Metrics Bar — Asymmetric 2:1 Hero Layout (Linear Style) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Large Hero Box (2 cols) */}
+        <div className="lg:col-span-2 bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-3.5 sm:p-4 flex flex-col justify-between shadow-xs relative overflow-hidden">
+          {/* Header Row: Title & Balance + Badge */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70 block">
+                Valor en Inventario
+              </span>
+              <div className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
+                ${Number(totalStockValue).toLocaleString('es-CO')}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${lowStockCount === 0 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${lowStockCount === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                {lowStockCount === 0 ? 'Stock Saludable' : `${lowStockCount} con Alerta`}
+              </span>
+              <div className="flex items-center justify-end gap-3 text-[10px] font-semibold mt-1">
+                <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Valor Stock
+                </span>
+                <span className="inline-flex items-center gap-1 text-red-600 dark:text-amber-400">
+                  <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-amber-400" /> Precio Venta
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-red-900/60 dark:text-red-300/60">Total Productos</span>
-            <p className="text-xl sm:text-2xl font-black text-[#450a0a] dark:text-[#fef2f2] tabular-nums">{products.length}</p>
+
+          {/* Center Body: Full-Width MetricLineChart */}
+          <div className="my-2.5 py-1 w-full">
+            <MetricLineChart
+              data={productsTrendData}
+              line1Color="#10b981"
+              line2Color="#dc2626"
+              line1Label="Valor Stock"
+              line2Label="Precio Venta"
+              hasSecondary={productsTrendData.length > 0}
+              formatValue={(v) => `$${Number(v).toLocaleString('es-CO')}`}
+              height={125}
+            />
+          </div>
+
+          {/* Sub-breakdown 3 columns at bottom */}
+          <div className="mt-3 pt-2.5 border-t border-red-200/40 dark:border-red-950/40 grid grid-cols-3 gap-2">
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Total Productos
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-[#450a0a] dark:text-[#fef2f2] tabular-nums block mt-0.5">
+                {products.length} catálogo
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Unidades en Stock
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums block mt-0.5">
+                {totalStockUnits.toLocaleString()} uds
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Precio Promedio
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-[#450a0a] dark:text-[#fef2f2] tabular-nums block mt-0.5">
+                ${Math.round(products.length > 0 ? products.reduce((acc, p) => acc + (p.price || 0), 0) / products.length : 0).toLocaleString('es-CO')}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1a0606] p-3.5 sm:p-4 rounded-xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-3.5 shadow-xs">
-          <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
-            <Package className="w-5 h-5" />
+        {/* Stacked Side Cards (1 col) */}
+        <div className="lg:col-span-1 flex flex-col gap-2">
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Total Productos</span>
+              <Boxes className="w-3.5 h-3.5 text-red-600 dark:text-amber-400" />
+            </div>
+            <div className="my-0.5 text-base sm:text-lg font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
+              {products.length}
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {products.filter((p) => p.active ?? p.is_active ?? true).length} ítems activos para venta
+            </span>
           </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-red-900/60 dark:text-red-300/60">Unidades en Stock</span>
-            <p className="text-xl sm:text-2xl font-black text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
-              {totalStockUnits.toLocaleString()} <span className="text-xs font-normal text-red-900/60 dark:text-red-300/60">uds</span>
-            </p>
-          </div>
-        </div>
 
-        <div className="bg-white dark:bg-[#1a0606] p-3.5 sm:p-4 rounded-xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-3.5 shadow-xs">
-          <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
-            <Sparkles className="w-5 h-5" />
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Unidades en Stock</span>
+              <Package className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="my-0.5 text-base sm:text-lg font-black tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+              {totalStockUnits.toLocaleString()} uds
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {totalStockUnits > 0 ? 'Disponibilidad inmediata' : 'Sin existencias registradas'}
+            </span>
           </div>
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-red-900/60 dark:text-red-300/60">Valor en Inventario</span>
-            <p className="text-xl sm:text-2xl font-black text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
-              ${totalStockValue.toLocaleString('es-CO')}
-            </p>
+
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Alertas de Stock</span>
+              <AlertTriangle className={`w-3.5 h-3.5 ${lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
+            </div>
+            <div className={`my-0.5 text-base sm:text-lg font-black tracking-tight tabular-nums ${lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {lowStockCount} {lowStockCount === 1 ? 'producto' : 'productos'}
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {lowStockCount === 0 ? 'Todas las referencias con stock óptimo' : 'Requieren reabastecimiento'}
+            </span>
           </div>
         </div>
       </div>
