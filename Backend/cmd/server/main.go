@@ -139,8 +139,7 @@ func main() {
 		r.Patch("/products/{id}/stock", productHandler.AdjustStock)
 		r.Delete("/products/{id}", productHandler.Delete)
 
-		// Clientes — borrados
-		r.Delete("/customers/{id}", customerHandler.Delete)
+		// Clientes — borrado de abonos (owner y admin)
 		r.Delete("/customer-payments/{id}", customerHandler.DeletePayment)
 
 		// Ventas — borrado
@@ -157,6 +156,14 @@ func main() {
 		r.Post("/incomes", accountingHandler.CreateIncome)
 		r.Put("/incomes/{id}", accountingHandler.UpdateIncome)
 		r.Delete("/incomes/{id}", accountingHandler.DeleteIncome)
+	})
+
+	// Operaciones críticas de clientes: solo el Dueño (Owner)
+	r.Group(func(r chi.Router) {
+		r.Use(custommw.RequireAuth)
+		r.Use(custommw.RequireRole(models.RoleOwner))
+
+		r.Delete("/customers/{id}", customerHandler.Delete)
 	})
 
 	port := os.Getenv("PORT")
