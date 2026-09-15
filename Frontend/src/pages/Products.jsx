@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import MetricLineChart from '../components/MetricLineChart'
 import { compressAndReadFile } from '../utils/imageUtils'
 import {
   Flame,
@@ -245,93 +246,185 @@ export default function Products() {
   const totalStockValue = useMemo(() => products.reduce((acc, p) => acc + (p.stock || 0) * (p.price || 0), 0), [products])
   const lowStockCount = useMemo(() => products.filter((p) => (p.stock || 0) <= (p.min_stock_alert || 5)).length, [products])
 
+  // Datos para MetricLineChart del inventario
+  const productsTrendData = useMemo(() => {
+    const sorted = [...products].sort((a, b) => ((b.stock || 0) * (b.price || 0)) - ((a.stock || 0) * (a.price || 0)))
+    return sorted.slice(0, 8).map((p) => ({
+      label: p.name.length > 7 ? p.name.substring(0, 7) + '..' : p.name,
+      value: (p.stock || 0) * (p.price || 0),
+      secondaryValue: p.price || 0
+    }))
+  }, [products])
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1c0707] p-6 rounded-3xl border border-red-200/80 dark:border-red-950/60 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#1a0606] p-5 rounded-2xl border border-red-200/60 dark:border-red-950/60 shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
               <Flame className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
+            <h1 className="text-xl font-bold tracking-tight text-[#450a0a] dark:text-[#fef2f2]">
               Productos & Inventario de Stock
             </h1>
           </div>
-          <p className="text-sm font-medium text-red-900/60 dark:text-red-300/60 mt-1">
+          <p className="text-xs text-red-900/60 dark:text-red-300/60 mt-0.5">
             Gestiona tu catálogo empaquetado, precios, existencias disponibles y alertas.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={openCreateModal}
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-black text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-700 hover:to-amber-700 text-white font-semibold text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
           <span>Nuevo Producto</span>
         </button>
       </div>
 
-      {/* Tarjetas resumen de Inventario */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-amber-400">
-            <Boxes className="w-6 h-6" />
+      {/* Unified Metrics Bar — Asymmetric 2:1 Hero Layout (Linear Style) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Large Hero Box (2 cols) */}
+        <div className="lg:col-span-2 bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-3.5 sm:p-4 flex flex-col justify-between shadow-xs relative overflow-hidden">
+          {/* Header Row: Title & Balance + Badge */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70 block">
+                Valor en Inventario
+              </span>
+              <div className="mt-0.5 text-2xl sm:text-3xl font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
+                ${Number(totalStockValue).toLocaleString('es-CO')}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${lowStockCount === 0 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${lowStockCount === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                {lowStockCount === 0 ? 'Stock Saludable' : `${lowStockCount} con Alerta`}
+              </span>
+              <div className="flex items-center justify-end gap-3 text-[10px] font-semibold mt-1">
+                <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Valor Stock
+                </span>
+                <span className="inline-flex items-center gap-1 text-red-600 dark:text-amber-400">
+                  <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-amber-400" /> Precio Venta
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Total Productos</span>
-            <p className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2]">{products.length}</p>
+
+          {/* Center Body: Full-Width MetricLineChart */}
+          <div className="my-2.5 py-1 w-full">
+            <MetricLineChart
+              data={productsTrendData}
+              line1Color="#10b981"
+              line2Color="#dc2626"
+              line1Label="Valor Stock"
+              line2Label="Precio Venta"
+              hasSecondary={productsTrendData.length > 0}
+              formatValue={(v) => `$${Number(v).toLocaleString('es-CO')}`}
+              height={125}
+            />
+          </div>
+
+          {/* Sub-breakdown 3 columns at bottom */}
+          <div className="mt-3 pt-2.5 border-t border-red-200/40 dark:border-red-950/40 grid grid-cols-3 gap-2">
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Total Productos
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-[#450a0a] dark:text-[#fef2f2] tabular-nums block mt-0.5">
+                {products.length} catálogo
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Unidades en Stock
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums block mt-0.5">
+                {totalStockUnits.toLocaleString()} uds
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-semibold text-red-900/60 dark:text-red-300/60 block uppercase tracking-wider">
+                Precio Promedio
+              </span>
+              <span className="text-xs sm:text-sm font-bold text-[#450a0a] dark:text-[#fef2f2] tabular-nums block mt-0.5">
+                ${Math.round(products.length > 0 ? products.reduce((acc, p) => acc + (p.price || 0), 0) / products.length : 0).toLocaleString('es-CO')}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
-            <Package className="w-6 h-6" />
+        {/* Stacked Side Cards (1 col) */}
+        <div className="lg:col-span-1 flex flex-col gap-2">
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Total Productos</span>
+              <Boxes className="w-3.5 h-3.5 text-red-600 dark:text-amber-400" />
+            </div>
+            <div className="my-0.5 text-base sm:text-lg font-black tracking-tight text-[#450a0a] dark:text-[#fef2f2] tabular-nums">
+              {products.length}
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {products.filter((p) => p.active ?? p.is_active ?? true).length} ítems activos para venta
+            </span>
           </div>
-          <div>
-            <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Unidades en Stock</span>
-            <p className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2]">
-              {totalStockUnits.toLocaleString()} <span className="text-xs font-semibold text-red-900/60 dark:text-red-300/60">unidades</span>
-            </p>
-          </div>
-        </div>
 
-        <div className="bg-white dark:bg-[#1c0707] p-5 rounded-3xl border border-red-200/60 dark:border-red-950/60 flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
-            <Sparkles className="w-6 h-6" />
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Unidades en Stock</span>
+              <Package className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="my-0.5 text-base sm:text-lg font-black tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
+              {totalStockUnits.toLocaleString()} uds
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {totalStockUnits > 0 ? 'Disponibilidad inmediata' : 'Sin existencias registradas'}
+            </span>
           </div>
-          <div>
-            <span className="text-xs font-bold uppercase text-red-900/50 dark:text-red-400/50">Valor en Inventario</span>
-            <p className="text-2xl font-black text-[#450a0a] dark:text-[#fef2f2]">
-              ${totalStockValue.toLocaleString('es-CO')}
-            </p>
+
+          <div className="bg-white dark:bg-[#1a0606] border border-red-200/60 dark:border-red-950/60 rounded-xl p-2.5 sm:p-3 flex-1 flex flex-col justify-between shadow-xs">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-red-900/70 dark:text-red-300/70">
+              <span>Alertas de Stock</span>
+              <AlertTriangle className={`w-3.5 h-3.5 ${lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
+            </div>
+            <div className={`my-0.5 text-base sm:text-lg font-black tracking-tight tabular-nums ${lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {lowStockCount} {lowStockCount === 1 ? 'producto' : 'productos'}
+            </div>
+            <span className="text-[10px] text-red-900/60 dark:text-red-300/60 font-normal">
+              {lowStockCount === 0 ? 'Todas las referencias con stock óptimo' : 'Requieren reabastecimiento'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
-      <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#1c0707] p-4 rounded-3xl border border-red-200/70 dark:border-red-950/60">
+      <div className="flex flex-col md:flex-row items-center gap-2.5 bg-white dark:bg-[#1a0606] p-2.5 sm:p-3 rounded-2xl border border-red-200/60 dark:border-red-950/60">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-red-900/40 dark:text-red-400/40" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-red-900/40 dark:text-red-400/40" />
           <input
             type="text"
             placeholder="Buscar por nombre, descripción o etiquetas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-medium text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-1 focus:ring-red-500"
           />
         </div>
 
         {/* Filtro Categoría */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto pb-0.5 md:pb-0">
           {categories.map((cat) => (
             <button
+              type="button"
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat
-                  ? 'bg-red-600 text-white shadow-xs'
-                  : 'bg-red-50/70 dark:bg-[#200808] text-red-950/70 dark:text-red-200/70 hover:bg-red-100/70 dark:hover:bg-red-950/60'
+                  ? 'bg-red-600 text-white font-bold'
+                  : 'text-red-900/70 dark:text-red-300/70 hover:bg-red-50 dark:hover:bg-[#200808]'
               }`}
             >
               {cat}
@@ -343,7 +436,7 @@ export default function Products() {
         <select
           value={stockFilter}
           onChange={(e) => setStockFilter(e.target.value)}
-          className="px-3.5 py-2.5 rounded-2xl bg-red-50/70 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-bold text-red-950 dark:text-red-100 cursor-pointer"
+          className="px-2.5 py-1.5 rounded-xl bg-red-50/60 dark:bg-[#200808] border border-red-200/60 dark:border-red-950/60 text-xs font-medium text-[#450a0a] dark:text-[#fef2f2] cursor-pointer focus:outline-none"
         >
           <option value="all">Todo el Stock</option>
           <option value="low">Stock Bajo</option>
@@ -366,7 +459,7 @@ export default function Products() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
           {filteredProducts.map((prod) => {
             const currentStock = prod.stock ?? 0
             const minAlert = prod.min_stock_alert ?? 5
@@ -377,19 +470,19 @@ export default function Products() {
             return (
               <div
                 key={prod.id}
-                className={`flex flex-col justify-between bg-white dark:bg-[#1c0707] rounded-3xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md ${
+                className={`flex flex-col justify-between bg-white dark:bg-[#1a0606] rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md ${
                   !active
                     ? 'border-gray-200 dark:border-zinc-800 opacity-60'
                     : isOutOfStock
                     ? 'border-rose-400/60 dark:border-rose-900/60'
                     : isLowStock
                     ? 'border-amber-300 dark:border-amber-900/60'
-                    : 'border-red-200/80 dark:border-red-950/60'
+                    : 'border-red-200/60 dark:border-red-950/60 hover:border-red-500'
                 }`}
               >
                 <div>
                   {/* Imagen y badges */}
-                  <div className="relative h-44 bg-black/10 overflow-hidden group">
+                  <div className="relative h-36 bg-black/10 overflow-hidden group">
                     <img
                       src={prod.image_url || DEFAULT_PRODUCT_IMAGE}
                       alt={prod.name}
@@ -401,7 +494,7 @@ export default function Products() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
                     {/* Badge Categoría */}
-                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-xl bg-black/60 backdrop-blur-xs text-white text-[10px] font-black tracking-wider uppercase">
+                    <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold tracking-wider uppercase">
                       {prod.category || 'General'}
                     </span>
 
@@ -409,20 +502,20 @@ export default function Products() {
                     <button
                       type="button"
                       onClick={(e) => toggleProductActive(prod, e)}
-                      className={`absolute top-3 right-3 p-1.5 rounded-xl backdrop-blur-xs transition-transform cursor-pointer ${
+                      className={`absolute top-2.5 right-2.5 p-1 rounded-lg backdrop-blur-xs transition-transform cursor-pointer ${
                         active
                           ? 'bg-emerald-500 text-white hover:scale-105'
                           : 'bg-zinc-700 text-zinc-300 hover:scale-105'
                       }`}
                       title={active ? 'Desactivar Producto' : 'Activar Producto'}
                     >
-                      {active ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      {active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                     </button>
 
                     {/* Badge de Stock en imagen */}
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
                       <span
-                        className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 backdrop-blur-md shadow-xs ${
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold flex items-center gap-1 backdrop-blur-md shadow-xs ${
                           isOutOfStock
                             ? 'bg-red-600/90 text-white'
                             : isLowStock
@@ -430,34 +523,34 @@ export default function Products() {
                             : 'bg-emerald-600/90 text-white'
                         }`}
                       >
-                        <Package className="w-3.5 h-3.5" />
+                        <Package className="w-3 h-3" />
                         <span>
                           {isOutOfStock ? 'Agotado (0)' : `${currentStock} en stock`}
                         </span>
                       </span>
 
-                      <span className="text-white font-black text-base drop-shadow-md">
+                      <span className="text-white font-bold text-sm drop-shadow-md tabular-nums">
                         ${Number(prod.price).toLocaleString('es-CO')}
                       </span>
                     </div>
                   </div>
 
                   {/* Info */}
-                  <div className="p-4 space-y-2">
-                    <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2] leading-snug line-clamp-1">
+                  <div className="p-3 space-y-1.5">
+                    <h3 className="font-bold text-xs text-[#450a0a] dark:text-[#fef2f2] leading-snug line-clamp-1">
                       {prod.name}
                     </h3>
                     {prod.description && (
-                      <p className="text-xs font-medium text-red-950/60 dark:text-red-300/60 line-clamp-2">
+                      <p className="text-[11px] text-red-900/70 dark:text-red-300/70 line-clamp-2">
                         {prod.description}
                       </p>
                     )}
                     {prod.tags && (
-                      <div className="flex flex-wrap gap-1 pt-1">
+                      <div className="flex flex-wrap gap-1 pt-0.5">
                         {prod.tags.split(',').map((t, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-0.5 rounded-lg bg-red-100/70 dark:bg-red-950 text-red-700 dark:text-amber-400 text-[10px] font-extrabold flex items-center gap-1"
+                            className="px-1.5 py-0.2 rounded-md bg-red-100/70 dark:bg-red-950 text-red-700 dark:text-amber-400 text-[9px] font-semibold flex items-center gap-1"
                           >
                             <Tag className="w-2.5 h-2.5" />
                             {t.trim()}
@@ -469,47 +562,52 @@ export default function Products() {
                 </div>
 
                 {/* Acciones y control de stock */}
-                <div className="p-3 border-t border-red-100 dark:border-red-950/60 bg-red-50/40 dark:bg-[#140505] flex items-center justify-between gap-2">
+                <div className="p-2.5 border-t border-red-200/40 dark:border-red-950/40 bg-red-50/20 dark:bg-[#140505] flex items-center justify-between gap-2">
                   {/* Ajustes rápidos de stock +/- */}
-                  <div className="flex items-center gap-1 bg-white dark:bg-[#1c0707] p-1 rounded-2xl border border-red-200/60 dark:border-red-950/60">
+                  <div className="flex items-center gap-0.5 bg-white dark:bg-[#1c0707] p-0.5 rounded-xl border border-red-200/60 dark:border-red-950/60">
                     <button
+                      type="button"
                       onClick={() => quickAdjustStock(prod, -1)}
-                      className="p-1 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 cursor-pointer"
+                      className="p-1 rounded-lg text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 cursor-pointer"
                       title="Restar 1 unidad"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <Minus className="w-3 h-3" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => openStockModal(prod)}
-                      className="px-2 py-0.5 text-xs font-black text-[#450a0a] dark:text-[#fef2f2] hover:underline cursor-pointer"
+                      className="px-2 py-0.5 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] hover:underline cursor-pointer tabular-nums"
                       title="Ajustar inventario / Registrar merma"
                     >
                       {currentStock}
                     </button>
                     <button
+                      type="button"
                       onClick={() => quickAdjustStock(prod, 1)}
-                      className="p-1 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 cursor-pointer"
+                      className="p-1 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 cursor-pointer"
                       title="Sumar 1 unidad"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" />
                     </button>
                   </div>
 
                   {/* Botones de Editar y Borrar */}
                   <div className="flex items-center gap-1">
                     <button
+                      type="button"
                       onClick={() => openEditModal(prod)}
-                      className="p-2 rounded-xl text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-red-700 dark:text-amber-400 hover:text-[#450a0a] dark:hover:text-white hover:bg-red-100 dark:hover:bg-[#2c0b0b] transition-colors cursor-pointer"
                       title="Editar Producto"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDeleteProduct(prod)}
-                      className="p-2 rounded-xl text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                       title="Eliminar Producto"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

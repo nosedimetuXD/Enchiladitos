@@ -729,14 +729,14 @@ export default function Sales() {
                   <div
                     key={prod.id}
                     onClick={() => !isOutOfStock && addToCart(prod)}
-                    className={`group relative flex flex-col justify-between bg-white dark:bg-[#1c0707] rounded-3xl border transition-all duration-200 overflow-hidden select-none ${
+                    className={`group relative flex flex-col justify-between bg-white dark:bg-[#1a0606] rounded-2xl border transition-all duration-200 overflow-hidden select-none ${
                       isOutOfStock
                         ? 'opacity-60 cursor-not-allowed border-zinc-300 dark:border-zinc-800'
                         : inCart
                         ? 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-red-600 ring-2 ring-red-500/20'
                         : isLowStock
                         ? 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-amber-300 dark:border-amber-900/60'
-                        : 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-red-200/80 dark:border-red-950/60'
+                        : 'cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 border-red-200/50 dark:border-red-950/40 hover:border-red-500'
                     }`}
                   >
                     {/* Badge de Stock */}
@@ -853,19 +853,19 @@ export default function Sales() {
 
       {/* Columna Derecha: Carrito de Compras & Descuentos (1/3) / DRAWER EN MÓVIL */}
       <div
-        className={`fixed lg:static bottom-0 left-0 right-0 z-50 lg:z-auto w-full flex flex-col bg-white dark:bg-[#1c0707] rounded-t-3xl lg:rounded-3xl border-t lg:border border-red-200/80 dark:border-red-950/60 shadow-2xl lg:shadow-xs overflow-hidden max-h-[85vh] lg:max-h-full transition-transform duration-300 ease-out ${
+        className={`fixed lg:static bottom-0 left-0 right-0 z-50 lg:z-auto w-full flex flex-col bg-white dark:bg-[#1a0606] rounded-t-2xl lg:rounded-2xl border-t lg:border border-red-200/60 dark:border-red-950/60 shadow-2xl lg:shadow-xs overflow-hidden max-h-[85vh] lg:max-h-full drawer-motion ${
           isMobileCartOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'
         }`}
       >
         {/* Header Carrito */}
-        <div className="p-4 border-b border-red-200/60 dark:border-red-950/60 flex items-center justify-between bg-red-50/30 dark:bg-[#200808]">
+        <div className="p-3.5 border-b border-red-200/40 dark:border-red-950/40 flex items-center justify-between bg-red-50/20 dark:bg-[#200808]/60">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-red-100 dark:bg-red-950 text-red-600 dark:text-amber-400">
+            <span className="p-2 rounded-xl bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-amber-400">
               <ShoppingBag className="w-4 h-4" />
             </span>
             <div>
-              <h3 className="font-black text-sm text-[#450a0a] dark:text-[#fef2f2]">Orden en Curso</h3>
-              <span className="text-[10px] font-bold text-red-900/60 dark:text-red-300/60">
+              <h3 className="font-bold text-xs text-[#450a0a] dark:text-[#fef2f2]">Orden en Curso</h3>
+              <span className="text-[10px] text-red-900/60 dark:text-red-300/60">
                 {totalCartCount} artículos
               </span>
             </div>
@@ -874,20 +874,24 @@ export default function Sales() {
           <div className="flex items-center gap-2">
             {cartItems.length > 0 && (
               <button
+                type="button"
                 onClick={clearCart}
-                className="text-[10px] font-black text-red-600 hover:text-red-700 uppercase tracking-wider cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200/80 dark:border-rose-800/40 transition-all duration-150 cursor-pointer shadow-2xs active:scale-95"
+                title="Vaciar orden actual"
               >
-                Vaciar
+                <Trash2 className="w-3 h-3 text-rose-500" />
+                <span>Vaciar</span>
               </button>
             )}
 
             {/* Botón Minimizar en Móvil */}
             <button
+              type="button"
               onClick={() => setIsMobileCartOpen(false)}
               className="lg:hidden p-1.5 text-red-600 dark:text-amber-400 hover:bg-red-100 dark:hover:bg-red-950/60 rounded-xl transition-colors cursor-pointer"
               title="Minimizar orden"
             >
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           </div>
         </div>
