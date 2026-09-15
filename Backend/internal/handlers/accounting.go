@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -85,37 +84,6 @@ func parseAccountingTime(dateStr string, explicitTime *time.Time) time.Time {
 	return time.Now()
 }
 
-func getTimeCondition(col string, period, startDate, endDate, yearParam, monthParam string) string {
-	if startDate != "" && endDate != "" {
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota')::date >= '%s'::date AND (%s AT TIME ZONE 'America/Bogota')::date <= '%s'::date", col, startDate, col, endDate)
-	}
-	if yearParam != "" {
-		y, _ := strconv.Atoi(yearParam)
-		if monthParam != "" {
-			m, _ := strconv.Atoi(monthParam)
-			if y > 2000 && m >= 1 && m <= 12 {
-				return fmt.Sprintf("EXTRACT(YEAR FROM (%s AT TIME ZONE 'America/Bogota')) = %d AND EXTRACT(MONTH FROM (%s AT TIME ZONE 'America/Bogota')) = %d", col, y, col, m)
-			}
-		} else if y > 2000 {
-			return fmt.Sprintf("EXTRACT(YEAR FROM (%s AT TIME ZONE 'America/Bogota')) = %d", col, y)
-		}
-	}
-	switch period {
-	case "today":
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date", col)
-	case "week":
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= ((now() AT TIME ZONE 'America/Bogota') - INTERVAL '7 days')", col)
-	case "month":
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('month', now() AT TIME ZONE 'America/Bogota')", col)
-	case "prev_month":
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('month', (now() AT TIME ZONE 'America/Bogota') - INTERVAL '1 month') AND (%s AT TIME ZONE 'America/Bogota') < date_trunc('month', now() AT TIME ZONE 'America/Bogota')", col, col)
-	case "year":
-		return fmt.Sprintf("(%s AT TIME ZONE 'America/Bogota') >= date_trunc('year', now() AT TIME ZONE 'America/Bogota')", col)
-	default:
-		return "1=1"
-	}
-}
-
 // GET /accounting/summary?period=today|week|month|all&start_date=...&end_date=...&year=...&month_num=...
 func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	period := r.URL.Query().Get("period")
@@ -124,8 +92,13 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	timeCondition := getTimeCondition("created_at", period, startDate, endDate, yearParam, monthParam)
-	timeCondSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
+	if err := validateDateRange(startDate, endDate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	timeCondition, timeArgs := getTimeCondition("created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondSales, timeArgsSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
 
 	summary := models.AccountingSummary{
 		IncomeByPaymentMethod: make(map[string]float64),
@@ -134,19 +107,19 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Ingresos por ventas (lo efectivamente cobrado en caja/bancos)
 	var cashSales, transferSales, totalSales, paidSales float64
-	salesQuery := "SELECT COALESCE(SUM(s.total), 0), COUNT(s.id), COALESCE(SUM(s.cash_amount), 0), COALESCE(SUM(s.transfer_amount), 0), COALESCE(SUM(s.paid_amount), 0) FROM sales s WHERE " + timeCondSales
-	_ = h.DB.QueryRow(r.Context(), salesQuery).Scan(&totalSales, &summary.SalesCount, &cashSales, &transferSales, &paidSales)
+	salesQuery := bindPlaceholders("SELECT COALESCE(SUM(s.total), 0), COUNT(s.id), COALESCE(SUM(s.cash_amount), 0), COALESCE(SUM(s.transfer_amount), 0), COALESCE(SUM(s.paid_amount), 0) FROM sales s WHERE " + timeCondSales)
+	_ = h.DB.QueryRow(r.Context(), salesQuery, timeArgsSales...).Scan(&totalSales, &summary.SalesCount, &cashSales, &transferSales, &paidSales)
 
 	// 2. Abonos de clientes a deudas (customer_payments)
 	var cashAbonos, transferAbonos, totalAbonos float64
 	var abonosCount int
-	abonosQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM customer_payments WHERE " + timeCondition
-	_ = h.DB.QueryRow(r.Context(), abonosQuery).Scan(&totalAbonos, &abonosCount, &cashAbonos, &transferAbonos)
+	abonosQuery := bindPlaceholders("SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM customer_payments WHERE " + timeCondition)
+	_ = h.DB.QueryRow(r.Context(), abonosQuery, timeArgs...).Scan(&totalAbonos, &abonosCount, &cashAbonos, &transferAbonos)
 
 	// 3. Ingresos manuales extraordinarios
 	var cashManual, transferManual, manualIncomes float64
-	incQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM incomes WHERE " + timeCondition
-	_ = h.DB.QueryRow(r.Context(), incQuery).Scan(&manualIncomes, &summary.IncomesCount, &cashManual, &transferManual)
+	incQuery := bindPlaceholders("SELECT COALESCE(SUM(amount), 0), COUNT(id), COALESCE(SUM(CASE WHEN payment_method = 'efectivo' THEN amount ELSE 0 END), 0), COALESCE(SUM(CASE WHEN payment_method != 'efectivo' THEN amount ELSE 0 END), 0) FROM incomes WHERE " + timeCondition)
+	_ = h.DB.QueryRow(r.Context(), incQuery, timeArgs...).Scan(&manualIncomes, &summary.IncomesCount, &cashManual, &transferManual)
 
 	summary.TotalIncome = paidSales + totalAbonos + manualIncomes
 	summary.IncomeByPaymentMethod["efectivo"] = cashSales + cashAbonos + cashManual
@@ -157,12 +130,12 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Gastos totales
-	expensesQuery := "SELECT COALESCE(SUM(amount), 0), COUNT(id) FROM expenses WHERE " + timeCondition
-	_ = h.DB.QueryRow(r.Context(), expensesQuery).Scan(&summary.TotalExpenses, &summary.ExpensesCount)
+	expensesQuery := bindPlaceholders("SELECT COALESCE(SUM(amount), 0), COUNT(id) FROM expenses WHERE " + timeCondition)
+	_ = h.DB.QueryRow(r.Context(), expensesQuery, timeArgs...).Scan(&summary.TotalExpenses, &summary.ExpensesCount)
 
 	// 4. Gastos por categoría
-	catQuery := "SELECT category, COALESCE(SUM(amount), 0) FROM expenses WHERE " + timeCondition + " GROUP BY category"
-	rows, err := h.DB.Query(r.Context(), catQuery)
+	catQuery := bindPlaceholders("SELECT category, COALESCE(SUM(amount), 0) FROM expenses WHERE " + timeCondition + " GROUP BY category")
+	rows, err := h.DB.Query(r.Context(), catQuery, timeArgs...)
 	if err == nil {
 		for rows.Next() {
 			var cat string
@@ -188,8 +161,8 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	// Top 10 Productos más vendidos
 	prodRows, errProdList := h.DB.Query(r.Context(),
-		`SELECT COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado') as prod_name,
-		        COALESCE(SUM(si.quantity), 0) as total_qty, 
+		bindPlaceholders(`SELECT COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado') as prod_name,
+		        COALESCE(SUM(si.quantity), 0) as total_qty,
 		        COALESCE(SUM(si.quantity * si.unit_price), 0) as total_amount
 		 FROM sale_items si
 		 JOIN sales s ON si.sale_id = s.id
@@ -197,7 +170,7 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		 WHERE `+timeCondSales+`
 		 GROUP BY COALESCE(NULLIF(si.product_name, ''), p.name, 'Producto Eliminado')
 		 ORDER BY total_qty DESC
-		 LIMIT 10`)
+		 LIMIT 10`), timeArgsSales...)
 	if errProdList == nil {
 		for prodRows.Next() {
 			var tp models.TopProductStat
@@ -213,12 +186,12 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	// Top 10 Clientes del período
 	custRows, errCust := h.DB.Query(r.Context(),
-		`SELECT s.customer_name, COALESCE(SUM(s.total), 0) as total_spent, COUNT(s.id) as orders_count
+		bindPlaceholders(`SELECT s.customer_name, COALESCE(SUM(s.total), 0) as total_spent, COUNT(s.id) as orders_count
 		 FROM sales s
 		 WHERE `+timeCondSales+` AND TRIM(s.customer_name) != '' AND LOWER(s.customer_name) != 'cliente general'
 		 GROUP BY s.customer_name
 		 ORDER BY total_spent DESC
-		 LIMIT 10`)
+		 LIMIT 10`), timeArgsSales...)
 	if errCust == nil {
 		for custRows.Next() {
 			var cs models.CustomerStat
@@ -231,16 +204,16 @@ func (h *AccountingHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	// Top 5 Bancos / Métodos del período
 	bankRows, errBank := h.DB.Query(r.Context(),
-		`SELECT 
+		bindPlaceholders(`SELECT
 			COALESCE(NULLIF(TRIM(s.bank_details), ''), 'Transferencia') as bank_name,
 			COUNT(s.id) as count,
 			COALESCE(SUM(CASE WHEN s.transfer_amount > 0 THEN s.transfer_amount ELSE s.total END), 0) as total_amount
 		 FROM sales s
-		 WHERE `+timeCondSales+` 
+		 WHERE `+timeCondSales+`
 		   AND (s.payment_method IN ('transferencia', 'mixto') OR s.transfer_amount > 0)
 		 GROUP BY bank_name
 		 ORDER BY count DESC, total_amount DESC
-		 LIMIT 5`)
+		 LIMIT 5`), timeArgsSales...)
 	if errBank == nil {
 		for bankRows.Next() {
 			var tb models.TopBankStat
@@ -265,16 +238,21 @@ func (h *AccountingHandler) ListExpenses(w http.ResponseWriter, r *http.Request)
 	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	timeCondition := getTimeCondition("e.created_at", period, startDate, endDate, yearParam, monthParam)
+	if err := validateDateRange(startDate, endDate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	query := fmt.Sprintf(`SELECT e.id, e.description, e.amount, e.category, e.payment_method, e.registered_by, 
-		        COALESCE(u.username, 'Dueño'), e.created_at 
+	timeCondition, timeArgs := getTimeCondition("e.created_at", period, startDate, endDate, yearParam, monthParam)
+
+	query := bindPlaceholders(fmt.Sprintf(`SELECT e.id, e.description, e.amount, e.category, e.payment_method, e.registered_by,
+		        COALESCE(u.username, 'Dueño'), e.created_at
 		 FROM expenses e
 		 LEFT JOIN users u ON e.registered_by = u.id
 		 WHERE %s
-		 ORDER BY e.created_at DESC`, timeCondition)
+		 ORDER BY e.created_at DESC`, timeCondition))
 
-	rows, err := h.DB.Query(r.Context(), query)
+	rows, err := h.DB.Query(r.Context(), query, timeArgs...)
 	if err != nil {
 		log.Printf("error consultando gastos: %v", err)
 		http.Error(w, "error consultando gastos", http.StatusInternalServerError)
@@ -363,7 +341,7 @@ func (h *AccountingHandler) CreateExpense(w http.ResponseWriter, r *http.Request
 	).Scan(&expID, &createdAt)
 	if err != nil {
 		log.Printf("error creando gasto: %v", err)
-		http.Error(w, fmt.Sprintf("error registrando gasto: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error registrando gasto", http.StatusInternalServerError)
 		return
 	}
 
@@ -425,7 +403,7 @@ func (h *AccountingHandler) UpdateExpense(w http.ResponseWriter, r *http.Request
 	)
 	if err != nil {
 		log.Printf("error actualizando gasto: %v", err)
-		http.Error(w, fmt.Sprintf("error actualizando gasto: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error actualizando gasto", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -453,7 +431,7 @@ func (h *AccountingHandler) DeleteExpense(w http.ResponseWriter, r *http.Request
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM expenses WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando gasto: %v", err)
-		http.Error(w, fmt.Sprintf("error eliminando gasto: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error eliminando gasto", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -477,11 +455,21 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 	yearParam := strings.TrimSpace(r.URL.Query().Get("year"))
 	monthParam := strings.TrimSpace(r.URL.Query().Get("month_num"))
 
-	timeCondSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
-	timeCondAbonos := getTimeCondition("cp.created_at", period, startDate, endDate, yearParam, monthParam)
-	timeCondIncomes := getTimeCondition("i.created_at", period, startDate, endDate, yearParam, monthParam)
+	if err := validateDateRange(startDate, endDate); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	query := fmt.Sprintf(`
+	timeCondSales, argsSales := getTimeCondition("s.created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondAbonos, argsAbonos := getTimeCondition("cp.created_at", period, startDate, endDate, yearParam, monthParam)
+	timeCondIncomes, argsIncomes := getTimeCondition("i.created_at", period, startDate, endDate, yearParam, monthParam)
+
+	var queryArgs []any
+	queryArgs = append(queryArgs, argsSales...)
+	queryArgs = append(queryArgs, argsAbonos...)
+	queryArgs = append(queryArgs, argsIncomes...)
+
+	query := bindPlaceholders(fmt.Sprintf(`
 		SELECT id, type, description, amount, category, payment_method, bank_details, customer_name, registered_by, registerer_name, created_at
 		FROM (
 			-- 1. Ventas POS con valor efectivamente cobrado
@@ -540,12 +528,12 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 			WHERE %s
 		) all_incomes
 		ORDER BY created_at DESC
-	`, timeCondSales, timeCondAbonos, timeCondIncomes)
+	`, timeCondSales, timeCondAbonos, timeCondIncomes))
 
-	rows, err := h.DB.Query(r.Context(), query)
+	rows, err := h.DB.Query(r.Context(), query, queryArgs...)
 	if err != nil {
 		log.Printf("error consultando ingresos consolidados: %v", err)
-		http.Error(w, fmt.Sprintf("error consultando ingresos: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error consultando ingresos", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -556,7 +544,7 @@ func (h *AccountingHandler) ListIncomes(w http.ResponseWriter, r *http.Request) 
 		if err := rows.Scan(&inc.ID, &inc.Type, &inc.Description, &inc.Amount, &inc.Category, &inc.PaymentMethod,
 			&inc.BankDetails, &inc.CustomerName, &inc.RegisteredBy, &inc.RegistererName, &inc.CreatedAt); err != nil {
 			log.Printf("error leyendo ingresos consolidados: %v", err)
-			http.Error(w, fmt.Sprintf("error leyendo ingresos: %v", err), http.StatusInternalServerError)
+			http.Error(w, "error leyendo ingresos", http.StatusInternalServerError)
 			return
 		}
 		incomes = append(incomes, inc)
@@ -621,7 +609,7 @@ func (h *AccountingHandler) CreateIncome(w http.ResponseWriter, r *http.Request)
 	).Scan(&incID, &createdAt)
 	if err != nil {
 		log.Printf("error creando ingreso manual: %v", err)
-		http.Error(w, fmt.Sprintf("error registrando ingreso: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error registrando ingreso", http.StatusInternalServerError)
 		return
 	}
 
@@ -683,7 +671,7 @@ func (h *AccountingHandler) UpdateIncome(w http.ResponseWriter, r *http.Request)
 	)
 	if err != nil {
 		log.Printf("error actualizando ingreso: %v", err)
-		http.Error(w, fmt.Sprintf("error actualizando ingreso: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error actualizando ingreso", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -711,7 +699,7 @@ func (h *AccountingHandler) DeleteIncome(w http.ResponseWriter, r *http.Request)
 	tag, err := h.DB.Exec(r.Context(), `DELETE FROM incomes WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("error eliminando ingreso: %v", err)
-		http.Error(w, fmt.Sprintf("error eliminando ingreso: %v", err), http.StatusInternalServerError)
+		http.Error(w, "error eliminando ingreso", http.StatusInternalServerError)
 		return
 	}
 	if tag.RowsAffected() == 0 {

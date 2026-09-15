@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Calendar,
   UserCheck,
+  UserPlus,
   Printer,
   Tag,
   Percent,
@@ -55,6 +56,17 @@ export default function Sales() {
   const [customerQuery, setCustomerQuery] = useState('')
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false)
   const customerDropdownRef = useRef(null)
+
+  // Creacion rapida de cliente desde el POS
+  const [isQuickCustomerModalOpen, setIsQuickCustomerModalOpen] = useState(false)
+  const [quickCustomerForm, setQuickCustomerForm] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    notes: ''
+  })
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const [quickCustomerError, setQuickCustomerError] = useState('')
 
   const selectedCustomerObj = useMemo(() => {
     if (!selectedCustomerId) return null
@@ -241,6 +253,70 @@ export default function Sales() {
     }
   }
 
+  function handleOpenQuickCustomerModal(query = customerQuery) {
+    const raw = (query || '').trim()
+    const parts = raw.split(/\s+/)
+    let first_name = ''
+    let last_name = ''
+    if (parts.length === 1) {
+      first_name = parts[0]
+    } else if (parts.length > 1) {
+      first_name = parts[0]
+      last_name = parts.slice(1).join(' ')
+    }
+    setQuickCustomerForm({
+      first_name,
+      last_name,
+      phone: '',
+      notes: ''
+    })
+    setQuickCustomerError('')
+    setIsQuickCustomerModalOpen(true)
+    setIsCustomerDropdownOpen(false)
+  }
+
+  async function handleQuickCreateCustomer(e) {
+    e.preventDefault()
+    const firstName = quickCustomerForm.first_name.trim()
+    if (!firstName) {
+      setQuickCustomerError('El nombre del cliente es obligatorio.')
+      return
+    }
+
+    try {
+      setIsCreatingCustomer(true)
+      setQuickCustomerError('')
+      const payload = {
+        first_name: firstName,
+        last_name: quickCustomerForm.last_name.trim(),
+        phone: quickCustomerForm.phone.trim(),
+        notes: quickCustomerForm.notes.trim()
+      }
+
+      const created = await api.post('/customers', payload)
+      const newCustomerObj = {
+        ...created,
+        total_debt: 0,
+        total_paid_eligible: 0,
+        rewards_redeemed: 0
+      }
+
+      setCustomersList((prev) => [newCustomerObj, ...prev])
+      const fullName = `${newCustomerObj.first_name} ${newCustomerObj.last_name || ''}`.trim()
+      setSelectedCustomerId(newCustomerObj.id)
+      setCustomerName(fullName)
+      setCustomerPhone(newCustomerObj.phone || '')
+      setCustomerQuery(fullName)
+      setIsQuickCustomerModalOpen(false)
+      setIsCustomerDropdownOpen(false)
+    } catch (err) {
+      console.error('Error creando cliente rapido:', err)
+      setQuickCustomerError(err.message || 'Error al registrar el cliente.')
+    } finally {
+      setIsCreatingCustomer(false)
+    }
+  }
+
   function addToCart(product) {
     const currentStock = product.stock ?? 0
     if (currentStock <= 0) return
@@ -365,6 +441,10 @@ export default function Sales() {
     setSelectedCustomerId('')
     setCustomerQuery('')
     setIsCustomerDropdownOpen(false)
+    setIsQuickCustomerModalOpen(false)
+    setQuickCustomerError('')
+    setIsCreatingCustomer(false)
+    setQuickCustomerForm({ first_name: '', last_name: '', phone: '', notes: '' })
     setSaleType('total')
     setPartialPaidAmount('')
     setPaymentMethod('efectivo')
@@ -490,10 +570,10 @@ export default function Sales() {
         )
       }
 
-      // Si queda saldo deudor, el cliente es obligatorio
+      // Si queda saldo deudor, el cliente registrado en base de datos es obligatorio
       if (effectivePendingAmount > 0) {
-        if (!selectedCustomerId && !customerName.trim()) {
-          throw new Error('Para ventas a crédito o con saldo pendiente, es obligatorio seleccionar o ingresar el nombre del cliente para registrar la deuda.')
+        if (!selectedCustomerId) {
+          throw new Error('Para ventas a crédito o con saldo pendiente, debes registrar o seleccionar un cliente del sistema para asignarle la deuda.')
         }
       }
 
@@ -1154,14 +1234,41 @@ export default function Sales() {
                   </div>
                 )}
 
-                {/* Opción de usar el texto escrito como cliente ocasional */}
+                {/* Opción de Crear Nuevo Cliente en Base de Datos */}
                 {customerQuery.trim() && !customersList.some(c => `${c.first_name} ${c.last_name || ''}`.trim().toLowerCase() === customerQuery.trim().toLowerCase()) && (
-                  <div
-                    onClick={() => handleUseCustomCustomerName(customerQuery)}
-                    className="p-2.5 bg-red-50/50 dark:bg-[#200808] hover:bg-red-100/70 dark:hover:bg-red-950/80 border-t border-red-200/60 dark:border-red-950 flex items-center gap-2 text-xs font-black text-red-600 dark:text-amber-400 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Usar &quot;{customerQuery.trim()}&quot; como cliente para esta venta</span>
+                  <div className="border-t border-red-200/60 dark:border-red-950 divide-y divide-red-100 dark:divide-red-950/40">
+                    <div
+                      onClick={() => handleOpenQuickCustomerModal(customerQuery)}
+                      className="p-3 bg-gradient-to-r from-red-50 to-amber-50 dark:from-[#250808] dark:to-[#1e0707] hover:from-red-100 hover:to-amber-100 dark:hover:from-[#2e0a0a] dark:hover:to-[#260909] flex items-center justify-between gap-2 text-xs font-black text-red-700 dark:text-amber-300 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <UserPlus className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="truncate">
+                          <span>Crear nuevo cliente <strong>&quot;{customerQuery.trim()}&quot;</strong></span>
+                          {effectivePendingAmount > 0 && (
+                            <span className="block text-[10px] text-red-600 dark:text-red-400 font-bold">
+                              Permite asignarle la deuda (${effectivePendingAmount.toLocaleString('es-CO')})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-extrabold uppercase shadow-xs">
+                        + Registrar
+                      </span>
+                    </div>
+
+                    {/* Si no hay saldo pendiente, permitir usar como cliente ocasional sin registrar */}
+                    {effectivePendingAmount === 0 && (
+                      <div
+                        onClick={() => handleUseCustomCustomerName(customerQuery)}
+                        className="p-2.5 bg-red-50/30 dark:bg-[#180505] hover:bg-red-50 dark:hover:bg-[#200808] flex items-center gap-2 text-[11px] font-bold text-red-900/70 dark:text-red-300/70 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-red-400" />
+                        <span>Usar como cliente ocasional para esta venta (sin guardar en CRM)</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1572,6 +1679,140 @@ export default function Sales() {
           </div>
         )}
       </Modal>
+
+      {/* Modal de Creacion Rapida de Cliente */}
+      {isQuickCustomerModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-in fade-in duration-150"
+          onClick={() => !isCreatingCustomer && setIsQuickCustomerModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-[#180505] border border-red-200 dark:border-red-900/80 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-red-200/60 dark:border-red-950/60 bg-red-50/40 dark:bg-[#200808]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-red-600/10 dark:bg-red-950/60 text-red-600 dark:text-amber-400 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-[#450a0a] dark:text-[#fef2f2]">
+                    Registrar Nuevo Cliente
+                  </h3>
+                  <p className="text-[10px] text-red-900/60 dark:text-red-300/60 font-semibold">
+                    Crear y vincular a esta venta para registrar deuda
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isCreatingCustomer}
+                onClick={() => setIsQuickCustomerModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreateCustomer} className="p-6 space-y-3.5">
+              {quickCustomerError && (
+                <div className="p-3 rounded-2xl bg-red-100 dark:bg-red-950/80 border border-red-300 dark:border-red-900 text-red-700 dark:text-red-200 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
+                  <span>{quickCustomerError}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                    Nombre <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={quickCustomerForm.first_name}
+                    onChange={(e) => setQuickCustomerForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                    placeholder="Ej. Carlos"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                    Apellido
+                  </label>
+                  <input
+                    type="text"
+                    value={quickCustomerForm.last_name}
+                    onChange={(e) => setQuickCustomerForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                    placeholder="Ej. Mendoza"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                  Telefono / WhatsApp <span className="text-[10px] lowercase text-red-900/50 dark:text-red-300/50">(opcional)</span>
+                </label>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3 text-red-400 pointer-events-none">
+                    <Phone className="w-3.5 h-3.5" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={quickCustomerForm.phone}
+                    onChange={(e) => setQuickCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Ej. 300 123 4567"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  />
+                </div>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-semibold">
+                  Recomendado para enviar comprobantes digitales y recordatorios de saldo.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase text-red-950 dark:text-red-200 mb-1">
+                  Notas / Referencia <span className="text-[10px] lowercase text-red-900/50 dark:text-red-300/50">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={quickCustomerForm.notes}
+                  onChange={(e) => setQuickCustomerForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Ej. Estudiante, salon 302, oficina..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-red-50/50 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 text-xs font-bold text-[#450a0a] dark:text-[#fef2f2] focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isCreatingCustomer}
+                  onClick={() => setIsQuickCustomerModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-950 text-xs font-bold text-red-950/70 dark:text-red-200/70 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingCustomer || !quickCustomerForm.first_name.trim()}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-black shadow-md shadow-red-950/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {isCreatingCustomer ? (
+                    <span>Guardando...</span>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Crear y Asignar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

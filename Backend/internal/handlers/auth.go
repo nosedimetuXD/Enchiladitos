@@ -32,6 +32,12 @@ type loginResponse struct {
 	User  models.User `json:"user"`
 }
 
+// dummyPasswordHash es un hash bcrypt válido de una contraseña que nadie usa. Se compara
+// contra él cuando el usuario no existe, para que el tiempo de respuesta de un intento de
+// login con usuario inexistente sea indistinguible del de un usuario existente con
+// contraseña incorrecta (evita enumeración de usuarios por canal de tiempo).
+const dummyPasswordHash = "$2a$10$lK4gY/xXmZbu9QTCrW7KRO8VxKJ6baEGt3wvPUCb2BxisMZIX9wNW"
+
 // POST /login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
@@ -40,26 +46,27 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _ = h.DB.Exec(r.Context(), `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''`)
-
 	var user models.User
-	var passwordHash string
+	passwordHash := dummyPasswordHash
 	err := h.DB.QueryRow(r.Context(),
 		`SELECT id, username, role, COALESCE(avatar_url, ''), password_hash, created_at
 		 FROM users WHERE LOWER(username) = LOWER($1)`, req.Username,
 	).Scan(&user.ID, &user.Username, &user.Role, &user.AvatarURL, &passwordHash, &user.CreatedAt)
 
+	userExists := true
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "usuario o contraseña incorrectos", http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
+		userExists = false
+		passwordHash = dummyPasswordHash
+	} else if err != nil {
 		log.Printf("error consultando usuario: %v", err)
 		http.Error(w, "error interno", http.StatusInternalServerError)
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+	// Se ejecuta siempre, exista o no el usuario, para mantener un tiempo de respuesta
+	// constante (ver dummyPasswordHash).
+	pwErr := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password))
+	if !userExists || pwErr != nil {
 		http.Error(w, "usuario o contraseña incorrectos", http.StatusUnauthorized)
 		return
 	}

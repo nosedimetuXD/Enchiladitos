@@ -120,8 +120,12 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_incomes_created_at ON incomes(created_at DESC);
 
--- 10. Datos iniciales (Opcional - Usuario Admin predeterminado)
--- Password por defecto: 'admin12345' (hash bcrypt)
-INSERT INTO users (username, password_hash, role)
-VALUES ('admin', '$2a$10$7vN3fQ1c1jYjP2ZgA8bF7uM3F1sY9V0sM4rN1hE5.L0eE7g6yC4Wa', 'owner')
-ON CONFLICT (username) DO NOTHING;
+-- 10. Datos iniciales
+-- NO se crea aquí ningún usuario con contraseña por defecto: commitear un hash bcrypt de
+-- una contraseña conocida ('admin'/'admin12345') en el control de versiones es un riesgo
+-- de seguridad si esta migración se aplica a otro entorno con esa credencial aún vigente.
+-- Crea el primer usuario dueño con la herramienta `cmd/hashpw` del backend (genera un hash
+-- bcrypt a partir de una contraseña que tú eliges, sin dejarla en texto plano ni en git):
+--   go run ./cmd/hashpw
+-- y luego inserta manualmente el resultado, p. ej.:
+--   INSERT INTO users (username, password_hash, role) VALUES ('tu_usuario', '<hash generado>', 'owner');

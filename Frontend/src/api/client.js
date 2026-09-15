@@ -1,4 +1,13 @@
-export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/+$/, '')
+// En producción, si falta VITE_API_URL preferimos fallar de forma ruidosa a arrancar
+// silenciosamente contra 'http://localhost:8080' (mixed content / build mal configurado
+// apuntando a un backend inexistente). En desarrollo sí se usa ese valor por comodidad.
+const rawApiUrl = import.meta.env.VITE_API_URL
+if (!rawApiUrl && import.meta.env.PROD) {
+  throw new Error(
+    'VITE_API_URL no está configurada. Defínela en las variables de entorno del build de producción (Vercel → Project Settings → Environment Variables).'
+  )
+}
+export const API_URL = (rawApiUrl || 'http://localhost:8080').replace(/\/+$/, '')
 
 function getToken() {
   return localStorage.getItem('token')
