@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Lock, User, Flame, AlertCircle } from 'lucide-react'
+import { Lock, User, Flame, AlertCircle, Eye, EyeOff } from 'lucide-react'
 
 export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -33,14 +34,14 @@ export default function Login() {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-md w-full bg-[#180505] border border-red-900/60 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-sm">
+      <div className="max-w-md w-full bg-[#180505] border border-red-900/60 rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10 backdrop-blur-sm modal-enter">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="relative inline-block mb-3">
             <img
               src="/logo.png"
               alt="Enchiladitos Logo"
-              className="w-20 h-20 rounded-3xl shadow-xl shadow-red-950/50 object-contain mx-auto border-2 border-red-600/40 p-1 bg-[#120303]"
+              className="w-20 h-20 rounded-2xl shadow-xl shadow-red-950/50 object-contain mx-auto border-2 border-red-600/40 p-1 bg-[#120303]"
             />
           </div>
           <span className="block text-2xl font-black tracking-tight text-white uppercase">
@@ -58,7 +59,11 @@ export default function Login() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-950/70 text-red-300 border border-red-800 p-3 rounded-2xl text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-shake">
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="bg-red-950/70 text-red-300 border border-red-800 p-3 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5 animate-shake"
+            >
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -77,8 +82,10 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Ingresa tu usuario"
+                autoComplete="username"
+                aria-invalid={!!error}
                 required
-                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#140505] border border-red-950 text-sm font-semibold text-white placeholder-red-300/30 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl bg-[#140505] border border-red-950 text-sm font-semibold text-white placeholder-red-300/60 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all"
               />
             </div>
           </div>
@@ -92,20 +99,31 @@ export default function Login() {
                 <Lock className="w-4 h-4 text-red-500" />
               </div>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete="current-password"
+                aria-invalid={!!error}
                 required
-                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#140505] border border-red-950 text-sm font-semibold text-white placeholder-red-300/30 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all"
+                className="w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-xl bg-[#140505] border border-red-950 text-sm font-semibold text-white placeholder-red-300/60 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent transition-all"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-700 hover:via-orange-700 hover:to-amber-700 text-white font-black text-sm shadow-lg hover:shadow-red-600/30 transition-all duration-200 disabled:opacity-50 cursor-pointer"
+            className="w-full mt-6 py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-700 hover:via-orange-700 hover:to-amber-700 text-white font-bold text-sm shadow-md hover:shadow-red-600/20 active:scale-[0.99] transition-all duration-150 disabled:opacity-50 cursor-pointer"
           >
             {loading ? 'Iniciando sesión...' : 'Ingresar a Caja / Sistema'}
           </button>

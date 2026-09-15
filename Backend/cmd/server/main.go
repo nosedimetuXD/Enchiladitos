@@ -52,6 +52,15 @@ func main() {
 		log.Println("no se encontró .env, usando variables de entorno del sistema")
 	}
 
+	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if len(jwtSecret) < 32 {
+		if os.Getenv("ENV") == "production" || os.Getenv("ENVIRONMENT") == "production" {
+			log.Fatalf("error fatal: JWT_SECRET es obligatoria y debe tener al menos 32 caracteres")
+		} else {
+			log.Println("ADVERTENCIA: JWT_SECRET no está configurada o tiene menos de 32 caracteres")
+		}
+	}
+
 	ctx := context.Background()
 
 	pool, err := db.Connect(ctx)
@@ -119,11 +128,10 @@ func main() {
 		r.Put("/customers/{id}", customerHandler.Update)
 		r.Post("/customers/{id}/payments", customerHandler.CreatePayment)
 
-		// Ventas (POS) — crear, listar y corregir ventas propias del turno
+		// Ventas (POS) — crear y listar ventas del turno
 		r.Get("/sales", saleHandler.List)
 		r.Get("/sales/{id}", saleHandler.Get)
 		r.Post("/sales", saleHandler.Create)
-		r.Put("/sales/{id}", saleHandler.Update)
 	})
 
 	// Rutas protegidas — solo Dueño/Administrador: gestión de inventario, borrados y
@@ -158,12 +166,13 @@ func main() {
 		r.Delete("/incomes/{id}", accountingHandler.DeleteIncome)
 	})
 
-	// Operaciones críticas de clientes: solo el Dueño (Owner)
+	// Operaciones críticas (clientes y ventas): solo el Dueño (Owner)
 	r.Group(func(r chi.Router) {
 		r.Use(custommw.RequireAuth)
 		r.Use(custommw.RequireRole(models.RoleOwner))
 
 		r.Delete("/customers/{id}", customerHandler.Delete)
+		r.Put("/sales/{id}", saleHandler.Update)
 	})
 
 	port := os.Getenv("PORT")

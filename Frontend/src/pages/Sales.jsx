@@ -1429,7 +1429,7 @@ export default function Sales() {
               </div>
 
               {paymentMethod === 'efectivo' && (
-                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-2">
+                <div className="p-3.5 rounded-2xl bg-red-50/40 dark:bg-[#200808] border border-red-200/60 dark:border-red-950 space-y-2.5">
                   <label className="block text-xs font-bold text-red-950 dark:text-red-200">
                     Efectivo Recibido ($)
                   </label>
@@ -1438,8 +1438,27 @@ export default function Sales() {
                     value={cashAmount}
                     onChange={(e) => setCashAmount(e.target.value)}
                     placeholder={String(effectivePaidAmount)}
-                    className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 text-sm font-black focus:outline-none"
+                    className="w-full px-4 py-2 rounded-xl bg-white dark:bg-[#140505] border border-red-200 dark:border-red-950/80 text-sm font-black focus:outline-none focus:ring-2 focus:ring-red-500/20"
                   />
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setCashAmount(String(effectivePaidAmount))}
+                      className="px-2.5 py-1 text-xs font-bold rounded-lg border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#140505] text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shadow-xs"
+                    >
+                      Monto Exacto
+                    </button>
+                    {[10000, 20000, 50000, 100000].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setCashAmount(String(val))}
+                        className="px-2.5 py-1 text-xs font-bold rounded-lg border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#140505] text-red-950 dark:text-red-200 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shadow-xs"
+                      >
+                        ${val.toLocaleString('es-CO')}
+                      </button>
+                    ))}
+                  </div>
                   {Number(cashAmount) >= effectivePaidAmount && (
                     <div className="flex justify-between items-center text-xs font-black text-emerald-600 dark:text-emerald-400 pt-1">
                       <span>Cambio / Vueltos:</span>
