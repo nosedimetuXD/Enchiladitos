@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
+import { removeAccents } from '../utils/stringUtils'
 import {
   Search,
   FileText,
@@ -267,11 +268,11 @@ export default function SalesHistory() {
   // Filtrado
   const filteredSales = useMemo(() => {
     return sales.filter((s) => {
-      const q = searchQuery.toLowerCase()
+      const q = removeAccents(searchQuery.toLowerCase())
       const matchesSearch =
-        (s.customer_name || '').toLowerCase().includes(q) ||
-        (s.bank_details && s.bank_details.toLowerCase().includes(q)) ||
-        (s.items && s.items.some((it) => (it.product_name || '').toLowerCase().includes(q)))
+        removeAccents((s.customer_name || '').toLowerCase()).includes(q) ||
+        (s.bank_details && removeAccents(s.bank_details.toLowerCase()).includes(q)) ||
+        (s.items && s.items.some((it) => removeAccents((it.product_name || '').toLowerCase()).includes(q)))
 
       const matchesMethod = selectedMethod === 'Todos' || (s.payment_method || '').toLowerCase() === selectedMethod.toLowerCase()
       
@@ -1051,7 +1052,7 @@ export default function SalesHistory() {
                 {selectedSale.stamp_reward_redeemed && (
                   <div className="flex justify-between text-amber-600 font-bold">
                     <span>Recompensa Fidelidad:</span>
-                    <span>50% OFF (7 Sellos Canjeados)</span>
+                    <span>{selectedSale.discount_percent ? `${selectedSale.discount_percent}% OFF` : '15% OFF'} (7 Sellos Canjeados)</span>
                   </div>
                 )}
                 {selectedSale.discount_amount > 0 && (

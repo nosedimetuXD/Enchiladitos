@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '../api/client'
 import Modal from '../components/Modal'
 import confetti from 'canvas-confetti'
+import { removeAccents } from '../utils/stringUtils'
 import {
   Search,
   Plus,
@@ -74,11 +75,11 @@ export default function Sales() {
   }, [selectedCustomerId, customersList])
 
   const filteredCustomers = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase()
+    const q = removeAccents(customerQuery.trim().toLowerCase())
     if (!q) return customersList.slice(0, 8)
     return customersList.filter((c) => {
-      const fullName = `${c.first_name} ${c.last_name || ''}`.toLowerCase()
-      const phone = (c.phone || '').toLowerCase()
+      const fullName = removeAccents(`${c.first_name} ${c.last_name || ''}`.toLowerCase())
+      const phone = removeAccents((c.phone || '').toLowerCase())
       return fullName.includes(q) || phone.includes(q)
     }).slice(0, 10)
   }, [customerQuery, customersList])
@@ -227,8 +228,8 @@ export default function Sales() {
   function handleApplyStampReward() {
     setRedeemStampReward(true)
     setDiscountType('percent')
-    setDiscountValue('50')
-    setDiscountReason('Recompensa 7 Sellos (50% OFF)')
+    setDiscountValue('15')
+    setDiscountReason('Recompensa 7 Sellos (15% OFF)')
     setShowDiscountInput(true)
   }
 
@@ -421,11 +422,11 @@ export default function Sales() {
     return products.filter((p) => {
       if (!isProductActive(p)) return false
       const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory
-      const query = searchQuery.toLowerCase()
+      const query = removeAccents(searchQuery.toLowerCase())
       const matchesSearch =
-        p.name.toLowerCase().includes(query) ||
-        (p.description && p.description.toLowerCase().includes(query)) ||
-        (p.tags && p.tags.toLowerCase().includes(query))
+        removeAccents(p.name.toLowerCase()).includes(query) ||
+        (p.description && removeAccents(p.description.toLowerCase()).includes(query)) ||
+        (p.tags && removeAccents(p.tags.toLowerCase()).includes(query))
       return matchesCategory && matchesSearch
     })
   }, [products, selectedCategory, searchQuery])
@@ -1239,7 +1240,7 @@ export default function Sales() {
                 )}
 
                 {/* Opción de Crear Nuevo Cliente en Base de Datos */}
-                {customerQuery.trim() && !customersList.some(c => `${c.first_name} ${c.last_name || ''}`.trim().toLowerCase() === customerQuery.trim().toLowerCase()) && (
+                {customerQuery.trim() && !customersList.some(c => removeAccents(`${c.first_name} ${c.last_name || ''}`.trim().toLowerCase()) === removeAccents(customerQuery.trim().toLowerCase())) && (
                   <div className="border-t border-red-200/60 dark:border-red-950 divide-y divide-red-100 dark:divide-red-950/40">
                     <div
                       onClick={() => handleOpenQuickCustomerModal(customerQuery)}
@@ -1324,8 +1325,8 @@ export default function Sales() {
                   {selectedCustomerObj.stamps_info?.has_reward_unlocked ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-600 text-white shadow-xs">
                       {selectedCustomerObj.stamps_info.available_rewards > 1
-                        ? `${selectedCustomerObj.stamps_info.available_rewards} Premios Listos (50% OFF)`
-                        : '50% OFF Disponible'}
+                        ? `${selectedCustomerObj.stamps_info.available_rewards} Premios Listos (15% OFF)`
+                        : '15% OFF Disponible'}
                     </span>
                   ) : (
                     <span className="text-[10px] font-bold text-amber-900/80 dark:text-amber-300/80">
@@ -1357,7 +1358,7 @@ export default function Sales() {
                   })}
                 </div>
 
-                {/* Botón de Canje de 50% de Descuento o Progreso */}
+                {/* Botón de Canje de 15% de Descuento o Progreso */}
                 {selectedCustomerObj.stamps_info?.has_reward_unlocked ? (
                   <div className="pt-1">
                     {!redeemStampReward ? (
@@ -1367,13 +1368,13 @@ export default function Sales() {
                         className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
                       >
                         <Gift className="w-4 h-4" />
-                        <span>Canjear Recompensa 50% de Descuento (7 Sellos)</span>
+                        <span>Canjear Recompensa 15% de Descuento (7 Sellos)</span>
                       </button>
                     ) : (
                       <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs font-black text-emerald-800 dark:text-emerald-200">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Recompensa 50% OFF Aplicada (-${discountCalculated.amount.toLocaleString('es-CO')})</span>
+                          <span>Recompensa 15% OFF Aplicada (-${discountCalculated.amount.toLocaleString('es-CO')})</span>
                         </div>
                         <button
                           type="button"

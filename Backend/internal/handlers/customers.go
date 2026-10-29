@@ -109,7 +109,10 @@ func (h *CustomerHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	if search != "" {
 		searchPattern := "%" + search + "%"
-		query := baseQuery + ` WHERE c.first_name ILIKE $1 OR c.last_name ILIKE $1 OR c.phone ILIKE $1 OR c.email ILIKE $1
+		query := baseQuery + ` WHERE translate(LOWER(c.first_name), 'áéíóúÁÉÍÓÚäëïöüÄËÏÖÜñÑ', 'aeiouaeiouaeiouaeiounn') LIKE translate(LOWER($1), 'áéíóúÁÉÍÓÚäëïöüÄËÏÖÜñÑ', 'aeiouaeiouaeiouaeiounn') 
+		                          OR translate(LOWER(c.last_name), 'áéíóúÁÉÍÓÚäëïöüÄËÏÖÜñÑ', 'aeiouaeiouaeiouaeiounn') LIKE translate(LOWER($1), 'áéíóúÁÉÍÓÚäëïöüÄËÏÖÜñÑ', 'aeiouaeiouaeiouaeiounn') 
+		                          OR c.phone ILIKE $1 
+		                          OR c.email ILIKE $1
 		                       ORDER BY total_debt DESC, c.first_name ASC, c.last_name ASC`
 		rows, err = h.DB.Query(r.Context(), query, searchPattern)
 	} else {

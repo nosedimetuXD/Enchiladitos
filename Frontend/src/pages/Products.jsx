@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import Modal from '../components/Modal'
 import MetricLineChart from '../components/MetricLineChart'
 import { compressAndReadFile } from '../utils/imageUtils'
+import { removeAccents } from '../utils/stringUtils'
 import {
   Flame,
   Plus,
@@ -225,11 +226,11 @@ export default function Products() {
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory
-      const query = searchQuery.toLowerCase()
+      const query = removeAccents(searchQuery.toLowerCase())
       const matchesSearch =
-        p.name.toLowerCase().includes(query) ||
-        (p.description && p.description.toLowerCase().includes(query)) ||
-        (p.tags && p.tags.toLowerCase().includes(query))
+        removeAccents(p.name.toLowerCase()).includes(query) ||
+        (p.description && removeAccents(p.description.toLowerCase()).includes(query)) ||
+        (p.tags && removeAccents(p.tags.toLowerCase()).includes(query))
 
       const currentStock = p.stock ?? 0
       const minAlert = p.min_stock_alert ?? 5

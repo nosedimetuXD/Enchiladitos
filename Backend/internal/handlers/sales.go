@@ -432,10 +432,10 @@ func (h *SaleHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 
 		stampRewardRedeemed = true
-		req.DiscountPercent = 50.0
-		req.DiscountAmount = (subtotal * 50.0) / 100.0
+		req.DiscountPercent = 15.0
+		req.DiscountAmount = (subtotal * 15.0) / 100.0
 		if discountReason == "" {
-			discountReason = "Recompensa 7 Sellos (50% OFF)"
+			discountReason = "Recompensa 7 Sellos (15% OFF)"
 		}
 	}
 

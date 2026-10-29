@@ -577,7 +577,7 @@ export default function Customers() {
             { id: 'all', label: `Todos (${customers.length})` },
             { id: 'with_debt', label: `Con Deuda (${clientesConDeudaCount})` },
             { id: 'clean', label: `Al Día (${clientesAlDiaCount})` },
-            { id: 'with_reward', label: `Premio 50% (${clientesConPremioCount})` }
+            { id: 'with_reward', label: `Premio 15% (${clientesConPremioCount})` }
           ].map((f) => (
             <button
               type="button"
@@ -653,7 +653,7 @@ export default function Customers() {
                           </span>
                           {hasReward && (
                             <span className="inline-block px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[9px] font-bold">
-                              50% OFF
+                              15% OFF
                             </span>
                           )}
                         </div>
@@ -799,7 +799,7 @@ export default function Customers() {
                               : 'bg-red-50 dark:bg-[#200808] text-red-800 dark:text-amber-400 border-red-200/50 dark:border-red-950/40'
                           }`}>
                             <Flame className="w-3 h-3" />
-                            {stamps}/7 Sellos {hasReward && '· 50% OFF'}
+                            {stamps}/7 Sellos {hasReward && '· 15% OFF'}
                           </span>
                         </td>
                         <td className="px-2.5 py-1.5 font-bold text-[#450a0a] dark:text-[#fef2f2] text-xs text-right tabular-nums whitespace-nowrap">
